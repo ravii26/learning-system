@@ -1,0 +1,104 @@
+import React from 'react';
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { db } from '@/lib/db';
+import { isAuthenticated } from '@/lib/auth';
+import NavLinks from '@/app/(dashboard)/NavLinks';
+import LogoutButton from '@/app/(dashboard)/LogoutButton';
+
+export const revalidate = 0; // Disable caching to ensure stats are always up to date
+
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  if (!isAuthenticated()) {
+    redirect('/login');
+  }
+
+  // Fetch active topics count (limit tracker)
+  const activeCount = await db.topic.count({
+    where: { status: 'active' },
+  });
+
+  // Fetch days since last review
+  const lastReview = await db.reviewLog.findFirst({
+    orderBy: { reviewedAt: 'desc' },
+  });
+
+  let daysSinceLastReview: number | null = null;
+  if (lastReview) {
+    const diffTime = Math.abs(new Date().getTime() - lastReview.reviewedAt.getTime());
+    daysSinceLastReview = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  }
+
+  return (
+    <div className="app-container">
+      {/* Sidebar Navigation */}
+      <aside className="app-sidebar">
+        <div style={{ padding: '24px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))' }}></div>
+          <span style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '-0.025em', background: 'linear-gradient(to right, #fff, #a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            Learning OS
+          </span>
+        </div>
+        
+        <div style={{ flexGrow: 1, padding: '24px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <NavLinks />
+          </nav>
+          
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+            <p>Single User Mode</p>
+            <p style={{ fontSize: '0.75rem', marginTop: '4px' }}>Active Slots Limit: 2</p>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Panel */}
+      <div className="app-main">
+        {/* Header */}
+        <header className="app-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>Active Load:</span>
+              <div 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  background: activeCount >= 2 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(99, 102, 241, 0.1)', 
+                  border: activeCount >= 2 ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(99, 102, 241, 0.2)',
+                  padding: '4px 12px', 
+                  borderRadius: '9999px',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  color: activeCount >= 2 ? 'var(--color-danger)' : 'var(--color-primary-light)'
+                }}
+              >
+                {activeCount} / 2 Active
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--color-text-secondary)' }}>Last Reviewed:</span>
+              <span style={{ color: daysSinceLastReview === null ? 'var(--color-warning)' : daysSinceLastReview > 7 ? 'var(--color-danger)' : 'var(--color-success)', fontWeight: 500 }}>
+                {daysSinceLastReview === null ? 'Never' : `${daysSinceLastReview} days ago`}
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <LogoutButton />
+          </div>
+        </header>
+
+        {/* Content */}
+        <main className="app-content">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}

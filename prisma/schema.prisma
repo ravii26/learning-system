@@ -1,0 +1,60 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Topic {
+  id              String         @id @default(uuid())
+  title           String
+  area            String         // Tech, Business, Finance, Creative, Personal, Other
+  why             String?        // Required before moving to active
+  depthTarget     String?        // Awareness, Working Knowledge, Proficiency, Deep, Mastery (required before active)
+  status          String         // inbox, queued, active, paused, maintenance, reference, dropped
+  progressPct     Int            @default(0) // 0-100
+  currentStage    String         // Define, Map, Fundamentals, Core Knowledge, Application, Advanced, Proof
+  lastCompleted   String?
+  nextAction      String?        // Required for active or paused
+  startedDate     DateTime?
+  lastTouchedDate DateTime       @default(now()) @updatedAt
+  proofOfLearning String?
+  resources       Json?          // List of link/text resources: [{title, type, url, purpose, status, notes}]
+  subtasks        Json?          // List of checklist subtasks: [{id, title, completed, createdAt}]
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Advanced learning science structures
+  contract        Json?          // { estimatedEffort, successCriterion, currentLevel, prerequisites: [{ title, status }] }
+  knowledgeMap    Json?          // { concepts: [{ id, title, parentId, status, difficulty, importance, nextReviewDate, reviewIntervalDays, consecutiveRecalls }] }
+  confusions      Json?          // [{ id, text, resolved, resolvedAt, answer }]
+  mistakes        Json?          // [{ id, concept, mistake, whyMade, correctUnderstanding, example, howToAvoid, createdAt }]
+  pauseHistory    Json?          // [{ id, pausedAt, resumedAt, reason, completedConcepts, currentConcept, openQuestion, reactivationScore }]
+  activeSlotType  String?        // 'primary' | 'secondary' | null
+
+  activityLogs    ActivityLog[]
+}
+
+model ActivityLog {
+  id           String   @id @default(uuid())
+  topicId      String
+  topic        Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  fieldChanged String
+  oldValue     String?
+  newValue     String?
+  timestamp    DateTime @default(now())
+}
+
+model ReviewLog {
+  id             String   @id @default(uuid())
+  reviewedAt     DateTime @default(now())
+  topicsReviewed Json     // Snapshot of decisions made: [{topicId, title, decision}]
+}
+
+model SystemSetting {
+  key   String @id
+  value String
+}
