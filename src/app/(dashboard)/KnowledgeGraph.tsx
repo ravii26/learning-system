@@ -38,6 +38,8 @@ interface GraphLink {
 export default function KnowledgeGraph({ topics }: KnowledgeGraphProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [hoverNode, setHoverNode] = useState<GraphNode | null>(null);
+  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [links, setLinks] = useState<GraphLink[]>([]);
 
@@ -180,6 +182,25 @@ export default function KnowledgeGraph({ topics }: KnowledgeGraphProps) {
     };
   }, [nodes, links]);
 
+  // Hover detector
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    let found: GraphNode | null = null;
+    for (const n of nodes) {
+      const dist = Math.sqrt((n.x - mx) ** 2 + (n.y - my) ** 2);
+      if (dist <= n.size + 8) { found = n; break; }
+    }
+    setHoverNode(found);
+    setHoverPos({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY });
+  };
+
   // Click detector
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -223,8 +244,33 @@ export default function KnowledgeGraph({ topics }: KnowledgeGraphProps) {
           width={500}
           height={350}
           onClick={handleCanvasClick}
-          style={{ width: '100%', display: 'block', cursor: 'pointer' }}
+          onMouseMove={handleCanvasMouseMove}
+          onMouseLeave={() => setHoverNode(null)}
+          style={{ width: '100%', display: 'block', cursor: hoverNode ? 'pointer' : 'default' }}
         />
+
+        {/* Hover tooltip */}
+        {hoverNode && (
+          <div style={{
+            position: 'absolute',
+            left: `${hoverPos.x + 12}px`,
+            top: `${hoverPos.y - 12}px`,
+            background: 'rgba(12,12,20,0.96)',
+            border: `1px solid ${hoverNode.color}44`,
+            borderLeft: `3px solid ${hoverNode.color}`,
+            padding: '6px 10px',
+            borderRadius: 'var(--radius-sm)',
+            fontSize: '0.75rem',
+            pointerEvents: 'none',
+            zIndex: 10,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            whiteSpace: 'nowrap',
+          }}>
+            <span style={{ fontWeight: 600, color: '#fff' }}>{hoverNode.label}</span>
+            {hoverNode.area && <span style={{ marginLeft: '6px', color: 'var(--color-text-muted)', fontSize: '0.68rem' }}>{hoverNode.area}</span>}
+            {hoverNode.status && <span style={{ display: 'block', color: 'var(--color-secondary-light)', fontSize: '0.68rem', marginTop: '1px' }}>{hoverNode.status}</span>}
+          </div>
+        )}
 
         {/* Selected node card detail overlay */}
         {selectedNode && (
@@ -268,6 +314,22 @@ export default function KnowledgeGraph({ topics }: KnowledgeGraphProps) {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', padding: '4px 0' }}>
+        {[
+          { color: '#a855f7', label: 'Core' },
+          { color: '#6366f1', label: 'Active' },
+          { color: '#f59e0b', label: 'Queued' },
+          { color: '#10b981', label: 'Maintained' },
+          { color: '#14b8a6', label: 'Concept' },
+        ].map(({ color, label }) => (
+          <span key={label} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, display: 'inline-block', boxShadow: `0 0 5px ${color}88`, flexShrink: 0 }} />
+            {label}
+          </span>
+        ))}
       </div>
 
     </div>

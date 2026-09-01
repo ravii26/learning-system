@@ -48,11 +48,12 @@ const SOCRATIC_LIBRARY: Record<string, {
 export default function SocraticCoach({
   concept,
   topicId,
+  topicTitle,
   onSaveProgress,
   explanationsRead,
   onIncrementExplanationsRead,
   onResetExplanationsRead,
-}: SocraticCoachProps) {
+}: SocraticCoachProps & { topicTitle?: string }) {
   // Tutor Stages: 'explain' | 'demonstrate' | 'connect' | 'question' | 'retrieve' | 'apply' | 'correct'
   const [stage, setStage] = useState<'explain' | 'demonstrate' | 'connect' | 'question' | 'retrieve' | 'apply' | 'correct'>('explain');
   
@@ -67,9 +68,24 @@ export default function SocraticCoach({
   const [howToAvoid, setHowToAvoid] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Retrieve templates
+  // Dynamic AI content & loading
+  const [aiTemplate, setAiTemplate] = useState<{
+    explain: string;
+    demonstrate: string;
+    connect: string;
+    question: string;
+    apply: string;
+    idealAnswer: string;
+  } | null>(null);
+  const [loadingAi, setLoadingAi] = useState(true);
+
+  // AI Evaluation Feedback
+  const [aiEval, setAiEval] = useState<{ captured?: string; missed?: string; tip?: string } | null>(null);
+  const [loadingEval, setLoadingEval] = useState(false);
+
+  // Fallback template library
   const titleKey = concept.title.toLowerCase();
-  const template = SOCRATIC_LIBRARY[titleKey] || {
+  const fallbackTemplate = SOCRATIC_LIBRARY[titleKey] || {
     explain: `Let's break down "${concept.title}". This represents a core capability in your study curriculum. Understanding this involves mastering the fundamental rules, structures, and execution steps.`,
     demonstrate: `Consider a real-world scenario of "${concept.title}". By observing how the components interact under stress, we can see the exact mechanics in action.`,
     connect: `Connect this concept to your existing foundational prerequisites. Mastering "${concept.title}" allows you to scale up to advanced problem-solving in this area.`,
@@ -78,7 +94,9 @@ export default function SocraticCoach({
     idealAnswer: `The ideal resolution involves: (1) Isolating the failure boundary, (2) Analyzing system invariants, and (3) Adapting thresholds to ensure high resilience and correctness under load.`,
   };
 
-  // Reset stage when concept changes
+  const template = aiTemplate || fallbackTemplate;
+
+  // Fetch AI content on concept change
   useEffect(() => {
     setStage('explain');
     setRetrievalInput('');
@@ -86,7 +104,41 @@ export default function SocraticCoach({
     setMistakeText('');
     setWhyMade('');
     setHowToAvoid('');
-    onIncrementExplanationsRead(); // Track content consumption
+    setAiEval(null);
+    onIncrementExplanationsRead();
+
+    let isMounted = true;
+    setLoadingAi(true);
+
+    fetch('/api/socratic', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'generate',
+        conceptTitle: concept.title,
+        topicTitle: topicTitle || '',
+      }),
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (isMounted) {
+          if (data && data.explain && data.idealAnswer) {
+            setAiTemplate(data);
+          } else {
+            setAiTemplate(null);
+          }
+          setLoadingAi(false);
+        }
+      })
+      .catch(err => {
+        console.error('Socratic AI fetch error:', err);
+        if (isMounted) {
+          setAiTemplate(null);
+          setLoadingAi(false);
+        }
+      });
+
+    return () => { isMounted = false; };
   }, [concept.id]);
 
   const handleNextStage = () => {
@@ -101,17 +153,40 @@ export default function SocraticCoach({
       alert('Retrieval requires effort! Please write a more detailed explanation from memory.');
       return;
     }
-    // Reset retrieval guard upon active recall check
     onResetExplanationsRead();
     setStage('apply');
   };
 
-  const submitApply = () => {
+  const submitApply = async () => {
     if (applyInput.trim().length < 15) {
       alert('Please write out your solution proposal before viewing the evaluation.');
       return;
     }
     setStage('correct');
+
+    // Trigger AI evaluation if available
+    setLoadingEval(true);
+    try {
+      const res = await fetch('/api/socratic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'evaluate',
+          conceptTitle: concept.title,
+          topicTitle: topicTitle || '',
+          userRecall: `${retrievalInput}\n\nSolution Attempt:\n${applyInput}`,
+          idealAnswer: template.idealAnswer,
+        }),
+      });
+      if (res.ok) {
+        const evalData = await res.json();
+        setAiEval(evalData);
+      }
+    } catch (e) {
+      console.error('AI Eval error:', e);
+    } finally {
+      setLoadingEval(false);
+    }
   };
 
   const handleSaveAssessment = async () => {
@@ -307,6 +382,35 @@ export default function SocraticCoach({
 
         {stage === 'correct' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* AI Evaluation feedback card */}
+            {loadingEval ? (
+              <div style={{ padding: '14px', borderRadius: 'var(--radius-sm)', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)', fontSize: '0.82rem', color: 'var(--color-primary-light)' }}>
+                ✨ Groq AI is analyzing your response and comparing with ideal model...
+              </div>
+            ) : aiEval && (
+              <div style={{ padding: '16px', borderRadius: 'var(--radius-sm)', background: 'rgba(99, 102, 241, 0.06)', border: '1px solid rgba(99, 102, 241, 0.25)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>🤖</span>
+                  <strong style={{ fontSize: '0.85rem', color: 'var(--color-primary-light)' }}>Groq AI Socratic Evaluation</strong>
+                </div>
+                {aiEval.captured && (
+                  <div style={{ fontSize: '0.8rem', color: '#10b981' }}>
+                    <strong>✅ What you captured:</strong> {aiEval.captured}
+                  </div>
+                )}
+                {aiEval.missed && (
+                  <div style={{ fontSize: '0.8rem', color: '#f59e0b' }}>
+                    <strong>⚠️ What to improve:</strong> {aiEval.missed}
+                  </div>
+                )}
+                {aiEval.tip && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
+                    <strong>💡 Key Tip:</strong> "{aiEval.tip}"
+                  </div>
+                )}
+              </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
                 <span className="form-label">YOUR DRAFT SOLUTION</span>

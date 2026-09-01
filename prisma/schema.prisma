@@ -34,6 +34,9 @@ model Topic {
   mistakes        Json?          // [{ id, concept, mistake, whyMade, correctUnderstanding, example, howToAvoid, createdAt }]
   pauseHistory    Json?          // [{ id, pausedAt, resumedAt, reason, completedConcepts, currentConcept, openQuestion, reactivationScore }]
   activeSlotType  String?        // 'primary' | 'secondary' | null
+  sessionLogs     Json?          // [{ id, activityType, whatDone, oneInsight, whatWasHard, nextAction, durationMinutes, moduleId?, timestamp }]
+  topicMode       String?        // 'self_directed' | 'course'
+  curriculum      Json?          // [{ id, order, title, estimatedMinutes, completed, completedAt, notes }]
 
   activityLogs    ActivityLog[]
 }

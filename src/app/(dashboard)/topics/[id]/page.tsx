@@ -11,6 +11,10 @@ import KnowledgeMap from './KnowledgeMap';
 import SocraticCoach from './SocraticCoach';
 import ConfusionMistakeBank from './ConfusionMistakeBank';
 import ReactivationModal from './ReactivationModal';
+import SessionDebriefModal, { SessionLog } from './SessionDebriefModal';
+import SessionTimeline from './SessionTimeline';
+import CurriculumView, { CourseModule } from './CurriculumView';
+import RichTextEditor from './RichTextEditor';
 
 interface ActivityLog {
   id: string;
@@ -61,6 +65,9 @@ interface Topic {
   mistakes: any[];
   pauseHistory: any[];
   activeSlotType: string | null;
+  sessionLogs: SessionLog[];
+  topicMode: 'self_directed' | 'course';
+  curriculum: CourseModule[];
 }
 
 const STAGES = ['Define', 'Map', 'Fundamentals', 'Core Knowledge', 'Application', 'Advanced', 'Proof'];
@@ -75,8 +82,8 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Tabs: 'workspace' | 'contract' | 'materials' | 'confusions' | 'history'
-  const [activeTab, setActiveTab] = useState<'workspace' | 'contract' | 'materials' | 'confusions' | 'history'>('workspace');
+  // Tabs
+  const [activeTab, setActiveTab] = useState<'workspace' | 'contract' | 'materials' | 'confusions' | 'history' | 'notes' | 'sessions'>('workspace');
 
   // Edit fields
   const [title, setTitle] = useState('');
@@ -98,7 +105,16 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
   const [mistakes, setMistakes] = useState<any[]>([]);
   const [pauseHistory, setPauseHistory] = useState<any[]>([]);
   const [activeSlotType, setActiveSlotType] = useState<string | null>(null);
-  
+
+  // Session Log state
+  const [sessionLogs, setSessionLogs] = useState<SessionLog[]>([]);
+  const [showDebrief, setShowDebrief] = useState(false);
+  const [timerElapsedMinutes, setTimerElapsedMinutes] = useState(25);
+
+  // Course Mode state
+  const [topicMode, setTopicMode] = useState<'self_directed' | 'course'>('self_directed');
+  const [curriculum, setCurriculum] = useState<CourseModule[]>([]);
+
   // Selected concept for active Socratic Coach tutoring
   const [selectedConcept, setSelectedConcept] = useState<any | null>(null);
   const [explanationsRead, setExplanationsRead] = useState(0);
@@ -150,6 +166,9 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
         setMistakes(data.mistakes || []);
         setPauseHistory(data.pauseHistory || []);
         setActiveSlotType(data.activeSlotType || null);
+        setSessionLogs(Array.isArray(data.sessionLogs) ? data.sessionLogs : []);
+        setTopicMode(data.topicMode || 'self_directed');
+        setCurriculum(Array.isArray(data.curriculum) ? data.curriculum : []);
 
         // Parse resources & subtasks JSON
         setResources(Array.isArray(data.resources) ? data.resources : []);
@@ -442,6 +461,51 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
     }
   };
 
+  // Session Log handlers
+  const handleSaveSessionLog = async (log: SessionLog) => {
+    const updated = [...sessionLogs, log];
+    setSessionLogs(updated);
+    const updates: Record<string, unknown> = { sessionLogs: updated };
+    if (log.nextAction.trim()) updates.nextAction = log.nextAction.trim();
+    try {
+      await fetch(`/api/topics/${params.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (log.nextAction.trim()) setNextAction(log.nextAction.trim());
+      await fetchTopic();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSaveCurriculum = async (modules: CourseModule[]) => {
+    setCurriculum(modules);
+    try {
+      await fetch(`/api/topics/${params.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ curriculum: modules }),
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSaveNotes = async (html: string) => {
+    setNotes(html);
+    try {
+      await fetch(`/api/topics/${params.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: html }),
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleSaveSocraticProgress = async (conceptId: string, success: boolean, mistakeText?: string, whyMade?: string, howToAvoid?: string) => {
     try {
       await fetch('/api/review/spaced', {
@@ -593,9 +657,10 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
         setSecondsRemaining((prev) => {
           if (prev <= 1) {
             setTimerActive(false);
-            setTimeout(() => {
-              alert('Timer Concluded!');
-            }, 0);
+            // Calculate elapsed minutes from the original timer preset
+            const presetSecs = timerMode === 'study' ? 25 * 60 : timerMode === 'shortBreak' ? 5 * 60 : 15 * 60;
+            setTimerElapsedMinutes(Math.round((presetSecs - 0) / 60));
+            setTimeout(() => setShowDebrief(true), 300);
             return 0;
           }
           return prev - 1;
@@ -605,7 +670,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
       if (interval) clearInterval(interval);
     }
     return () => { if (interval) clearInterval(interval); };
-  }, [timerActive]);
+  }, [timerActive, timerMode]);
 
   const resetTimer = (mode: 'study' | 'shortBreak' | 'longBreak') => {
     setTimerActive(false);
@@ -704,21 +769,24 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
       </div>
 
       {/* Main Tab selectors */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', gap: '12px' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', gap: '4px', overflowX: 'auto' }}>
         {[
-          { key: 'workspace', label: '💻 Study Desk & Map' },
-          { key: 'contract', label: '📜 Learning Contract' },
-          { key: 'materials', label: '📚 Study Materials' },
-          { key: 'confusions', label: '🚫 Mistakes & Confusions' },
-          { key: 'history', label: '📜 Logs & Reactivations' },
+          { key: 'workspace', label: topicMode === 'course' ? '📚 Curriculum' : '💻 Study Desk & Map' },
+          { key: 'contract', label: '📜 Contract' },
+          { key: 'materials', label: '📚 Materials' },
+          { key: 'notes', label: '📝 Notes' },
+          { key: 'confusions', label: '🚫 Mistakes' },
+          { key: 'sessions', label: `📅 Sessions${sessionLogs.length > 0 ? ` (${sessionLogs.length})` : ''}` },
+          { key: 'history', label: '📜 History' },
         ].map((t) => (
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key as any)}
             style={{
-              padding: '12px 16px',
-              fontSize: '0.88rem',
+              padding: '10px 14px',
+              fontSize: '0.82rem',
               fontWeight: 600,
+              whiteSpace: 'nowrap',
               color: activeTab === t.key ? 'var(--color-primary-light)' : 'var(--color-text-secondary)',
               borderBottom: activeTab === t.key ? '2px solid var(--color-primary)' : '2px solid transparent',
               transition: 'all var(--transition-fast)',
@@ -737,38 +805,63 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
           
           {activeTab === 'workspace' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              
-              {/* Socratic Coach Active panel */}
-              {selectedConcept ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <button
-                    onClick={() => setSelectedConcept(null)}
-                    className="btn btn-secondary"
-                    style={{ alignSelf: 'flex-start', fontSize: '0.75rem', padding: '6px 12px' }}
-                  >
-                    ← Back to Knowledge Map
-                  </button>
-                  
-                  <SocraticCoach
-                    concept={selectedConcept}
-                    topicId={params.id}
-                    onSaveProgress={handleSaveSocraticProgress}
-                    explanationsRead={explanationsRead}
-                    onIncrementExplanationsRead={() => setExplanationsRead(prev => prev + 1)}
-                    onResetExplanationsRead={() => setExplanationsRead(0)}
-                  />
-                </div>
-              ) : (
-                <KnowledgeMap
-                  concepts={concepts}
-                  topicTitle={title}
-                  onSaveConcepts={handleSaveConcepts}
-                  onSelectConcept={(c) => setSelectedConcept(c)}
-                  selectedConceptId={selectedConcept?.id}
+
+              {/* Course Mode — Curriculum View */}
+              {topicMode === 'course' ? (
+                <CurriculumView
+                  curriculum={curriculum}
+                  onSaveCurriculum={handleSaveCurriculum}
                 />
+              ) : (
+                /* Self-Directed — Socratic Coach + Knowledge Map */
+                selectedConcept ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <button
+                      onClick={() => setSelectedConcept(null)}
+                      className="btn btn-secondary"
+                      style={{ alignSelf: 'flex-start', fontSize: '0.75rem', padding: '6px 12px' }}
+                    >
+                      ← Back to Knowledge Map
+                    </button>
+                    <SocraticCoach
+                      concept={selectedConcept}
+                      topicId={params.id}
+                      topicTitle={title}
+                      onSaveProgress={handleSaveSocraticProgress}
+                      explanationsRead={explanationsRead}
+                      onIncrementExplanationsRead={() => setExplanationsRead(prev => prev + 1)}
+                      onResetExplanationsRead={() => setExplanationsRead(0)}
+                    />
+                  </div>
+                ) : (
+                  <KnowledgeMap
+                    concepts={concepts}
+                    topicTitle={title}
+                    onSaveConcepts={handleSaveConcepts}
+                    onSelectConcept={(c) => setSelectedConcept(c)}
+                    selectedConceptId={selectedConcept?.id}
+                  />
+                )
               )}
 
             </div>
+          )}
+
+          {/* Notes Tab — Rich Text Editor */}
+          {activeTab === 'notes' && (
+            <div className="glass-panel" style={{ padding: '4px' }}>
+              <RichTextEditor
+                content={notes}
+                onChange={handleSaveNotes}
+                placeholder="Write notes, summaries, key concepts... Format with headings, bullets, bold, and more."
+                minHeight={300}
+              />
+            </div>
+          )}
+
+          {/* Sessions Tab — Session Timeline */}
+          {activeTab === 'sessions' && (
+            <SessionTimeline sessionLogs={sessionLogs} />
           )}
 
           {activeTab === 'contract' && (
@@ -1025,6 +1118,33 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
                   </div>
                 </div>
               </div>
+
+              {/* Manual Log Session button */}
+              <button
+                type="button"
+                onClick={() => { setTimerElapsedMinutes(Math.round((25 * 60 - secondsRemaining) / 60) || 25); setShowDebrief(true); }}
+                className="btn btn-secondary"
+                style={{ width: '100%', fontSize: '0.75rem', padding: '6px', borderStyle: 'dashed' }}
+              >
+                📝 Log a Session Manually
+              </button>
+
+              {/* Topic mode toggle */}
+              <div style={{ paddingTop: '8px', borderTop: '1px solid var(--border-color)' }}>
+                <p style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Learning Mode</p>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={async () => { setTopicMode('self_directed'); await fetch(`/api/topics/${params.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topicMode: 'self_directed' }) }); }}
+                    style={{ flex: 1, padding: '6px 4px', fontSize: '0.7rem', borderRadius: 'var(--radius-sm)', border: topicMode === 'self_directed' ? '1.5px solid var(--color-primary)' : '1.5px solid var(--border-color)', background: topicMode === 'self_directed' ? 'rgba(99,102,241,0.12)' : 'transparent', color: topicMode === 'self_directed' ? 'var(--color-primary-light)' : 'var(--color-text-muted)', cursor: 'pointer' }}
+                  >🧭 Self-Directed</button>
+                  <button
+                    type="button"
+                    onClick={async () => { setTopicMode('course'); await fetch(`/api/topics/${params.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topicMode: 'course' }) }); }}
+                    style={{ flex: 1, padding: '6px 4px', fontSize: '0.7rem', borderRadius: 'var(--radius-sm)', border: topicMode === 'course' ? '1.5px solid #a855f7' : '1.5px solid var(--border-color)', background: topicMode === 'course' ? 'rgba(168,85,247,0.12)' : 'transparent', color: topicMode === 'course' ? '#c084fc' : 'var(--color-text-muted)', cursor: 'pointer' }}
+                  >📚 Course</button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1065,6 +1185,17 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
           concepts={concepts}
           onConfirmResume={handleConfirmReactivation}
           onClose={() => setShowReactivation(false)}
+        />
+      )}
+
+      {/* Session Debrief Modal overlay */}
+      {showDebrief && (
+        <SessionDebriefModal
+          topicTitle={title}
+          currentNextAction={nextAction}
+          timerDurationMinutes={timerElapsedMinutes}
+          onSave={handleSaveSessionLog}
+          onClose={() => setShowDebrief(false)}
         />
       )}
 

@@ -49,9 +49,9 @@ export default async function DashboardLayout({
             <NavLinks />
           </nav>
           
-          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-            <p>Single User Mode</p>
-            <p style={{ fontSize: '0.75rem', marginTop: '4px' }}>Active Slots Limit: 2</p>
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-success)', display: 'inline-block', boxShadow: '0 0 6px var(--color-success)', flexShrink: 0 }} />
+            <span>Single User · 2 Active Slots</span>
           </div>
         </div>
       </aside>
@@ -83,9 +83,31 @@ export default async function DashboardLayout({
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
               <span style={{ color: 'var(--color-text-secondary)' }}>Last Reviewed:</span>
-              <span style={{ color: daysSinceLastReview === null ? 'var(--color-warning)' : daysSinceLastReview > 7 ? 'var(--color-danger)' : 'var(--color-success)', fontWeight: 500 }}>
-                {daysSinceLastReview === null ? 'Never' : `${daysSinceLastReview} days ago`}
-              </span>
+              {daysSinceLastReview === null ? (
+                <Link
+                  href="/review"
+                  style={{
+                    color: 'var(--color-warning)',
+                    fontWeight: 500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    textDecoration: 'none',
+                    borderBottom: '1px dashed rgba(245,158,11,0.4)',
+                    paddingBottom: '1px',
+                    transition: 'opacity 0.15s ease',
+                  }}
+                >
+                  Start your first review →
+                </Link>
+              ) : (
+                <span style={{
+                  color: daysSinceLastReview > 7 ? 'var(--color-danger)' : 'var(--color-success)',
+                  fontWeight: 500,
+                }}>
+                  {daysSinceLastReview === 0 ? 'Today' : `${daysSinceLastReview}d ago`}
+                </span>
+              )}
             </div>
           </div>
 

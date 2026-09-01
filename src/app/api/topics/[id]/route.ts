@@ -166,6 +166,9 @@ export async function PUT(
         mistakes: body.mistakes !== undefined ? body.mistakes : existing.mistakes,
         pauseHistory: body.pauseHistory !== undefined ? body.pauseHistory : existing.pauseHistory,
         activeSlotType: finalActiveSlotType,
+        sessionLogs: body.sessionLogs !== undefined ? body.sessionLogs : (existing as any).sessionLogs,
+        topicMode: body.topicMode !== undefined ? body.topicMode : (existing as any).topicMode,
+        curriculum: body.curriculum !== undefined ? body.curriculum : (existing as any).curriculum,
       },
     });
 

@@ -13,6 +13,13 @@
   },
   "dependencies": {
     "@prisma/client": "^5.10.2",
+    "@tiptap/extension-bubble-menu": "^3.30.5",
+    "@tiptap/extension-link": "^3.30.5",
+    "@tiptap/extension-placeholder": "^3.30.5",
+    "@tiptap/extension-underline": "^3.30.5",
+    "@tiptap/pm": "^3.30.5",
+    "@tiptap/react": "^3.30.5",
+    "@tiptap/starter-kit": "^3.30.5",
     "jsonwebtoken": "^9.0.2",
     "next": "^14.1.0",
     "react": "^18.2.0",

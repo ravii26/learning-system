@@ -86,69 +86,72 @@ export default function KnowledgeMap({
     onSaveConcepts(updated);
   };
 
-  // Pre-populate standard roadmap based on title heuristics
-  const handlePrepopulatePath = () => {
-    const titleLower = topicTitle.toLowerCase();
+  const [isGeneratingMap, setIsGeneratingMap] = useState(false);
+
+  // Auto-generate roadmap via Groq AI
+  const handlePrepopulatePath = async () => {
+    setIsGeneratingMap(true);
     let generated: Omit<Concept, 'id'>[] = [];
 
-    if (titleLower.includes('system design') || titleLower.includes('backend') || titleLower.includes('architecture')) {
-      generated = [
-        { title: 'Distributed Fundamentals (CAP Theorem)', parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
-        { title: 'Database Replication & Consistency', parentId: null, status: 'Unknown', difficulty: 'High', importance: 'High' },
-        { title: 'Database Partitioning & Sharding', parentId: null, status: 'Unknown', difficulty: 'High', importance: 'High' },
-        { title: 'Caching & Content Delivery Networks (CDN)', parentId: null, status: 'Unknown', difficulty: 'Low', importance: 'High' },
-        { title: 'Message Queues & Event Streaming', parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
-        { title: 'Load Balancing & Gateway Routers', parentId: null, status: 'Unknown', difficulty: 'Low', importance: 'Medium' },
-      ];
-    } else if (titleLower.includes('valuation') || titleLower.includes('finance') || titleLower.includes('financial')) {
-      generated = [
-        { title: 'Financial Statements Analysis', parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
-        { title: 'Free Cash Flow calculation (FCFF/FCFE)', parentId: null, status: 'Unknown', difficulty: 'High', importance: 'High' },
-        { title: 'Cost of Capital & WACC estimation', parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
-        { title: 'Discounted Cash Flow (DCF) modelling', parentId: null, status: 'Unknown', difficulty: 'High', importance: 'High' },
-        { title: 'Terminal Value & Enterprise Value pricing', parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'Medium' },
-      ];
-    } else if (titleLower.includes('kubernetes') || titleLower.includes('docker') || titleLower.includes('container')) {
-      generated = [
-        { title: 'Containerization Basics & Dockerfiles', parentId: null, status: 'Unknown', difficulty: 'Low', importance: 'High' },
-        { title: 'Kubernetes Pods & Workload Deployments', parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
-        { title: 'Networking & Services (ClusterIP/NodePort)', parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
-        { title: 'Persistent Storage & Volumes', parentId: null, status: 'Unknown', difficulty: 'High', importance: 'Medium' },
-        { title: 'ConfigMaps & Secret management', parentId: null, status: 'Unknown', difficulty: 'Low', importance: 'High' },
-      ];
-    } else if (titleLower.includes('negotiation') || titleLower.includes('influence') || titleLower.includes('sales')) {
-      generated = [
-        { title: 'Tactical Empathy & Calibrated Questions', parentId: null, status: 'Unknown', difficulty: 'Low', importance: 'High' },
-        { title: 'Mirroring & Labeling Techniques', parentId: null, status: 'Unknown', difficulty: 'Low', importance: 'High' },
-        { title: 'Accusation Audit & Anchoring', parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
-        { title: 'BATNA & Walkaway thresholds', parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
-        { title: 'Closing deals and handling objections', parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
-      ];
-    } else {
-      // General Fallback
-      generated = [
-        { title: `${topicTitle} Fundamentals`, parentId: null, status: 'Unknown', difficulty: 'Low', importance: 'High' },
-        { title: `Core Principles of ${topicTitle}`, parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
-        { title: `Practical Application Scenarios`, parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
-        { title: `Advanced Concepts & Optimization`, parentId: null, status: 'Unknown', difficulty: 'High', importance: 'Medium' },
-        { title: `Final Capability Demonstration`, parentId: null, status: 'Unknown', difficulty: 'High', importance: 'High' },
-      ];
+    try {
+      const res = await fetch('/api/socratic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate-concepts',
+          topicTitle,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.concepts) && data.concepts.length > 0) {
+          generated = data.concepts.map((c: any) => ({
+            title: c.title || 'Core Concept',
+            parentId: null,
+            status: 'Unknown',
+            difficulty: c.difficulty || 'Medium',
+            importance: c.importance || 'High',
+          }));
+        }
+      }
+    } catch (e) {
+      console.error('Failed to generate AI concept map:', e);
     }
 
-    // Build concepts with IDs and references
-    const finalConcepts: Concept[] = [];
-    generated.forEach((g) => {
-      finalConcepts.push({
-        id: Math.random().toString(36).substring(2, 9),
-        title: g.title,
-        parentId: g.parentId,
-        status: g.status,
-        difficulty: g.difficulty,
-        importance: g.importance,
-      });
-    });
+    // Fallback if AI didn't return concepts
+    if (generated.length === 0) {
+      const titleLower = topicTitle.toLowerCase();
+      if (titleLower.includes('system design') || titleLower.includes('backend') || titleLower.includes('architecture')) {
+        generated = [
+          { title: 'Distributed Fundamentals (CAP Theorem)', parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
+          { title: 'Database Replication & Consistency', parentId: null, status: 'Unknown', difficulty: 'High', importance: 'High' },
+          { title: 'Database Partitioning & Sharding', parentId: null, status: 'Unknown', difficulty: 'High', importance: 'High' },
+          { title: 'Caching & Content Delivery Networks (CDN)', parentId: null, status: 'Unknown', difficulty: 'Low', importance: 'High' },
+          { title: 'Message Queues & Event Streaming', parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
+        ];
+      } else {
+        generated = [
+          { title: `${topicTitle} Fundamentals`, parentId: null, status: 'Unknown', difficulty: 'Low', importance: 'High' },
+          { title: `Core Mechanics of ${topicTitle}`, parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
+          { title: `Practical Application & Synthesis`, parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
+          { title: `Advanced Optimization in ${topicTitle}`, parentId: null, status: 'Unknown', difficulty: 'High', importance: 'Medium' },
+        ];
+      }
+    }
+
+    // Build concepts with IDs
+    const finalConcepts: Concept[] = generated.map((g) => ({
+      id: Math.random().toString(36).substring(2, 9),
+      title: g.title,
+      parentId: g.parentId,
+      status: g.status,
+      difficulty: g.difficulty,
+      importance: g.importance,
+    }));
 
     onSaveConcepts(finalConcepts);
+    setIsGeneratingMap(false);
   };
 
   // Group concepts into roots and children
@@ -250,10 +253,11 @@ export default function KnowledgeMap({
           {concepts.length === 0 && (
             <button
               onClick={handlePrepopulatePath}
+              disabled={isGeneratingMap}
               className="btn btn-secondary"
               style={{ padding: '6px 12px', fontSize: '0.75rem', color: 'var(--color-primary-light)' }}
             >
-              ⚡ Auto-Generate Path
+              {isGeneratingMap ? '✨ Generating AI Map...' : '✨ Auto-Generate Concept Map'}
             </button>
           )}
           <button

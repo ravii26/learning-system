@@ -24,6 +24,22 @@ export default function ExplorePage() {
   const [outcome, setOutcome] = useState<'interesting' | 'useful' | 'important' | 'useless' | 'curiosity'>('interesting');
   const [saving, setSaving] = useState(false);
 
+  // Recent explorations
+  const [recentExplorations, setRecentExplorations] = useState<Array<{ id: string; title: string; status: string; lastTouchedDate: string }>>([]);
+
+  useEffect(() => {
+    // Fetch topics that were saved from explorations (contain '[Explored:' in title)
+    fetch('/api/topics')
+      .then(r => r.ok ? r.json() : [])
+      .then((data: Array<{ id: string; title: string; status: string; lastTouchedDate: string }>) => {
+        const explored = data
+          .filter((t: { title: string }) => t.title.includes('[Explored:'))
+          .slice(0, 5);
+        setRecentExplorations(explored);
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (sessionState === 'running') {
       timerRef.current = setInterval(() => {
@@ -143,48 +159,90 @@ export default function ExplorePage() {
 
       {/* SETUP STATE */}
       {sessionState === 'setup' && (
-        <form onSubmit={(e) => { e.preventDefault(); startSession(); }} className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ fontSize: '3rem', textAlign: 'center' }}>⏱️</div>
-          
-          <div className="form-group">
-            <label className="form-label">WHAT CURIOSITY ARE YOU EXPLORING?</label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="e.g. How Venture Capital Works, Caching Mechanisms, History of Cinematography..."
-              value={topicTitle}
-              onChange={(e) => setTopicTitle(e.target.value)}
-              required
-              autoFocus
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">SESSION LENGTH</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-              {[15, 30, 60].map((mins) => (
-                <button
-                  key={mins}
-                  type="button"
-                  onClick={() => setDurationMinutes(mins)}
-                  className="btn"
-                  style={{
-                    fontSize: '0.85rem',
-                    background: durationMinutes === mins ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255,255,255,0.02)',
-                    border: durationMinutes === mins ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
-                    color: durationMinutes === mins ? 'var(--color-primary-light)' : 'var(--color-text-secondary)',
-                  }}
-                >
-                  {mins} Minutes
-                </button>
-              ))}
+        <>
+          <form onSubmit={(e) => { e.preventDefault(); startSession(); }} className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ fontSize: '3rem', textAlign: 'center' }}>⏱️</div>
+            
+            <div className="form-group">
+              <label className="form-label">What curiosity are you exploring?</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. How Venture Capital Works, Caching Mechanisms, History of Cinematography..."
+                value={topicTitle}
+                onChange={(e) => setTopicTitle(e.target.value)}
+                required
+                autoFocus
+              />
             </div>
-          </div>
 
-          <button type="submit" className="btn btn-primary" style={{ alignSelf: 'center', marginTop: '12px' }}>
-            ⚡ Start Exploration
-          </button>
-        </form>
+            <div className="form-group">
+              <label className="form-label">Session length</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                {[15, 30, 60].map((mins) => (
+                  <button
+                    key={mins}
+                    type="button"
+                    onClick={() => setDurationMinutes(mins)}
+                    className="btn"
+                    style={{
+                      fontSize: '0.85rem',
+                      background: durationMinutes === mins ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255,255,255,0.02)',
+                      border: durationMinutes === mins ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
+                      color: durationMinutes === mins ? 'var(--color-primary-light)' : 'var(--color-text-secondary)',
+                    }}
+                  >
+                    {mins} Minutes
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button type="submit" className="btn btn-primary" style={{ alignSelf: 'center', marginTop: '12px' }}>
+              ⚡ Start Exploration
+            </button>
+          </form>
+
+          {/* Recent Explorations */}
+          {recentExplorations.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <h3 style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>🕐</span> Recent Explorations
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {recentExplorations.map(t => {
+                  // Parse outcome badge from title suffix
+                  const outcomeMatch = t.title.match(/\[Explored: ([^\]]+)\]/);
+                  const outcomeLabel = outcomeMatch ? outcomeMatch[1] : 'Explored';
+                  const displayTitle = t.title.replace(/\s*\[Explored:[^\]]+\]/, '');
+                  const statusColor: Record<string, string> = {
+                    queued: 'var(--color-primary-light)',
+                    reference: 'var(--color-text-muted)',
+                    dropped: 'var(--color-danger)',
+                  };
+                  return (
+                    <div key={t.id} className="review-preview-card">
+                      <span style={{ fontSize: '1rem' }}>🔬</span>
+                      <span style={{ flexGrow: 1, fontSize: '0.85rem', fontWeight: 500 }}>{displayTitle}</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                        {new Date(t.lastTouchedDate).toLocaleDateString()}
+                      </span>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: statusColor[t.status] || 'var(--color-text-muted)' }}>
+                        {outcomeLabel}
+                      </span>
+                      <a
+                        href={`/topics/${t.id}`}
+                        style={{ fontSize: '0.7rem', color: 'var(--color-primary-light)', whiteSpace: 'nowrap', textDecoration: 'none' }}
+                      >
+                        View →
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* RUNNING / PAUSED STATE */}
@@ -221,7 +279,7 @@ export default function ExplorePage() {
           {/* Note taking Pad */}
           <div className="glass-panel" style={{ padding: '24px' }}>
             <div className="flex-between" style={{ marginBottom: '8px' }}>
-              <label className="form-label" style={{ marginBottom: 0 }}>CURIOSITY SCRATCHPAD (FAST NOTES)</label>
+              <label className="form-label" style={{ marginBottom: 0 }}>Curiosity scratchpad (fast notes)</label>
               <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
                 <button
                   type="button"
@@ -295,7 +353,7 @@ export default function ExplorePage() {
           </div>
 
           <div style={{ borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', padding: '24px 0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <label className="form-label">SELECT VERDICT OUTCOME</label>
+            <label className="form-label">Select verdict outcome</label>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button

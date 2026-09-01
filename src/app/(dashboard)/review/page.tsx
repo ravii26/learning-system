@@ -233,18 +233,59 @@ export default function ReviewPage() {
 
       {/* STEP: Intro */}
       {step === 'intro' && (
-        <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem' }}>🔄</div>
-          <div>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '8px' }}>Auditing {activePaused.length} Focus Cards</h2>
-            <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>
-              We will review each active and paused learning topic. You will update their next actions, decide whether to continue studying, pause, or move them to maintenance/dropped.
-            </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+          {/* Stats strip */}
+          <div className="stat-strip">
+            <span className="stat-chip" style={{ background: 'rgba(168,85,247,0.08)', borderColor: 'rgba(168,85,247,0.25)', color: '#c084fc' }}>
+              ⚡ {activePaused.filter(t => t.status === 'active').length} Active
+            </span>
+            <span className="stat-chip" style={{ background: 'rgba(245,158,11,0.08)', borderColor: 'rgba(245,158,11,0.25)', color: '#fbbf24' }}>
+              ⏸️ {activePaused.filter(t => t.status === 'paused').length} Paused
+            </span>
+            <span className="stat-chip" style={{ background: 'rgba(99,102,241,0.08)', borderColor: 'rgba(99,102,241,0.25)', color: '#818cf8' }}>
+              📋 {queuedTopics.length} Queued
+            </span>
           </div>
-          
-          <button onClick={startReview} className="btn btn-primary" style={{ alignSelf: 'center', marginTop: '12px' }}>
-            🚀 Start Focus Review
-          </button>
+
+          <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '3rem' }}>🔄</div>
+            <div>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '8px' }}>Auditing {activePaused.length} Focus Cards</h2>
+              <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>
+                Review each active and paused topic, update next actions, and decide whether to continue, pause, or close them out.
+              </p>
+            </div>
+
+            {activePaused.length === 0 ? (
+              <div style={{ padding: '20px', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--color-text-muted)', fontSize: '0.88rem' }}>
+                ✨ Nothing to review — your focus is clean!
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' }}>
+                {activePaused.map(t => (
+                  <div key={t.id} className="review-preview-card">
+                    <span className={`badge badge-${t.area.toLowerCase()}`}>{t.area}</span>
+                    <span style={{ flexGrow: 1, fontSize: '0.88rem', fontWeight: 500 }}>{t.title}</span>
+                    <span style={{ fontSize: '0.73rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                      {new Date(t.lastTouchedDate).toLocaleDateString()}
+                    </span>
+                    <span style={{
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      color: t.status === 'active' ? 'var(--color-primary-light)' : 'var(--color-warning)',
+                    }}>
+                      {t.status.toUpperCase()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button onClick={startReview} className="btn btn-primary" style={{ alignSelf: 'center', marginTop: '4px' }}>
+              🚀 Start Focus Review
+            </button>
+          </div>
         </div>
       )}
 
@@ -252,8 +293,14 @@ export default function ReviewPage() {
       {step === 'reviewing' && activePaused[currentIdx] && (
         <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* Progress bar */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
+          {/* Visual progress bar */}
+          <div className="review-progress-bar">
+            <div
+              className="review-progress-fill"
+              style={{ width: `${Math.round(((currentIdx + 1) / activePaused.length) * 100)}%` }}
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.73rem', color: 'var(--color-text-secondary)', marginTop: '-14px' }}>
             <span>Topic {currentIdx + 1} of {activePaused.length}</span>
             <span>{Math.round(((currentIdx + 1) / activePaused.length) * 100)}% reviewed</span>
           </div>
@@ -272,7 +319,7 @@ export default function ReviewPage() {
 
           <div style={{ borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', padding: '20px 0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">NEXT CONCRETE ACTION (VERB-FIRST)</label>
+              <label className="form-label">Next concrete action (verb-first)</label>
               <input
                 type="text"
                 className="form-input"
@@ -284,7 +331,7 @@ export default function ReviewPage() {
             </div>
 
             <div>
-              <label className="form-label" style={{ marginBottom: '8px' }}>STATUS DECISION</label>
+              <label className="form-label" style={{ marginBottom: '8px' }}>Status decision</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <button
                   type="button"
@@ -426,12 +473,12 @@ export default function ReviewPage() {
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px' }}>Activate "{promotingTopic.title}"</h3>
                 
                 <div className="form-group">
-                  <label className="form-label">WHY IS THIS CRITICAL NOW?</label>
+                  <label className="form-label">Why is this critical now?</label>
                   <textarea className="form-input" style={{ width: '100%', height: '60px', resize: 'none' }} value={why} onChange={e => setWhy(e.target.value)} required />
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">DEPTH TARGET</label>
+                  <label className="form-label">Depth target</label>
                   <select className="form-input" value={depthTarget} onChange={e => setDepthTarget(e.target.value)} style={{ background: '#121218' }}>
                     <option value="Awareness">Awareness</option>
                     <option value="Working Knowledge">Working Knowledge</option>
@@ -442,7 +489,7 @@ export default function ReviewPage() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">CONCRETE NEXT ACTION (VERB-FIRST)</label>
+                  <label className="form-label">Concrete next action (verb-first)</label>
                   <input type="text" className="form-input" value={nextAction} onChange={e => setNextAction(e.target.value)} required />
                 </div>
 
@@ -477,7 +524,7 @@ export default function ReviewPage() {
               Your focus and pipeline allocations have been recorded. Active counts and milestones are up to date.
             </p>
             <div style={{ background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: 'var(--radius-sm)', textAlign: 'left', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <p style={{ fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px' }}>SUMMARY OF AUDIT DECISIONS:</p>
+              <p style={{ fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px' }}>Summary of audit decisions:</p>
               {decisions.map(d => (
                 <div key={d.topicId} className="flex-between">
                   <span>{d.title}</span>
