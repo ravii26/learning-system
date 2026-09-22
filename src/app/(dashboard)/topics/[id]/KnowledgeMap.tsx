@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-interface Concept {
+export interface Concept {
   id: string;
   title: string;
   parentId: string | null;

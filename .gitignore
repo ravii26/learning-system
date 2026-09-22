@@ -2,3 +2,19 @@ node_modules
 .next
 .env
 package-lock.json
+
+# SQLite artifacts — this project uses PostgreSQL. A stray *.db here is a
+# leftover that invites `prisma db push` against the wrong datasource.
+*.db
+*.db-journal
+
+# Build output
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# Test output
+coverage
+
+# Database dumps — never commit these, they contain real data
+*.dump
+*.sql.gz
