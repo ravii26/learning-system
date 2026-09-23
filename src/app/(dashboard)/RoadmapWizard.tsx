@@ -34,6 +34,9 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
   const [topics, setTopics] = useState<GeneratedTopic[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [expandedTopicIdx, setExpandedTopicIdx] = useState<number | null>(null);
+  // The full generate-roadmap response, kept only for Goal.roadmapRaw
+  // (provenance — see POST /api/goals). Not read back out for any logic.
+  const [rawRoadmapResponse, setRawRoadmapResponse] = useState<unknown>(null);
 
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -74,6 +77,7 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
       setRoadmapTitle(data.roadmapTitle || `${goal} Roadmap`);
       setEstimatedWeeks(data.estimatedWeeks || 8);
       setTopics(Array.isArray(data.topics) ? data.topics : []);
+      setRawRoadmapResponse(data);
       setStep(4);
     } catch (e: any) {
       console.error(e);
@@ -90,48 +94,36 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
     setError(null);
 
     try {
-      for (let i = 0; i < topics.length; i++) {
-        const t = topics[i];
-        const isFirst = i === 0;
+      // One call, server-side: creates the Goal, every topic, and the
+      // GoalLinks joining them, atomically — see POST /api/goals. Used to
+      // be a client-side loop of individual POST /api/topics calls with
+      // no Goal at all, which is exactly the "thrown away" data problem
+      // Phase 7 exists to fix (roadmapTitle/estimatedWeeks/the original
+      // prompt vanished the moment topics existed).
+      const res = await fetch('/api/goals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: roadmapTitle,
+          outcome: goal,
+          why: desiredOutcome || null,
+          roadmapRaw: rawRoadmapResponse,
+          currentLevel,
+          topics,
+        }),
+      });
 
-        const curriculumModules = (t.curriculum || []).map((title, idx) => ({
-          id: Math.random().toString(36).substring(2, 9),
-          order: idx + 1,
-          title,
-          estimatedMinutes: 45,
-          completed: false,
-          completedAt: null,
-          notes: '',
-        }));
-
-        await fetch('/api/topics', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: t.title,
-            area: t.area || 'Tech',
-            why: t.why || `Part of ${roadmapTitle}`,
-            depthTarget: t.depthTarget || 'Proficiency',
-            status: isFirst ? 'active' : 'queued',
-            nextAction: t.nextAction || 'Start initial concept overview',
-            topicMode: t.mode || 'self_directed',
-            curriculum: curriculumModules,
-            contract: {
-              outcome: t.why || '',
-              estimatedEffort: t.estimatedHours || 10,
-              successCriterion: 'Complete foundational concepts and practical exercises',
-              currentLevel: currentLevel === 'beginner' ? 'Beginner' : 'Intermediate',
-            },
-          }),
-        });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to create goal');
       }
 
       router.refresh();
       if (onComplete) onComplete();
       onClose();
-    } catch (e) {
-      console.error('Error creating topics:', e);
-      setError('Failed to create roadmap topics');
+    } catch (e: any) {
+      console.error('Error creating goal:', e);
+      setError(e.message || 'Failed to create roadmap topics');
     } finally {
       setCreating(false);
     }

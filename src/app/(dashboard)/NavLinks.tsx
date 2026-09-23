@@ -10,6 +10,7 @@ export default function NavLinks() {
     { name: 'Today', href: '/', icon: '☀️' },
     { name: 'Plan', href: '/plan', icon: '📊' },
     { name: 'Where You Stand', href: '/skills', icon: '🧭' },
+    { name: 'Goals', href: '/goals', icon: '🎯' },
     { name: 'Weekly Review', href: '/review', icon: '🔄' },
     { name: 'Exploration Mode', href: '/explore', icon: '⏱️' },
   ];

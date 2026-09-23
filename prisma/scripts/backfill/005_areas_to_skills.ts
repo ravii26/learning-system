@@ -16,16 +16,13 @@
  */
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
+import { slugifySkillName } from '../../../src/lib/skillSlug';
 
 const db = new PrismaClient();
 const DRY_RUN = process.argv.includes('--dry-run');
 
 // Matches VALID_AREAS in src/lib/validations/topic.ts.
 const AREAS = ['Tech', 'Business', 'Finance', 'Creative', 'Personal', 'Other'];
-
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-}
 
 async function main() {
   console.log(DRY_RUN ? '=== DRY RUN — no writes will be made ===\n' : '=== LIVE RUN ===\n');
@@ -42,7 +39,7 @@ async function main() {
     const slugToSkillId = new Map<string, string>();
 
     for (const area of AREAS) {
-      const slug = slugify(area);
+      const slug = slugifySkillName(area);
       const existing = await db.skill.findFirst({ where: { userId: user.id, slug } });
       const data = { userId: user.id, name: area, slug, kind: 'area' as const, path: [], depth: 0 };
 

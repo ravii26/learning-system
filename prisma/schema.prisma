@@ -39,6 +39,14 @@ enum SkillKind {
   subskill
 }
 
+enum GoalStatus {
+  draft
+  active
+  achieved
+  abandoned
+  paused
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String?  @unique
@@ -55,6 +63,8 @@ model User {
   confusions     Confusion[]
   mistakes       Mistake[]
   skills         Skill[]
+  goals          Goal[]
+  goalLinks      GoalLink[]
 }
 
 model Topic {
@@ -110,6 +120,7 @@ model Topic {
   topicPauseRows  TopicPause[]
   confusionRows   Confusion[]
   mistakeRows     Mistake[]
+  goalLinks       GoalLink[]
 }
 
 model ActivityLog {
@@ -244,7 +255,8 @@ model Skill {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  topics Topic[]
+  topics    Topic[]
+  goalLinks GoalLink[]
 
   @@unique([userId, slug])
   @@index([userId, parentId])
@@ -393,6 +405,74 @@ model Mistake {
 
   @@index([userId, topicId, occurredAt])
   @@index([userId, conceptId])
+}
+
+/// A user-stated outcome ("crack a senior backend interview by June"), the
+/// thing an AI-generated roadmap (api/generate-roadmap) actually decomposes
+/// into — previously thrown away, flattened straight into loose Topics
+/// with no record of what generated them or why. GoalLink is the join to
+/// what serves the goal (Topic and/or Skill, so a topic can serve more
+/// than one goal).
+model Goal {
+  id     String     @id @default(uuid())
+  userId String
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title      String // e.g. roadmapTitle from the generator
+  outcome    String // the user's own words — verbatim, not rephrased
+  why        String?
+  status     GoalStatus @default(active)
+  targetDate DateTime?
+  startedAt  DateTime?
+  achievedAt DateTime?
+
+  // Readiness is `criteria met / criteria total`, never a fabricated
+  // percentage-with-confidence — see src/lib/goalReadiness.ts. Cached here
+  // so the Today screen and goal list don't recompute it on every read;
+  // readinessAt is how a stale cache after a failed recompute is caught.
+  readinessMet   Int       @default(0)
+  readinessTotal Int       @default(0)
+  readinessAt    DateTime?
+  // [{ id, label, met, topicIds }] — one entry per linked required topic
+  // today (see goalReadiness.ts); schema-unstable once richer AI-authored
+  // criteria exist, so this stays Json rather than its own table.
+  readinessBreakdown Json?
+
+  // Raw response from api/generate-roadmap at creation time — provenance,
+  // and lets a future prompt-format change replay/diff against what was
+  // actually generated. Never parsed back out for logic; display/debug only.
+  roadmapRaw Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  links GoalLink[]
+
+  @@index([userId, status, targetDate])
+}
+
+model GoalLink {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  goalId String
+  goal   Goal   @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  // Exactly one of these is set — enforced in application code, not the DB
+  // (Prisma/Postgres can't express an XOR constraint cleanly here).
+  topicId String?
+  topic   Topic?  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  skillId String?
+  skill   Skill?  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  weight   Float   @default(1) // contribution to readiness, once weighting is more than "all required links count equally"
+  order    Int     @default(0)
+  required Boolean @default(true)
+
+  @@unique([goalId, topicId])
+  @@unique([goalId, skillId])
+  @@index([userId, goalId, order])
 }
 
 model SystemSetting {

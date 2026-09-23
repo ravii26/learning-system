@@ -71,7 +71,13 @@ export async function POST(request: Request) {
       confusions,
       mistakes,
       pauseHistory,
-      activeSlotType
+      activeSlotType,
+      // Previously missing from this destructure entirely — every topic
+      // created here (including every one from the AI roadmap wizard, the
+      // only real caller that sends them) silently lost its topicMode and
+      // curriculum modules on creation, with no error to signal it.
+      topicMode,
+      curriculum,
     } = body;
 
     if (!title) {
@@ -144,6 +150,8 @@ export async function POST(request: Request) {
         mistakes: mistakes || [],
         pauseHistory: pauseHistory || [],
         activeSlotType: finalActiveSlotType,
+        topicMode: topicMode || null,
+        curriculum: curriculum || [],
       },
     });
 
