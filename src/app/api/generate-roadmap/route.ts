@@ -1,12 +1,5 @@
 import { NextResponse } from 'next/server';
-import { isAuthenticated } from '@/lib/auth';
-
-function checkAuth() {
-  if (!isAuthenticated()) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  return null;
-}
+import { requireAuth } from '@/lib/apiAuth';
 
 export interface GeneratedTopic {
   title: string;
@@ -91,8 +84,8 @@ const TEMPLATE_FALLBACKS: Record<string, GeneratedTopic[]> = {
 };
 
 export async function POST(request: Request) {
-  const authResponse = checkAuth();
-  if (authResponse) return authResponse;
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   try {
     const body = await request.json();

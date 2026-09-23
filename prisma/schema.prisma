@@ -7,8 +7,20 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model User {
+  id        String   @id @default(uuid())
+  email     String?  @unique
+  createdAt DateTime @default(now())
+
+  topics       Topic[]
+  activityLogs ActivityLog[]
+  reviewLogs   ReviewLog[]
+}
+
 model Topic {
   id              String         @id @default(uuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   title           String
   area            String         // Tech, Business, Finance, Creative, Personal, Other
   why             String?        // Required before moving to active
@@ -43,6 +55,8 @@ model Topic {
 
 model ActivityLog {
   id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   topicId      String
   topic        Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
   fieldChanged String
@@ -53,6 +67,8 @@ model ActivityLog {
 
 model ReviewLog {
   id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   reviewedAt     DateTime @default(now())
   topicsReviewed Json     // Snapshot of decisions made: [{topicId, title, decision}]
 }

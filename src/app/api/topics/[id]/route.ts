@@ -1,15 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { isAuthenticated } from '@/lib/auth';
+import { requireAuth } from '@/lib/apiAuth';
 import { validateTopicPayload } from '@/lib/validations/topic';
 import { buildTopicUpdateData } from '@/lib/topicUpdate';
-
-function checkAuth() {
-  if (!isAuthenticated()) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  return null;
-}
 
 // Enforce SOW state transitions
 function isValidTransition(from: string, to: string): boolean {
@@ -40,12 +33,13 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const authResponse = checkAuth();
-  if (authResponse) return authResponse;
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
 
   try {
-    const topic = await db.topic.findUnique({
-      where: { id: params.id },
+    const topic = await db.topic.findFirst({
+      where: { id: params.id, userId },
       include: {
         activityLogs: {
           orderBy: { timestamp: 'desc' },
@@ -68,8 +62,9 @@ export async function PUT(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const authResponse = checkAuth();
-  if (authResponse) return authResponse;
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
 
   try {
     const id = params.id;
@@ -80,8 +75,9 @@ export async function PUT(
     }
     const body = validation.payload;
 
-    // Fetch existing topic
-    const existing = await db.topic.findUnique({ where: { id } });
+    // Fetch existing topic, scoped to this user — a topic id belonging to
+    // someone else must 404, not leak via a cross-user update.
+    const existing = await db.topic.findFirst({ where: { id, userId } });
     if (!existing) {
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }
@@ -105,7 +101,7 @@ export async function PUT(
     let finalActiveSlotType = body.activeSlotType !== undefined ? body.activeSlotType : existing.activeSlotType;
     if (newStatus === 'active') {
       const activeTopics = await db.topic.findMany({
-        where: { status: 'active', id: { not: id } }
+        where: { status: 'active', userId, id: { not: id } }
       });
       if (activeTopics.length >= 2) {
         return NextResponse.json(
@@ -178,6 +174,7 @@ export async function PUT(
       if (oldStr !== newStr) {
         await db.activityLog.create({
           data: {
+            userId,
             topicId: id,
             fieldChanged: field,
             oldValue: oldStr,
@@ -207,13 +204,21 @@ export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const authResponse = checkAuth();
-  if (authResponse) return authResponse;
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
 
   try {
-    await db.topic.delete({
-      where: { id: params.id },
+    // deleteMany, not delete: `delete` requires a unique `where` (id alone),
+    // which would let a request delete another user's topic by id. Scoping
+    // by userId here means a foreign id deletes nothing rather than leaking
+    // a cross-user 500 from a broken unique-constraint lookup.
+    const result = await db.topic.deleteMany({
+      where: { id: params.id, userId },
     });
+    if (result.count === 0) {
+      return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
+    }
     return NextResponse.json({ success: true });
   } catch (e) {
     console.error('Failed to delete topic:', e);

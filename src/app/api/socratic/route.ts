@@ -1,12 +1,5 @@
 import { NextResponse } from 'next/server';
-import { isAuthenticated } from '@/lib/auth';
-
-function checkAuth() {
-  if (!isAuthenticated()) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  return null;
-}
+import { requireAuth } from '@/lib/apiAuth';
 
 async function callGroq(messages: Array<{ role: string; content: string }>, responseFormatJson = true) {
   const apiKey = process.env.GROQ_API_KEY;
@@ -48,9 +41,24 @@ async function callGroq(messages: Array<{ role: string; content: string }>, resp
   throw lastError || new Error('All Groq candidate models failed');
 }
 
+function generateSmartFallback(conceptTitle: string, topicTitle: string = 'General Topic') {
+  const c = conceptTitle.trim();
+  const t = topicTitle.trim();
+
+  return {
+    explain: `Understanding "${c}" is a fundamental pillar of mastering ${t}.\n\nAt its core, "${c}" defines how data, rules, or components are structured and processed. When working with ${t}, "${c}" acts as the engine that guarantees predictable execution, performance efficiency, and architectural consistency.`,
+    demonstrate: `Imagine a real-world scenario in ${t} where high volume or complexity is introduced. Without "${c}", the system experiences latency bottlenecks, data inconsistencies, or unhandled failure states.\n\nBy applying "${c}", the system enforces strict boundaries, isolating inputs and ensuring every operation yields a verifiable outcome.`,
+    connect: `Think of "${c}" like a modular building block in ${t}. Just as strong foundations allow building taller structures, mastering "${c}" unlocks your ability to understand advanced paradigms and optimize real-world implementations in ${t}.`,
+    question: `In your own words, what is the single most important purpose of "${c}" within ${t}, and what happens if it is omitted?`,
+    apply: `You are tasked with implementing or troubleshooting "${c}" in a production ${t} project. Describe the key configuration steps, potential edge cases to watch for, and how you would verify that your setup is working correctly.`,
+    idealAnswer: `An ideal implementation of "${c}" includes:\n1. Clear initialization and parameter scoping\n2. Robust error handling for edge-case inputs\n3. Verification via targeted testing and diagnostic logging to confirm output correctness.`,
+    isFallback: true,
+  };
+}
+
 export async function POST(request: Request) {
-  const authResponse = checkAuth();
-  if (authResponse) return authResponse;
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   try {
     const body = await request.json();
@@ -69,7 +77,7 @@ Return JSON only in this exact format:
 {
   "concepts": [
     {
-      "title": "Concept Title (e.g. Present Simple Tense, Vectorization, CAP Theorem)",
+      "title": "Concept Title (e.g. Vector Indexing, RAG Pipeline, CAP Theorem)",
       "difficulty": "Low" | "Medium" | "High",
       "importance": "Low" | "Medium" | "High"
     }
@@ -77,13 +85,64 @@ Return JSON only in this exact format:
 }
 `;
 
-      const rawJson = await callGroq([
-        { role: 'system', content: 'You are an expert tutor creating structured concept maps. Return valid JSON only.' },
-        { role: 'user', content: prompt }
-      ]);
+      try {
+        const rawJson = await callGroq([
+          { role: 'system', content: 'You are an expert tutor creating structured concept maps. Return valid JSON only.' },
+          { role: 'user', content: prompt }
+        ]);
+        const parsed = JSON.parse(rawJson || '{}');
+        return NextResponse.json(parsed);
+      } catch (e) {
+        // Fallback concept tree
+        return NextResponse.json({
+          concepts: [
+            { title: `${topicTitle} Fundamentals & Core Principles`, difficulty: 'Low', importance: 'High' },
+            { title: `${topicTitle} Architecture & Data Flow`, difficulty: 'Medium', importance: 'High' },
+            { title: `${topicTitle} Implementation Patterns`, difficulty: 'Medium', importance: 'Medium' },
+            { title: `${topicTitle} Advanced Optimization & Edge Cases`, difficulty: 'High', importance: 'High' },
+          ]
+        });
+      }
+    }
 
-      const parsed = JSON.parse(rawJson || '{}');
-      return NextResponse.json(parsed);
+    if (action === 'generate-curriculum') {
+      if (!topicTitle) {
+        return NextResponse.json({ error: 'topicTitle is required' }, { status: 400 });
+      }
+
+      const prompt = `
+Generate a clear, structured curriculum of 4 to 6 sequential study modules for learning: "${topicTitle}".
+Each module should have a practical title, realistic estimated study minutes (between 20 and 60 minutes), and a 1-sentence description/notes.
+
+Return JSON only in this exact format:
+{
+  "modules": [
+    {
+      "title": "Module Title (e.g., Foundations & Core Mechanics)",
+      "estimatedMinutes": 30,
+      "notes": "1-sentence summary of what will be learned."
+    }
+  ]
+}
+`;
+
+      try {
+        const rawJson = await callGroq([
+          { role: 'system', content: 'You are an expert curriculum designer. Return valid JSON only.' },
+          { role: 'user', content: prompt }
+        ]);
+        const parsed = JSON.parse(rawJson || '{}');
+        return NextResponse.json(parsed);
+      } catch (e) {
+        return NextResponse.json({
+          modules: [
+            { title: `Module 1: Foundations & Core Terminology of ${topicTitle}`, estimatedMinutes: 30, notes: 'Master core principles and fundamental mechanics.' },
+            { title: `Module 2: Practical Patterns & Guided Exercises`, estimatedMinutes: 45, notes: 'Hands-on application and standard implementation patterns.' },
+            { title: `Module 3: Troubleshooting, Edge Cases & Debugging`, estimatedMinutes: 35, notes: 'Identify common pitfalls and prevent errors.' },
+            { title: `Module 4: Real-World Application & Synthesis`, estimatedMinutes: 60, notes: 'Independent problem-solving and capstone project.' },
+          ]
+        });
+      }
     }
 
     if (action === 'evaluate') {
@@ -111,13 +170,22 @@ Respond with JSON only in this exact format:
 }
 `;
 
-      const rawJson = await callGroq([
-        { role: 'system', content: 'You evaluate student learning recall accurately and constructively. Return JSON only.' },
-        { role: 'user', content: prompt }
-      ]);
-
-      const parsed = JSON.parse(rawJson || '{}');
-      return NextResponse.json(parsed);
+      try {
+        const rawJson = await callGroq([
+          { role: 'system', content: 'You evaluate student learning recall accurately and constructively. Return JSON only.' },
+          { role: 'user', content: prompt }
+        ]);
+        const parsed = JSON.parse(rawJson || '{}');
+        return NextResponse.json(parsed);
+      } catch (e) {
+        // Heuristic evaluation fallback
+        const recallLength = userRecall.trim().length;
+        return NextResponse.json({
+          captured: recallLength > 30 ? 'Solid attempt capturing core concepts from memory.' : 'Basic effort initiated.',
+          missed: recallLength < 60 ? 'Consider elaborating on specific mechanics, constraints, or execution steps.' : 'Minor edge cases and implementation nuances.',
+          tip: `Always relate "${conceptTitle || 'this concept'}" back to practical trade-offs in ${topicTitle || 'your project'}.`,
+        });
+      }
     }
 
     // Default action: 'generate' Socratic content
@@ -125,7 +193,8 @@ Respond with JSON only in this exact format:
       return NextResponse.json({ error: 'conceptTitle is required' }, { status: 400 });
     }
 
-    const prompt = `
+    try {
+      const prompt = `
 You are a world-class Socratic tutor. Generate a complete 6-stage Socratic learning module for:
 Concept: "${conceptTitle}"
 Topic Domain: "${topicTitle || 'General Knowledge'}"
@@ -141,31 +210,35 @@ Return JSON only with these exact keys:
 }
 `;
 
-    const rawJson = await callGroq([
-      { role: 'system', content: 'You are a master teacher and mentor. Explain clearly, directly, and engagingly. Return JSON only.' },
-      { role: 'user', content: prompt }
-    ]);
+      const rawJson = await callGroq([
+        { role: 'system', content: 'You are a master teacher and mentor. Explain clearly, directly, and engagingly. Return JSON only.' },
+        { role: 'user', content: prompt }
+      ]);
 
-    const parsed = JSON.parse(rawJson || '{}');
+      const parsed = JSON.parse(rawJson || '{}');
 
-    // Helper to flatten string or array into string
-    const stringifyField = (val: any) => {
-      if (typeof val === 'string') return val;
-      if (Array.isArray(val)) return val.map(item => typeof item === 'object' ? JSON.stringify(item) : String(item)).join('\n');
-      if (typeof val === 'object' && val !== null) return JSON.stringify(val, null, 2);
-      return String(val || '');
-    };
+      const stringifyField = (val: any) => {
+        if (typeof val === 'string') return val;
+        if (Array.isArray(val)) return val.map(item => typeof item === 'object' ? JSON.stringify(item) : String(item)).join('\n');
+        if (typeof val === 'object' && val !== null) return JSON.stringify(val, null, 2);
+        return String(val || '');
+      };
 
-    return NextResponse.json({
-      explain: stringifyField(parsed.explain),
-      demonstrate: stringifyField(parsed.demonstrate),
-      connect: stringifyField(parsed.connect),
-      question: stringifyField(parsed.question),
-      apply: stringifyField(parsed.apply),
-      idealAnswer: stringifyField(parsed.idealAnswer),
-    });
+      return NextResponse.json({
+        explain: stringifyField(parsed.explain),
+        demonstrate: stringifyField(parsed.demonstrate),
+        connect: stringifyField(parsed.connect),
+        question: stringifyField(parsed.question),
+        apply: stringifyField(parsed.apply),
+        idealAnswer: stringifyField(parsed.idealAnswer),
+        isAi: true,
+      });
+    } catch (groqErr) {
+      // Return smart dynamic fallback
+      return NextResponse.json(generateSmartFallback(conceptTitle, topicTitle));
+    }
   } catch (error: any) {
     console.error('Socratic AI route error:', error);
-    return NextResponse.json({ error: error?.message || 'Failed to process Socratic request' }, { status: 500 });
+    return NextResponse.json(generateSmartFallback(request.headers.get('x-concept') || 'Study Concept'));
   }
 }

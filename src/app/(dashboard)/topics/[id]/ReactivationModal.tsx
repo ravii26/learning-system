@@ -1,10 +1,5 @@
 import React, { useState } from 'react';
-
-interface Concept {
-  id: string;
-  title: string;
-  status: string;
-}
+import type { Concept } from './KnowledgeMap';
 
 interface ReactivationModalProps {
   topicTitle: string;

@@ -1,17 +1,11 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { isAuthenticated } from '@/lib/auth';
-
-function checkAuth() {
-  if (!isAuthenticated()) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  return null;
-}
+import { requireAuth } from '@/lib/apiAuth';
 
 export async function GET() {
-  const authResponse = checkAuth();
-  if (authResponse) return authResponse;
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
 
   try {
     const oneYearAgo = new Date();
@@ -20,6 +14,7 @@ export async function GET() {
     // Fetch logs from the last 365 days
     const logs = await db.activityLog.findMany({
       where: {
+        userId,
         timestamp: {
           gte: oneYearAgo,
         },

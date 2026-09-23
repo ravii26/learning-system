@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { Concept } from './KnowledgeMap';
 
 interface Prerequisite {
   id: string;
@@ -12,12 +13,6 @@ interface Contract {
   successCriterion: string;
   currentLevel: string;
   prerequisites: Prerequisite[];
-}
-
-interface Concept {
-  id: string;
-  title: string;
-  status: string;
 }
 
 interface LearningContractProps {

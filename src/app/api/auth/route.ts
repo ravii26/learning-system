@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { checkPassword, signSessionToken, setSessionCookie, clearSessionCookie, isAuthenticated } from '@/lib/auth';
+import { SEED_USER_ID } from '@/lib/currentUser';
 
 export async function GET() {
   const authenticated = isAuthenticated();
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
     }
 
     if (checkPassword(password)) {
-      const token = signSessionToken();
+      const token = signSessionToken(SEED_USER_ID);
       setSessionCookie(token);
       return NextResponse.json({ success: true });
     } else {

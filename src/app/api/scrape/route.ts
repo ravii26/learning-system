@@ -1,16 +1,10 @@
 import { NextResponse } from 'next/server';
-import { isAuthenticated } from '@/lib/auth';
-
-function checkAuth() {
-  if (!isAuthenticated()) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  return null;
-}
+import { requireAuth } from '@/lib/apiAuth';
+import { checkUrlSafety } from '@/lib/urlSafety';
 
 export async function POST(request: Request) {
-  const authResponse = checkAuth();
-  if (authResponse) return authResponse;
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   try {
     const body = await request.json();
@@ -18,6 +12,15 @@ export async function POST(request: Request) {
 
     if (!url) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
+    }
+
+    // SSRF guard: this endpoint fetches whatever URL the client sends,
+    // server-side. Without this check a pasted URL could reach internal
+    // services (cloud metadata, localhost, the app's own database) that
+    // this server can see but the client never could.
+    const safety = await checkUrlSafety(url);
+    if (!safety.safe) {
+      return NextResponse.json({ error: `URL not allowed: ${safety.reason}` }, { status: 400 });
     }
 
     const response = await fetch(url, {
@@ -43,7 +46,7 @@ export async function POST(request: Request) {
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'");
 
-    const descMatch = html.match(/<meta[^>]+name="description"[^>]+content="([^"]*)"/i) || 
+    const descMatch = html.match(/<meta[^>]+name="description"[^>]+content="([^"]*)"/i) ||
                       html.match(/<meta[^>]+content="([^"]*)"[^>]+name="description"/i) ||
                       html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]*)"/i);
     const description = descMatch ? descMatch[1].trim() : '';

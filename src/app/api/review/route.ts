@@ -1,20 +1,15 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { isAuthenticated } from '@/lib/auth';
-
-function checkAuth() {
-  if (!isAuthenticated()) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  return null;
-}
+import { requireAuth } from '@/lib/apiAuth';
 
 export async function GET() {
-  const authResponse = checkAuth();
-  if (authResponse) return authResponse;
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
 
   try {
     const logs = await db.reviewLog.findMany({
+      where: { userId },
       orderBy: { reviewedAt: 'desc' },
       take: 20,
     });
@@ -32,8 +27,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const authResponse = checkAuth();
-  if (authResponse) return authResponse;
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
 
   try {
     const body = await request.json();
@@ -47,7 +43,7 @@ export async function POST(request: Request) {
     for (const rev of reviews) {
       const { topicId, decision } = rev;
 
-      const topic = await db.topic.findUnique({ where: { id: topicId } });
+      const topic = await db.topic.findFirst({ where: { id: topicId, userId } });
       if (!topic) continue;
 
       let newStatus = topic.status;
@@ -73,7 +69,7 @@ export async function POST(request: Request) {
         // Active Topic Limit validation during review
         if (newStatus === 'active' && topic.status !== 'active') {
           const activeCount = await db.topic.count({
-            where: { status: 'active' },
+            where: { status: 'active', userId },
           });
           if (activeCount >= 2) {
             return NextResponse.json(
@@ -92,6 +88,7 @@ export async function POST(request: Request) {
         // Log the activity log
         await db.activityLog.create({
           data: {
+            userId,
             topicId,
             fieldChanged: 'status',
             oldValue: topic.status,
@@ -104,6 +101,7 @@ export async function POST(request: Request) {
     // Save review log
     const log = await db.reviewLog.create({
       data: {
+        userId,
         topicsReviewed: reviews,
       },
     });

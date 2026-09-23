@@ -1,20 +1,14 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { isAuthenticated } from '@/lib/auth';
-
-function checkAuth() {
-  if (!isAuthenticated()) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  return null;
-}
+import { requireAuth } from '@/lib/apiAuth';
 
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const authResponse = checkAuth();
-  if (authResponse) return authResponse;
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
 
   try {
     const body = await request.json();
@@ -24,8 +18,14 @@ export async function POST(
       return NextResponse.json({ error: 'fieldChanged and newValue are required' }, { status: 400 });
     }
 
+    const topic = await db.topic.findFirst({ where: { id: params.id, userId } });
+    if (!topic) {
+      return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
+    }
+
     const log = await db.activityLog.create({
       data: {
+        userId,
         topicId: params.id,
         fieldChanged,
         oldValue,

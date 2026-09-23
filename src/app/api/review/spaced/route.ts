@@ -1,22 +1,17 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { isAuthenticated } from '@/lib/auth';
-
-function checkAuth() {
-  if (!isAuthenticated()) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  return null;
-}
+import { requireAuth } from '@/lib/apiAuth';
 
 export async function GET() {
-  const authResponse = checkAuth();
-  if (authResponse) return authResponse;
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
 
   try {
     // 1. Fetch active and maintenance topics
     const topics = await db.topic.findMany({
       where: {
+        userId,
         status: { in: ['active', 'maintenance'] }
       }
     });
@@ -66,8 +61,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const authResponse = checkAuth();
-  if (authResponse) return authResponse;
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
 
   try {
     const body = await request.json();
@@ -77,8 +73,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'topicId and conceptId are required' }, { status: 400 });
     }
 
-    // Load topic
-    const topic = await db.topic.findUnique({ where: { id: topicId } });
+    // Load topic, scoped to this user
+    const topic = await db.topic.findFirst({ where: { id: topicId, userId } });
     if (!topic) {
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }
@@ -118,7 +114,7 @@ export async function POST(request: Request) {
           // Reset interval to 1 day on fail
           nextInterval = 1;
           nextConsecutive = 0;
-          
+
           // Revert status to Exposed or Understood
           if (c.status === 'Can Recall' || c.status === 'Can Apply') {
             newStatus = 'Understood';

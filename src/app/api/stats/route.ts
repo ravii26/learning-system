@@ -1,20 +1,14 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { isAuthenticated } from '@/lib/auth';
-
-function checkAuth() {
-  if (!isAuthenticated()) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  return null;
-}
+import { requireAuth } from '@/lib/apiAuth';
 
 export async function GET() {
-  const authResponse = checkAuth();
-  if (authResponse) return authResponse;
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
 
   try {
-    const topics = await db.topic.findMany();
+    const topics = await db.topic.findMany({ where: { userId } });
 
     const counts = {
       inbox: 0,
@@ -43,6 +37,7 @@ export async function GET() {
 
     // Get the most recent review log
     const lastReview = await db.reviewLog.findFirst({
+      where: { userId },
       orderBy: { reviewedAt: 'desc' },
     });
 

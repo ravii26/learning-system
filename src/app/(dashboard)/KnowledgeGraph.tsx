@@ -1,10 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-
-interface Concept {
-  id: string;
-  title: string;
-  status: string;
-}
+import type { Concept } from './topics/[id]/KnowledgeMap';
 
 interface Topic {
   id: string;

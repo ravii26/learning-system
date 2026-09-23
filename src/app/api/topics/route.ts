@@ -1,18 +1,12 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { isAuthenticated } from '@/lib/auth';
-
-// Enforce authentication for all topic database modifications
-function checkAuth() {
-  if (!isAuthenticated()) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  return null;
-}
+import { requireAuth } from '@/lib/apiAuth';
+import { validateTopicPayload } from '@/lib/validations/topic';
 
 export async function GET(request: Request) {
-  const authResponse = checkAuth();
-  if (authResponse) return authResponse;
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
 
   try {
     const { searchParams } = new URL(request.url);
@@ -22,7 +16,7 @@ export async function GET(request: Request) {
 
     // Build filters
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = {};
+    const where: any = { userId };
     if (area) {
       where.area = area;
     }
@@ -49,11 +43,17 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const authResponse = checkAuth();
-  if (authResponse) return authResponse;
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
 
   try {
-    const body = await request.json();
+    const rawBody = await request.json();
+    const validation = validateTopicPayload(rawBody, true);
+    if (!validation.isValid || !validation.payload) {
+      return NextResponse.json({ error: validation.error || 'Invalid payload' }, { status: 400 });
+    }
+    const body = validation.payload;
     const { 
       title, 
       area, 
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     if (status === 'active') {
       // 1. Verify Active Limit (max 2 active topics)
       const activeTopics = await db.topic.findMany({
-        where: { status: 'active' },
+        where: { status: 'active', userId },
       });
       if (activeTopics.length >= 2) {
         return NextResponse.json(
@@ -121,6 +121,7 @@ export async function POST(request: Request) {
     // Create the Topic card
     const topic = await db.topic.create({
       data: {
+        userId,
         title,
         area: finalArea,
         why,
@@ -146,6 +147,7 @@ export async function POST(request: Request) {
     // Create Activity Log entry for creation
     await db.activityLog.create({
       data: {
+        userId,
         topicId: topic.id,
         fieldChanged: 'status',
         oldValue: null,
@@ -156,6 +158,7 @@ export async function POST(request: Request) {
     if (nextAction) {
       await db.activityLog.create({
         data: {
+          userId,
           topicId: topic.id,
           fieldChanged: 'nextAction',
           oldValue: null,

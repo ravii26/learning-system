@@ -1,16 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { generateSessionPlan, SessionPlan, SessionPlanStep } from '@/lib/sessionHeuristics';
-
-interface Topic {
-  id: string;
-  title: string;
-  area: string;
-  status: string;
-  why: string | null;
-  depthTarget: string | null;
-  nextAction: string | null;
-  activeSlotType: string | null;
-}
+import { generateSessionPlan, SessionPlan, SessionPlanStep, Topic } from '@/lib/sessionHeuristics';
 
 interface LearnNowModalProps {
   activeTopics: Topic[];
