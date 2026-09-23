@@ -19,6 +19,8 @@ export const TOPIC_BODY_FIELDS = [
   'proofOfLearning',
   'notes',
   'topicMode',
+  'mode',
+  'skillId',
   // Json columns, each owned by its own client handler
   'resources',
   'subtasks',

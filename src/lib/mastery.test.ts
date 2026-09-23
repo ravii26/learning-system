@@ -61,6 +61,56 @@ describe('computeSkillMastery', () => {
     });
   });
 
+  describe('practice and artifacts (Phase 9)', () => {
+    it('is 0 practice/artifacts with no rows, matching pre-Phase-9 callers', () => {
+      const r = computeSkillMastery([{ masteryLevel: 'CanApply' }], []);
+      expect(r.breakdown.practice).toBe(0);
+      expect(r.breakdown.artifacts).toBe(0);
+    });
+
+    it('averages PracticeRep scores for the practice component', () => {
+      const r = computeSkillMastery([], [], [{ score: 0.8 }, { score: 0.4 }]);
+      expect(r.breakdown.practice).toBeCloseTo(0.6, 5);
+    });
+
+    it('saturates artifacts at 1.0 once the count reaches the target', () => {
+      const twoArtifacts = computeSkillMastery([], [], [], [{}, {}]);
+      const fiveArtifacts = computeSkillMastery([], [], [], [{}, {}, {}, {}, {}]);
+      const tenArtifacts = computeSkillMastery([], [], [], Array(10).fill({}));
+      expect(twoArtifacts.breakdown.artifacts).toBeCloseTo(0.4, 5);
+      expect(fiveArtifacts.breakdown.artifacts).toBe(1);
+      expect(tenArtifacts.breakdown.artifacts).toBe(1);
+    });
+
+    it('excludes an evidence-free source from the score instead of scoring it 0', () => {
+      // Full coverage, no reviews/reps/artifacts at all — score must equal
+      // coverage exactly, not be dragged down by three absent dimensions.
+      const r = computeSkillMastery([{ masteryLevel: 'CanTeach' }], []);
+      expect(r.score).toBeCloseTo(1, 5);
+    });
+
+    it('blends all four sources when every one has evidence', () => {
+      const r = computeSkillMastery(
+        [{ masteryLevel: 'CanApply' }], // coverage 1.0
+        [{ grade: 'Again' }], // retention 0
+        [{ score: 1 }], // practice 1.0
+        [] // artifacts 0 (excluded — no rows)
+      );
+      // Only coverage, retention, practice have evidence -> equal thirds
+      expect(r.score).toBeCloseTo((1 + 0 + 1) / 3, 5);
+    });
+
+    it('sums all four sources into evidenceCount', () => {
+      const r = computeSkillMastery(
+        [{ masteryLevel: 'Understood' }],
+        [{ grade: 'Good' }, { grade: 'Hard' }],
+        [{ score: 0.5 }],
+        [{}, {}]
+      );
+      expect(r.evidenceCount).toBe(6);
+    });
+  });
+
   describe('evidenceCount', () => {
     it('sums concepts and review logs', () => {
       const r = computeSkillMastery(

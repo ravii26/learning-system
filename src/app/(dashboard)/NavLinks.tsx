@@ -12,6 +12,7 @@ export default function NavLinks() {
     { name: 'Where You Stand', href: '/skills', icon: '🧭' },
     { name: 'Goals', href: '/goals', icon: '🎯' },
     { name: 'Notes', href: '/notes', icon: '📓' },
+    { name: 'Practice', href: '/practice', icon: '🎙️' },
     { name: 'Weekly Review', href: '/review', icon: '🔄' },
     { name: 'Exploration Mode', href: '/explore', icon: '⏱️' },
   ];

@@ -78,6 +78,8 @@ export async function POST(request: Request) {
       // curriculum modules on creation, with no error to signal it.
       topicMode,
       curriculum,
+      mode,
+      skillId,
     } = body;
 
     if (!title) {
@@ -152,6 +154,8 @@ export async function POST(request: Request) {
         activeSlotType: finalActiveSlotType,
         topicMode: topicMode || null,
         curriculum: curriculum || [],
+        mode: mode || 'syllabus',
+        skillId: skillId || null,
       },
     });
 

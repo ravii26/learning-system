@@ -75,6 +75,8 @@ model User {
   captures       CaptureItem[]
   notes          Note[]
   noteLinks      NoteLink[]
+  practiceReps   PracticeRep[]
+  artifacts      Artifact[]
 }
 
 model Topic {
@@ -134,6 +136,8 @@ model Topic {
   // Named linkedNotes, not notes — `notes String?` above is the existing
   // plain markdown field; this is the accretion-mode Note relation.
   linkedNotes     Note[]
+  practiceReps    PracticeRep[]
+  artifacts       Artifact[]
 }
 
 model ActivityLog {
@@ -206,6 +210,7 @@ model Concept {
   incomingLinks ConceptLink[] @relation("ConceptLinkTo")
   mistakes      Mistake[]
   notes         Note[]
+  promptedReps  PracticeRep[]
 
   // The due-concepts query: replaces the full-topic-scan in
   // api/review/spaced/route.ts with an indexed lookup.
@@ -581,6 +586,70 @@ model NoteLink {
 
   @@unique([fromId, toId])
   @@index([userId, toId])
+}
+
+/// A single rep of deliberate practice — a speaking rep, a writing rep,
+/// whatever the topic's rubric covers. The payload for practice-mode
+/// domains (project plan's Example D: English/communication — no
+/// curriculum, no concepts, success is a trend, not a completion bar).
+/// rubricScores keeps the raw per-dimension input for the trend UI
+/// (src/lib/practiceTrend.ts); `score` is the single 0..1 rollup number
+/// mastery.ts needs, computed once at write time by
+/// src/lib/practiceScore.ts so mastery recompute never has to re-derive it
+/// (and never has to know which dimensions are inverted).
+model PracticeRep {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  promptText String
+  // The concept this rep's prompt was drawn from, if any — the cross-mode
+  // payoff from the plan: "prompts pulled from concepts you're currently
+  // learning doubles as retrieval practice." Null for a generic prompt.
+  promptConceptId String?
+  promptConcept   Concept? @relation(fields: [promptConceptId], references: [id], onDelete: SetNull)
+
+  rubricScores Json     // { [dimension]: 1..5 } raw, as entered — e.g. { fluency: 3, structure: 4, vocabulary: 2, fillers: 2 }
+  invertedKeys String[] @default([]) // dimensions where a LOWER raw score is better, e.g. "fillers"
+  score        Float    // 0..1 rollup — see src/lib/practiceScore.ts; this is what mastery.ts reads
+
+  recordingUrl    String?
+  transcript      String?
+  aiFeedback      String?
+  durationSeconds Int?
+
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId, topicId, occurredAt])
+  @@index([userId, occurredAt])
+}
+
+/// Proof of learning that isn't a graded review — a shipped app, a mock
+/// interview, a written thesis. Applies to any topic mode (Example A's
+/// "3 mock interviews", Example B's "shipped app", Example D's practice
+/// reps) though this phase only wires up the practice-mode UI for it; the
+/// schema and mastery contribution are mode-agnostic.
+model Artifact {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  url         String?
+  kind        String? // project | writing | presentation | mock_interview | other
+
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId, topicId, occurredAt])
 }
 
 model SystemSetting {

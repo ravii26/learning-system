@@ -15,11 +15,9 @@ import { pickNextAction, type NextActionPick, type TopicForNextAction } from '@/
  * It picks for you and always says why (src/lib/nextAction.ts) — a pick
  * with no visible reason isn't trustworthy.
  *
- * Deliberately not on this screen yet, because the underlying feature
- * doesn't exist: a Goal readiness footer (Goals land in Phase 7) and a
- * "daily rep" practice card (practice mode lands in Phase 9). The pomodoro
- * timer card below links to the existing /review page's pomodoro tab
- * instead of promising something not built yet.
+ * The daily rep card below (Phase 9) only shows once a practice-mode topic
+ * exists — see /practice, which is also where "start one" lives; this
+ * screen doesn't offer topic creation for a mode it can't configure.
  */
 
 interface Topic extends TopicForNextAction {
@@ -28,6 +26,7 @@ interface Topic extends TopicForNextAction {
   currentStage: string;
   depthTarget: string | null;
   why: string | null;
+  mode: string;
 }
 
 export default function TodayPage() {
@@ -37,6 +36,7 @@ export default function TodayPage() {
 
   const [topics, setTopics] = useState<Topic[]>([]);
   const [dueCount, setDueCount] = useState(0);
+  const [repLoggedToday, setRepLoggedToday] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const [captureTitle, setCaptureTitle] = useState('');
@@ -48,10 +48,24 @@ export default function TodayPage() {
         fetch('/api/topics'),
         fetch('/api/review/spaced'),
       ]);
-      if (topicsRes.ok) setTopics(await topicsRes.json());
+      let allTopics: Topic[] = [];
+      if (topicsRes.ok) {
+        allTopics = await topicsRes.json();
+        setTopics(allTopics);
+      }
       if (spacedRes.ok) {
         const spaced = await spacedRes.json();
         setDueCount(spaced.dueConcepts?.length || 0);
+      }
+
+      const hasPracticeTopic = allTopics.some((t) => t.mode === 'practice');
+      if (hasPracticeTopic) {
+        const repsRes = await fetch('/api/practice-reps');
+        if (repsRes.ok) {
+          const reps: Array<{ occurredAt: string }> = await repsRes.json();
+          const todayKey = new Date().toISOString().slice(0, 10);
+          setRepLoggedToday(reps.some((r) => r.occurredAt.slice(0, 10) === todayKey));
+        }
       }
     } catch (e) {
       console.error('Failed to load Today screen data:', e);
@@ -127,6 +141,7 @@ export default function TodayPage() {
 
   const activeTopics = topics.filter((t) => t.status === 'active');
   const pick: NextActionPick | null = pickNextAction(activeTopics);
+  const hasPracticeTopic = topics.some((t) => t.mode === 'practice');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '760px' }}>
@@ -177,8 +192,8 @@ export default function TodayPage() {
         )}
       </div>
 
-      {/* Due reviews + pomodoro — link out to the existing /review page */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+      {/* Due reviews + pomodoro + daily rep — link out, one choice each */}
+      <div style={{ display: 'grid', gridTemplateColumns: hasPracticeTopic ? 'repeat(3, 1fr)' : '1fr 1fr', gap: '14px' }}>
         <div className="glass-panel" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
           <div>
             <span style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
@@ -200,6 +215,20 @@ export default function TodayPage() {
           </div>
           <Link href="/review" className="btn btn-secondary" style={{ whiteSpace: 'nowrap' }}>Start ▸</Link>
         </div>
+
+        {hasPracticeTopic && (
+          <div className="glass-panel" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <div>
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
+                ▸ Daily rep
+              </span>
+              <div style={{ fontSize: '0.9rem', marginTop: '4px' }}>{repLoggedToday ? 'Logged today ✓' : '2-min impromptu'}</div>
+            </div>
+            <Link href="/practice" className="btn btn-secondary" style={{ whiteSpace: 'nowrap' }}>
+              {repLoggedToday ? 'View ▸' : 'Record ▸'}
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* NOW — the WIP-limited active slots */}

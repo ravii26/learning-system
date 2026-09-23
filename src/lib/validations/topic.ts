@@ -21,7 +21,11 @@ export interface TopicPayload {
   sessionLogs?: any[];
   topicMode?: 'self_directed' | 'course';
   curriculum?: any[];
+  mode?: 'syllabus' | 'practice' | 'accretion' | 'reference';
+  skillId?: string | null;
 }
+
+export const VALID_MODES = ['syllabus', 'practice', 'accretion', 'reference'];
 
 export const VALID_STATUSES = ['inbox', 'queued', 'active', 'paused', 'maintenance', 'reference', 'dropped'];
 export const VALID_AREAS = ['Tech', 'Business', 'Finance', 'Creative', 'Personal', 'Other'];
@@ -38,6 +42,10 @@ export function validateTopicPayload(body: any, isCreate = false): { isValid: bo
 
   if (body.status && !VALID_STATUSES.includes(body.status)) {
     return { isValid: false, error: `Invalid status: ${body.status}` };
+  }
+
+  if (body.mode && !VALID_MODES.includes(body.mode)) {
+    return { isValid: false, error: `Invalid mode: ${body.mode}` };
   }
 
   if (body.progressPct !== undefined) {

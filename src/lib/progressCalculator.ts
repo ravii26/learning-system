@@ -52,19 +52,25 @@ export function calculateTopicProgress(topic: TopicProgressData): number {
 /**
  * Mode-aware entry point, per the project plan's Part 3 progress table
  * (syllabus / practice / accretion / reference each mean something
- * different by "progress"). Only `syllabus` has real underlying data
- * today — PracticeRep (practice) and Note (accretion) don't exist until
- * Phases 8/9, and no UI can set a topic to a non-syllabus mode yet (every
- * topic defaults to 'syllabus' — see the Phase 5 migration). The other
- * three branches currently delegate to the same calculation as syllabus;
- * they're separated here so the mode dispatch exists and each branch has
- * an obvious place to diverge once its backing feature lands, rather than
- * bolting mode-awareness on later as a bigger change.
+ * different by "progress"). Only `syllabus` has a meaningful percentage —
+ * a syllabus topic has a finish line (curriculum coverage x concept
+ * mastery x artifacts), so 0-100% is honest.
+ *
+ * `practice` and `accretion` topics have no finish line by design (Example
+ * C/D in the plan: "no percentage anywhere," "success is a curve, not a
+ * bar"). This function still returns a number, since `progressPct` is a
+ * required Int column read by other UI (e.g. the Today screen's active-
+ * topic cards), but a practice/accretion topic naturally has zero
+ * subtasks/curriculum/concepts, so `calculateTopicProgress` already
+ * returns 0 for them — which is the honest answer for "% complete" on a
+ * mode that never completes. Their real progress signal lives in a
+ * dedicated curve/trend UI instead (src/lib/practiceTrend.ts for practice,
+ * the /notes growth sparkline for accretion), not this percentage.
  */
 export function calculateTopicProgressForMode(mode: string, topic: TopicProgressData): number {
   switch (mode) {
-    case 'practice': // TODO(Phase 9): rep cadence x rubric trend, rendered as a curve, not this weighted blend
-    case 'accretion': // TODO(Phase 8): note/link growth, capped, never 100%
+    case 'practice':
+    case 'accretion':
     case 'reference': // TODO: no percentage at all once there's a UI that can show that — see below
     case 'syllabus':
     default:

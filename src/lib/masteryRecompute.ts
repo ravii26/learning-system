@@ -48,10 +48,25 @@ export async function recomputeSkillMastery(db: DbClient, userId: string, skillI
       })
     : [];
 
-  const result = computeSkillMastery(concepts, reviewLogs);
-  const lastEvidenceAt = reviewLogs.length > 0
-    ? reviewLogs.reduce((latest, r) => (r.reviewedAt > latest ? r.reviewedAt : latest), reviewLogs[0].reviewedAt)
-    : null;
+  const practiceReps = topicIds.length > 0
+    ? await db.practiceRep.findMany({
+        where: { userId, topicId: { in: topicIds } },
+        select: { score: true, occurredAt: true },
+      })
+    : [];
+  const artifacts = topicIds.length > 0
+    ? await db.artifact.findMany({
+        where: { userId, topicId: { in: topicIds } },
+        select: { id: true, occurredAt: true },
+      })
+    : [];
+
+  const result = computeSkillMastery(concepts, reviewLogs, practiceReps, artifacts);
+  const lastEvidenceAt = [
+    ...reviewLogs.map((r) => r.reviewedAt),
+    ...practiceReps.map((r) => r.occurredAt),
+    ...artifacts.map((a) => a.occurredAt),
+  ].reduce((latest: Date | null, d) => (latest === null || d > latest ? d : latest), null);
 
   await db.skill.update({
     where: { id: skillId },
