@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/apiAuth';
+import { callGroqContent } from '@/lib/ai/groqClient';
 
 export interface GeneratedTopic {
   title: string;
@@ -162,44 +163,10 @@ Study Time Available: ${weeklyHours} hours/week
 
 Generate the complete JSON learning path following all validation and curriculum design rules.`;
 
-    const candidateModels = ['openai/gpt-oss-120b', 'groq/compound', 'qwen/qwen3.6-27b'];
-    let groqRes: Response | null = null;
-    let lastErr: any = null;
-
-    for (const model of candidateModels) {
-      try {
-        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt },
-            ],
-            temperature: 0.3,
-            response_format: { type: 'json_object' },
-          }),
-        });
-
-        if (res.ok) {
-          groqRes = res;
-          break;
-        }
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-
-    if (!groqRes || !groqRes.ok) {
-      throw new Error(`Groq models failed: ${lastErr?.message || 'API request error'}`);
-    }
-
-    const groqData = await groqRes.json();
-    const rawContent = groqData.choices[0]?.message?.content || '{}';
+    const rawContent = await callGroqContent(apiKey, [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], { temperature: 0.3 });
     const parsed: RoadmapResponse = JSON.parse(rawContent);
 
     // Validate parsed output structure

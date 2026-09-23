@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Invalid kind: ${kind}` }, { status: 400 });
     }
 
-    const topic = await db.topic.findFirst({ where: { id: topicId, userId } });
+    const topic = await db.topic.findFirst({ where: { id: topicId, userId, deletedAt: null } });
     if (!topic) {
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }

@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     for (const rev of reviews) {
       const { topicId, decision } = rev;
 
-      const topic = await db.topic.findFirst({ where: { id: topicId, userId } });
+      const topic = await db.topic.findFirst({ where: { id: topicId, userId, deletedAt: null } });
       if (!topic) continue;
 
       let newStatus = topic.status;

@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'rubricScores must have at least one dimension' }, { status: 400 });
     }
 
-    const topic = await db.topic.findFirst({ where: { id: topicId, userId } });
+    const topic = await db.topic.findFirst({ where: { id: topicId, userId, deletedAt: null } });
     if (!topic) {
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }

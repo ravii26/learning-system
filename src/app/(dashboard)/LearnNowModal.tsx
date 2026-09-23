@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { generateSessionPlan, SessionPlan, SessionPlanStep, Topic } from '@/lib/sessionHeuristics';
 

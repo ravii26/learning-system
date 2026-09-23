@@ -46,7 +46,7 @@ export async function GET(
 
   try {
     const topic = await db.topic.findFirst({
-      where: { id: params.id, userId },
+      where: { id: params.id, userId, deletedAt: null },
       include: {
         activityLogs: {
           orderBy: { timestamp: 'desc' },
@@ -83,8 +83,11 @@ export async function PUT(
     const body = validation.payload;
 
     // Fetch existing topic, scoped to this user — a topic id belonging to
-    // someone else must 404, not leak via a cross-user update.
-    const existing = await db.topic.findFirst({ where: { id, userId } });
+    // someone else must 404, not leak via a cross-user update. deletedAt:
+    // null means a soft-deleted topic 404s on the ordinary edit path too —
+    // undeleting is an explicit action (POST .../restore), not a side
+    // effect of an unrelated PUT.
+    const existing = await db.topic.findFirst({ where: { id, userId, deletedAt: null } });
     if (!existing) {
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }
@@ -108,7 +111,7 @@ export async function PUT(
     let finalActiveSlotType = body.activeSlotType !== undefined ? body.activeSlotType : existing.activeSlotType;
     if (newStatus === 'active') {
       const activeTopics = await db.topic.findMany({
-        where: { status: 'active', userId, id: { not: id } }
+        where: { status: 'active', userId, id: { not: id }, deletedAt: null }
       });
       if (activeTopics.length >= 2) {
         return NextResponse.json(
@@ -269,12 +272,24 @@ export async function DELETE(
   const { userId } = auth;
 
   try {
-    // deleteMany, not delete: `delete` requires a unique `where` (id alone),
-    // which would let a request delete another user's topic by id. Scoping
-    // by userId here means a foreign id deletes nothing rather than leaking
-    // a cross-user 500 from a broken unique-constraint lookup.
-    const result = await db.topic.deleteMany({
-      where: { id: params.id, userId },
+    // Soft-delete only (Phase 10) — this used to be db.topic.deleteMany,
+    // which cascades onDelete through Concept, ReviewLog, SessionLog,
+    // TopicPause, Confusion, Mistake, PracticeRep, Artifact, GoalLink: a
+    // year of FSRS review history gone on one misclick, permanently. Now
+    // it just sets deletedAt; the row and everything cascaded off it stays
+    // intact and restorable (POST .../restore) until Phase 11 revisits
+    // whether a real purge path is ever needed.
+    //
+    // updateMany, not update: `update` requires a unique `where` (id
+    // alone), which would let a request touch another user's topic by id.
+    // Scoping by userId means a foreign id updates nothing rather than
+    // leaking a cross-user 500 from a broken unique-constraint lookup.
+    // deletedAt: null in the where clause makes this idempotent-safe: a
+    // second DELETE on an already-deleted topic reports 404, not a
+    // silent no-op success.
+    const result = await db.topic.updateMany({
+      where: { id: params.id, userId, deletedAt: null },
+      data: { deletedAt: new Date() },
     });
     if (result.count === 0) {
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });

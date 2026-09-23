@@ -8,7 +8,7 @@ export async function GET() {
   const { userId } = auth;
 
   try {
-    const topics = await db.topic.findMany({ where: { userId } });
+    const topics = await db.topic.findMany({ where: { userId, deletedAt: null } });
 
     const counts = {
       inbox: 0,

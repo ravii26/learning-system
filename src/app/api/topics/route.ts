@@ -13,10 +13,14 @@ export async function GET(request: Request) {
     const area = searchParams.get('area');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
+    // ?deleted=1 lists the trash instead of live topics — the only way to
+    // see what's soft-deleted and find an id to pass to .../restore, since
+    // this phase doesn't add a dedicated trash page.
+    const deletedOnly = searchParams.get('deleted') === '1';
 
     // Build filters
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = { userId };
+    const where: any = { userId, deletedAt: deletedOnly ? { not: null } : null };
     if (area) {
       where.area = area;
     }
@@ -93,7 +97,7 @@ export async function POST(request: Request) {
     if (status === 'active') {
       // 1. Verify Active Limit (max 2 active topics)
       const activeTopics = await db.topic.findMany({
-        where: { status: 'active', userId },
+        where: { status: 'active', userId, deletedAt: null },
       });
       if (activeTopics.length >= 2) {
         return NextResponse.json(

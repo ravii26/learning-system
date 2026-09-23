@@ -18,7 +18,7 @@ export async function POST(
       return NextResponse.json({ error: 'fieldChanged and newValue are required' }, { status: 400 });
     }
 
-    const topic = await db.topic.findFirst({ where: { id: params.id, userId } });
+    const topic = await db.topic.findFirst({ where: { id: params.id, userId, deletedAt: null } });
     if (!topic) {
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }

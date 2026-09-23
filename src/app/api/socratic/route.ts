@@ -1,44 +1,13 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/apiAuth';
+import { callGroqContent } from '@/lib/ai/groqClient';
 
-async function callGroq(messages: Array<{ role: string; content: string }>, responseFormatJson = true) {
+async function callGroq(messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>, responseFormatJson = true) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error('GROQ_API_KEY is not configured');
   }
-
-  // Model fallback priority order based on available models on user account
-  const candidateModels = ['openai/gpt-oss-120b', 'groq/compound', 'qwen/qwen3.6-27b'];
-  let lastError: Error | null = null;
-
-  for (const model of candidateModels) {
-    try {
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          temperature: 0.5,
-          response_format: responseFormatJson ? { type: 'json_object' } : undefined,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const content = data.choices[0]?.message?.content;
-        if (content) return content;
-      }
-    } catch (e: any) {
-      lastError = e;
-      console.warn(`Groq model ${model} failed, trying fallback...`, e);
-    }
-  }
-
-  throw lastError || new Error('All Groq candidate models failed');
+  return callGroqContent(apiKey, messages, { temperature: 0.5, jsonMode: responseFormatJson });
 }
 
 function generateSmartFallback(conceptTitle: string, topicTitle: string = 'General Topic') {
@@ -93,6 +62,7 @@ Return JSON only in this exact format:
         const parsed = JSON.parse(rawJson || '{}');
         return NextResponse.json(parsed);
       } catch (e) {
+        console.warn('generate-concepts AI call failed, using fallback:', e instanceof Error ? e.message : e);
         // Fallback concept tree
         return NextResponse.json({
           concepts: [
@@ -134,6 +104,7 @@ Return JSON only in this exact format:
         const parsed = JSON.parse(rawJson || '{}');
         return NextResponse.json(parsed);
       } catch (e) {
+        console.warn('generate-curriculum AI call failed, using fallback:', e instanceof Error ? e.message : e);
         return NextResponse.json({
           modules: [
             { title: `Module 1: Foundations & Core Terminology of ${topicTitle}`, estimatedMinutes: 30, notes: 'Master core principles and fundamental mechanics.' },
@@ -178,6 +149,7 @@ Respond with JSON only in this exact format:
         const parsed = JSON.parse(rawJson || '{}');
         return NextResponse.json(parsed);
       } catch (e) {
+        console.warn('evaluate AI call failed, using heuristic fallback:', e instanceof Error ? e.message : e);
         // Heuristic evaluation fallback
         const recallLength = userRecall.trim().length;
         return NextResponse.json({
@@ -234,6 +206,7 @@ Return JSON only with these exact keys:
         isAi: true,
       });
     } catch (groqErr) {
+      console.warn('generate (default) AI call failed, using smart fallback:', groqErr instanceof Error ? groqErr.message : groqErr);
       // Return smart dynamic fallback
       return NextResponse.json(generateSmartFallback(conceptTitle, topicTitle));
     }

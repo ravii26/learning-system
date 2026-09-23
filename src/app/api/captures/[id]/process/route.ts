@@ -49,7 +49,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       if (!topicId) {
         return NextResponse.json({ error: 'topicId is required to create a concept' }, { status: 400 });
       }
-      const topic = await db.topic.findFirst({ where: { id: topicId, userId } });
+      const topic = await db.topic.findFirst({ where: { id: topicId, userId, deletedAt: null } });
       if (!topic) {
         return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
       }
@@ -74,7 +74,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       // creating a new one.
       const { existingTopicId } = body as { existingTopicId?: string };
       if (existingTopicId) {
-        const existingTopic = await db.topic.findFirst({ where: { id: existingTopicId, userId } });
+        const existingTopic = await db.topic.findFirst({ where: { id: existingTopicId, userId, deletedAt: null } });
         if (!existingTopic) {
           return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
         }

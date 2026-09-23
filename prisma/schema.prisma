@@ -90,6 +90,12 @@ model Topic {
   why             String?        // Required before moving to active
   depthTarget     String?        // Awareness, Working Knowledge, Proficiency, Deep, Mastery (required before active)
   status          String         // inbox, queued, active, paused, maintenance, reference, dropped
+  // Soft-delete only — DELETE /api/topics/[id] sets this instead of
+  // removing the row. Concept/ReviewLog/SessionLog/etc. all cascade off
+  // Topic; a hard delete would have taken a year of FSRS history with it
+  // on one misclick. Every read path that lists or looks up a user's
+  // topics filters deletedAt: null (see src/app/api/topics/**).
+  deletedAt       DateTime?
   progressPct     Int            @default(0) // 0-100
   currentStage    String         // Define, Map, Fundamentals, Core Knowledge, Application, Advanced, Proof
   lastCompleted   String?

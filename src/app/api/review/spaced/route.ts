@@ -23,7 +23,7 @@ export async function GET() {
         suspended: false,
         masteryLevel: { not: 'Unknown' }, // matches the old `if (c.status === 'Unknown') continue;`
         OR: [{ nextReview: null }, { nextReview: { lte: now } }],
-        topic: { status: { in: ['active', 'maintenance'] } },
+        topic: { status: { in: ['active', 'maintenance'] }, deletedAt: null },
       },
       include: { topic: { select: { title: true, area: true } } },
       orderBy: { nextReview: 'asc' },
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Concept not found' }, { status: 404 });
     }
 
-    const topic = await db.topic.findFirst({ where: { id: concept.topicId, userId } });
+    const topic = await db.topic.findFirst({ where: { id: concept.topicId, userId, deletedAt: null } });
     if (!topic) {
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }

@@ -28,7 +28,9 @@ export async function recomputeSkillMastery(db: DbClient, userId: string, skillI
   const subtreeIds = await getSkillSubtreeIds(db, userId, skillId);
 
   const topics = await db.topic.findMany({
-    where: { userId, skillId: { in: subtreeIds } },
+    // deletedAt: null — a soft-deleted topic's old evidence must not keep
+    // inflating a skill's mastery after it's gone from the user's view.
+    where: { userId, skillId: { in: subtreeIds }, deletedAt: null },
     select: { id: true },
   });
   const topicIds = topics.map((t) => t.id);
