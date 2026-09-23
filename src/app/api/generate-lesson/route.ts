@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/apiAuth';
-import { callGroqContent } from '@/lib/ai/groqClient';
+import { callAIContent, hasAnyAIProviderConfigured } from '@/lib/ai/aiClient';
 
 export async function POST(request: Request) {
   const auth = requireAuth();
@@ -14,8 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'moduleTitle is required' }, { status: 400 });
     }
 
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
+    if (!hasAnyAIProviderConfigured()) {
       return NextResponse.json({
         title: moduleTitle,
         summary: `Foundational overview for ${moduleTitle}`,
@@ -78,7 +77,7 @@ Generate valid JSON matching this structure:
 
 RETURN VALID JSON ONLY. NO MARKDOWN WRAPPERS OR EXTRA TEXT.`;
 
-    const rawContent = await callGroqContent(apiKey, [
+    const { content: rawContent } = await callAIContent([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: `Generate the complete lesson content and quiz for "${moduleTitle}".` },
     ], { temperature: 0.3 });

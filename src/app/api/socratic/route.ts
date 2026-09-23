@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/apiAuth';
-import { callGroqContent } from '@/lib/ai/groqClient';
+import { callAIContent, hasAnyAIProviderConfigured } from '@/lib/ai/aiClient';
 
-async function callGroq(messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>, responseFormatJson = true) {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    throw new Error('GROQ_API_KEY is not configured');
+async function callAiTutor(messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>, responseFormatJson = true) {
+  if (!hasAnyAIProviderConfigured()) {
+    throw new Error('No AI provider is configured (OPENROUTER_API_KEY / GROQ_API_KEY)');
   }
-  return callGroqContent(apiKey, messages, { temperature: 0.5, jsonMode: responseFormatJson });
+  const { content } = await callAIContent(messages, { temperature: 0.5, jsonMode: responseFormatJson });
+  return content;
 }
 
 function generateSmartFallback(conceptTitle: string, topicTitle: string = 'General Topic') {
@@ -55,7 +55,7 @@ Return JSON only in this exact format:
 `;
 
       try {
-        const rawJson = await callGroq([
+        const rawJson = await callAiTutor([
           { role: 'system', content: 'You are an expert tutor creating structured concept maps. Return valid JSON only.' },
           { role: 'user', content: prompt }
         ]);
@@ -97,7 +97,7 @@ Return JSON only in this exact format:
 `;
 
       try {
-        const rawJson = await callGroq([
+        const rawJson = await callAiTutor([
           { role: 'system', content: 'You are an expert curriculum designer. Return valid JSON only.' },
           { role: 'user', content: prompt }
         ]);
@@ -142,7 +142,7 @@ Respond with JSON only in this exact format:
 `;
 
       try {
-        const rawJson = await callGroq([
+        const rawJson = await callAiTutor([
           { role: 'system', content: 'You evaluate student learning recall accurately and constructively. Return JSON only.' },
           { role: 'user', content: prompt }
         ]);
@@ -182,7 +182,7 @@ Return JSON only with these exact keys:
 }
 `;
 
-      const rawJson = await callGroq([
+      const rawJson = await callAiTutor([
         { role: 'system', content: 'You are a master teacher and mentor. Explain clearly, directly, and engagingly. Return JSON only.' },
         { role: 'user', content: prompt }
       ]);

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/apiAuth';
-import { callGroqContent } from '@/lib/ai/groqClient';
+import { callAIContent, hasAnyAIProviderConfigured } from '@/lib/ai/aiClient';
 
 export interface GeneratedTopic {
   title: string;
@@ -96,9 +96,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Goal is required' }, { status: 400 });
     }
 
-    const apiKey = process.env.GROQ_API_KEY;
-
-    if (!apiKey) {
+    if (!hasAnyAIProviderConfigured()) {
       return NextResponse.json({
         isValid: true,
         topics: TEMPLATE_FALLBACKS.default,
@@ -163,7 +161,7 @@ Study Time Available: ${weeklyHours} hours/week
 
 Generate the complete JSON learning path following all validation and curriculum design rules.`;
 
-    const rawContent = await callGroqContent(apiKey, [
+    const { content: rawContent } = await callAIContent([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ], { temperature: 0.3 });
