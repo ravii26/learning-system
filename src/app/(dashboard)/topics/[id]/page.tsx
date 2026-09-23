@@ -7,7 +7,7 @@ import { renderMarkdown } from '@/lib/markdown';
 
 // Modular Imports
 import LearningContract from './LearningContract';
-import KnowledgeMap from './KnowledgeMap';
+import KnowledgeMap, { Concept } from './KnowledgeMap';
 import SocraticCoach from './SocraticCoach';
 import ConfusionMistakeBank from './ConfusionMistakeBank';
 import ReactivationModal from './ReactivationModal';
@@ -15,6 +15,7 @@ import SessionDebriefModal, { SessionLog } from './SessionDebriefModal';
 import SessionTimeline from './SessionTimeline';
 import CurriculumView, { CourseModule } from './CurriculumView';
 import RichTextEditor from './RichTextEditor';
+import CustomDialog, { CustomDialogConfig } from '@/components/CustomDialog';
 
 interface ActivityLog {
   id: string;
@@ -238,11 +239,12 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
           notes: notes.trim() || null,
           resources,
           subtasks,
-          contract,
-          knowledgeMap: { concepts },
-          confusions,
-          mistakes,
-          pauseHistory,
+          // contract / knowledgeMap / confusions / mistakes / pauseHistory are
+          // deliberately NOT sent here. Each has its own save handler, and the
+          // copies in this component's state go stale the moment the Socratic
+          // coach or the spaced-review queue writes to them. Including them in
+          // this form save overwrote live review scheduling with whatever was
+          // loaded at mount.
         }),
       });
 
@@ -263,47 +265,56 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
     }
   };
 
-  const handlePause = async () => {
-    // Collect pause reason
-    const reason = prompt('Why are you pausing this topic?');
-    if (reason === null) return;
+  const [dialogConfig, setDialogConfig] = useState<CustomDialogConfig>({ isOpen: false, message: '' });
 
-    const newPauseLog = {
-      id: Math.random().toString(36).substring(2, 9),
-      pausedAt: new Date().toISOString(),
-      resumedAt: null,
-      reason: reason.trim() || 'Switched focus to another priority.',
-      completedConcepts: concepts.filter(c => c.status !== 'Unknown' && c.status !== 'Exposed').map(c => c.title),
-      currentConcept: selectedConcept?.title || 'None',
-      openQuestion: confusions.filter(c => !c.resolved)[0]?.text || 'None',
-      reactivationScore: null,
-    };
+  const handlePause = () => {
+    setDialogConfig({
+      isOpen: true,
+      type: 'prompt',
+      title: 'Pause Topic',
+      message: 'Why are you pausing this topic? (e.g. Switched focus, taking a break)',
+      promptValue: 'Switched focus to another priority.',
+      confirmLabel: 'Pause Topic',
+      onConfirm: async (reason) => {
+        setDialogConfig(prev => ({ ...prev, isOpen: false }));
+        const newPauseLog = {
+          id: Math.random().toString(36).substring(2, 9),
+          pausedAt: new Date().toISOString(),
+          resumedAt: null,
+          reason: (reason || '').trim() || 'Switched focus to another priority.',
+          completedConcepts: concepts.filter(c => c.status !== 'Unknown' && c.status !== 'Exposed').map(c => c.title),
+          currentConcept: selectedConcept?.title || 'None',
+          openQuestion: confusions.filter(c => !c.resolved)[0]?.text || 'None',
+          reactivationScore: null,
+        };
 
-    const updatedPauseHistory = [...pauseHistory, newPauseLog];
-    setPauseHistory(updatedPauseHistory);
+        const updatedPauseHistory = [...pauseHistory, newPauseLog];
+        setPauseHistory(updatedPauseHistory);
 
-    // Save with paused status
-    setError(null);
-    try {
-      const res = await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'paused',
-          pauseHistory: updatedPauseHistory,
-        }),
-      });
+        setError(null);
+        try {
+          const res = await fetch(`/api/topics/${params.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: 'paused',
+              pauseHistory: updatedPauseHistory,
+            }),
+          });
 
-      if (res.ok) {
-        await fetchTopic();
-        router.refresh();
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to pause topic');
-      }
-    } catch (e) {
-      alert('Connection error pausing topic');
-    }
+          if (res.ok) {
+            await fetchTopic();
+            router.refresh();
+          } else {
+            const data = await res.json();
+            setDialogConfig({ isOpen: true, type: 'error', title: 'Pause Error', message: data.error || 'Failed to pause topic' });
+          }
+        } catch (e) {
+          setDialogConfig({ isOpen: true, type: 'error', title: 'Connection Error', message: 'Connection error pausing topic' });
+        }
+      },
+      onCancel: () => setDialogConfig(prev => ({ ...prev, isOpen: false })),
+    });
   };
 
   const handleResume = async () => {
@@ -314,16 +325,34 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
         const stats = await statsRes.json();
         const activeCount = stats.counts.active;
         if (topic?.status !== 'active' && activeCount >= 2) {
-          alert('Active limit reached (max 2). You must pause or drop another active topic first.');
+          setDialogConfig({
+            isOpen: true,
+            type: 'warning',
+            title: 'Active Capacity Reached',
+            message: 'You already have 2 active topics. Please pause or drop an active topic first before resuming this one.',
+            onConfirm: () => setDialogConfig(prev => ({ ...prev, isOpen: false })),
+          });
           return;
         }
       }
-    } catch (e) {
-      console.error(e);
-    }
 
-    // Launch Socratic reactivation modal instead of straight save!
-    setShowReactivation(true);
+      setError(null);
+      const res = await fetch(`/api/topics/${params.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'active' }),
+      });
+
+      if (res.ok) {
+        await fetchTopic();
+        router.refresh();
+      } else {
+        const data = await res.json();
+        setDialogConfig({ isOpen: true, type: 'error', title: 'Resume Error', message: data.error || 'Failed to resume topic' });
+      }
+    } catch (e) {
+      setDialogConfig({ isOpen: true, type: 'error', title: 'Connection Error', message: 'Error connecting to database' });
+    }
   };
 
   // Reactivation success handler
@@ -480,6 +509,8 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
     }
   };
 
+  const [generatingStudyPlan, setGeneratingStudyPlan] = useState(false);
+
   const handleSaveCurriculum = async (modules: CourseModule[]) => {
     setCurriculum(modules);
     try {
@@ -490,6 +521,75 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
       });
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleGenerateStudyPlan = async () => {
+    setGeneratingStudyPlan(true);
+    try {
+      const res = await fetch('/api/socratic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate-curriculum', topicTitle: title }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.modules) && data.modules.length > 0) {
+          const generated: CourseModule[] = data.modules.map((m: any, i: number) => ({
+            id: Math.random().toString(36).substring(2, 9),
+            order: i + 1,
+            title: m.title || `Module ${i + 1}`,
+            estimatedMinutes: m.estimatedMinutes || 30,
+            completed: false,
+            completedAt: null,
+            notes: m.notes || '',
+          }));
+          await handleSaveCurriculum(generated);
+          setTopicMode('course');
+        }
+      }
+    } catch (e) {
+      console.error('Failed to generate study plan:', e);
+    } finally {
+      setGeneratingStudyPlan(false);
+    }
+  };
+
+  const handleStartKnowledgeMap = async () => {
+    setGeneratingStudyPlan(true);
+    try {
+      const res = await fetch('/api/socratic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate-concepts', topicTitle: title }),
+      });
+      let generatedConcepts: Concept[] = [];
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.concepts) && data.concepts.length > 0) {
+          generatedConcepts = data.concepts.map((c: any) => ({
+            id: Math.random().toString(36).substring(2, 9),
+            title: c.title || 'Core Concept',
+            parentId: null,
+            status: 'Unknown',
+            difficulty: c.difficulty || 'Medium',
+            importance: c.importance || 'High',
+          }));
+        }
+      }
+      if (generatedConcepts.length === 0) {
+        generatedConcepts = [
+          { id: Math.random().toString(36).substring(2, 9), title: `${title} Fundamentals`, parentId: null, status: 'Unknown', difficulty: 'Low', importance: 'High' },
+          { id: Math.random().toString(36).substring(2, 9), title: `Core Mechanics of ${title}`, parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
+          { id: Math.random().toString(36).substring(2, 9), title: `Practical Application & Synthesis`, parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
+        ];
+      }
+      await handleSaveConcepts(generatedConcepts);
+      setTopicMode('self_directed');
+    } catch (e) {
+      console.error('Failed to generate concepts:', e);
+    } finally {
+      setGeneratingStudyPlan(false);
     }
   };
 
@@ -580,21 +680,31 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
     }
   };
 
-  const handleDeleteResource = async (index: number) => {
-    if (!confirm('Remove resource?')) return;
-    const updated = resources.filter((_, i) => i !== index);
-    setResources(updated);
+  const handleDeleteResource = (index: number) => {
+    setDialogConfig({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Remove Bookmark',
+      message: 'Are you sure you want to remove this bookmark resource?',
+      confirmLabel: 'Remove',
+      onConfirm: async () => {
+        setDialogConfig(prev => ({ ...prev, isOpen: false }));
+        const updated = resources.filter((_, i) => i !== index);
+        setResources(updated);
 
-    try {
-      await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resources: updated }),
-      });
-      await fetchTopic();
-    } catch (e) {
-      console.error(e);
-    }
+        try {
+          await fetch(`/api/topics/${params.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ resources: updated }),
+          });
+          await fetchTopic();
+        } catch (e) {
+          console.error(e);
+        }
+      },
+      onCancel: () => setDialogConfig(prev => ({ ...prev, isOpen: false })),
+    });
   };
 
   // Materials: Subtasks Checklist
@@ -706,14 +816,56 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
     }
   };
 
-  const handleDeleteTopic = async () => {
-    if (!confirm('Permanent Delete?')) return;
-    try {
-      await fetch(`/api/topics/${params.id}`, { method: 'DELETE' });
-      router.push('/');
-      router.refresh();
-    } catch (e) {
-      console.error(e);
+  const handleDeleteTopic = () => {
+    setDialogConfig({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Delete Topic',
+      message: `Are you sure you want to permanently delete "${title}"? This action cannot be undone.`,
+      confirmLabel: 'Delete Topic',
+      onConfirm: async () => {
+        setDialogConfig(prev => ({ ...prev, isOpen: false }));
+        try {
+          await fetch(`/api/topics/${params.id}`, { method: 'DELETE' });
+          router.push('/');
+          router.refresh();
+        } catch (e) {
+          console.error(e);
+        }
+      },
+      onCancel: () => setDialogConfig(prev => ({ ...prev, isOpen: false })),
+    });
+  };
+
+  const handleLaunchSocraticSession = async () => {
+    if (selectedConcept) {
+      setSelectedConcept(null);
+      return;
+    }
+    setActiveTab('workspace');
+    if (concepts.length > 0) {
+      setSelectedConcept(concepts[0]);
+    } else {
+      const defaultConcept = {
+        id: Math.random().toString(36).substring(2, 9),
+        title: `${title} Fundamentals & Core Principles`,
+        status: 'Exposed',
+        parentId: null,
+        difficulty: 'Medium',
+        importance: 'High',
+      };
+      const updatedConcepts = [defaultConcept];
+      setConcepts(updatedConcepts);
+      setSelectedConcept(defaultConcept);
+      try {
+        await fetch(`/api/topics/${params.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ knowledgeMap: { concepts: updatedConcepts } }),
+        });
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 
@@ -732,10 +884,10 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      
+
       {/* Header bar */}
-      <div className="flex-between">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div className="flex-between" style={{ flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <Link href="/" style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             ← Back
           </Link>
@@ -745,6 +897,9 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
               ⚡ {activeSlotType} focus slot
             </span>
           )}
+          <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-muted)', border: '1px solid var(--border-color)' }}>
+            🏷️ {area}
+          </span>
         </div>
         
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -768,26 +923,78 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
         </div>
       </div>
 
+      {/* Current Focus Hero Card */}
+      <div className="glass-panel" style={{ padding: '18px 22px', borderLeft: '4px solid var(--color-primary)', background: 'rgba(99, 102, 241, 0.05)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-primary-light)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              🎯 Your Next Action
+            </span>
+            {nextAction && nextAction.trim() ? (
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: '2px', color: '#fff' }}>
+                {nextAction}
+              </h3>
+            ) : (
+              <div style={{ marginTop: '4px' }}>
+                <p style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)' }}>
+                  You have not set a next action yet.
+                </p>
+                <button
+                  onClick={() => setActiveTab('contract')}
+                  style={{ marginTop: '6px', fontSize: '0.78rem', color: 'var(--color-primary-light)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                >
+                  Go to My Goal & Progress to set one →
+                </button>
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+            <button
+              onClick={() => {
+                setActiveTab('workspace');
+                if (concepts.length > 0) {
+                  setSelectedConcept(concepts[0]);
+                } else if (curriculum.length > 0) {
+                  setSelectedConcept({ id: curriculum[0].id, title: curriculum[0].title });
+                } else {
+                  handleGenerateStudyPlan();
+                }
+              }}
+              className="btn btn-primary"
+              style={{ fontSize: '0.78rem', padding: '6px 14px', borderRadius: 'var(--radius-sm)' }}
+            >
+              🧠 Practice with AI Coach
+            </button>
+            <button
+              onClick={() => setActiveTab('materials')}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.78rem', padding: '6px 12px', borderRadius: 'var(--radius-sm)' }}
+            >
+              📋 Tasks ({subtasks.filter(s => s.completed).length}/{subtasks.length})
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Main Tab selectors */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', gap: '4px', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', gap: '6px', overflowX: 'auto' }}>
         {[
-          { key: 'workspace', label: topicMode === 'course' ? '📚 Curriculum' : '💻 Study Desk & Map' },
-          { key: 'contract', label: '📜 Contract' },
-          { key: 'materials', label: '📚 Materials' },
-          { key: 'notes', label: '📝 Notes' },
-          { key: 'confusions', label: '🚫 Mistakes' },
-          { key: 'sessions', label: `📅 Sessions${sessionLogs.length > 0 ? ` (${sessionLogs.length})` : ''}` },
-          { key: 'history', label: '📜 History' },
+          { key: 'workspace', label: '📖 Study & Practice' },
+          { key: 'materials', label: `📋 Tasks & Resources (${subtasks.length + resources.length})` },
+          { key: 'contract', label: '🎯 My Goal & Progress' },
+          { key: 'sessions', label: `📊 Sessions & Notes (${sessionLogs.length})` },
         ].map((t) => (
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key as any)}
             style={{
-              padding: '10px 14px',
-              fontSize: '0.82rem',
+              padding: '10px 16px',
+              fontSize: '0.85rem',
               fontWeight: 600,
               whiteSpace: 'nowrap',
-              color: activeTab === t.key ? 'var(--color-primary-light)' : 'var(--color-text-secondary)',
+              color: activeTab === t.key ? '#fff' : 'var(--color-text-secondary)',
+              background: activeTab === t.key ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+              borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0',
               borderBottom: activeTab === t.key ? '2px solid var(--color-primary)' : '2px solid transparent',
               transition: 'all var(--transition-fast)',
             }}
@@ -806,42 +1013,110 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
           {activeTab === 'workspace' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-              {/* Course Mode — Curriculum View */}
-              {topicMode === 'course' ? (
-                <CurriculumView
-                  curriculum={curriculum}
-                  onSaveCurriculum={handleSaveCurriculum}
-                />
-              ) : (
-                /* Self-Directed — Socratic Coach + Knowledge Map */
-                selectedConcept ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <button
-                      onClick={() => setSelectedConcept(null)}
-                      className="btn btn-secondary"
-                      style={{ alignSelf: 'flex-start', fontSize: '0.75rem', padding: '6px 12px' }}
-                    >
-                      ← Back to Knowledge Map
-                    </button>
-                    <SocraticCoach
-                      concept={selectedConcept}
-                      topicId={params.id}
-                      topicTitle={title}
-                      onSaveProgress={handleSaveSocraticProgress}
-                      explanationsRead={explanationsRead}
-                      onIncrementExplanationsRead={() => setExplanationsRead(prev => prev + 1)}
-                      onResetExplanationsRead={() => setExplanationsRead(0)}
-                    />
+              {/* Show Curriculum when no concepts yet, otherwise Knowledge Map + Socratic Coach */}
+              {concepts.length === 0 && curriculum.length === 0 ? (
+                /* Truly empty — no curriculum, no concepts yet */
+                <div className="glass-panel" style={{ padding: '36px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', textAlign: 'center' }}>
+                  <span style={{ fontSize: '2.8rem' }}>🚀</span>
+                  <div>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#fff', marginBottom: '6px' }}>Ready to learn {title}?</h3>
+                    <p style={{ fontSize: '0.86rem', color: 'var(--color-text-secondary)', maxWidth: '420px', lineHeight: 1.5 }}>
+                      Get started in seconds. Let AI generate structured study modules for this topic, or build a visual concept map.
+                    </p>
                   </div>
-                ) : (
-                  <KnowledgeMap
-                    concepts={concepts}
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <button
+                      onClick={handleGenerateStudyPlan}
+                      disabled={generatingStudyPlan}
+                      className="btn btn-primary"
+                      style={{ fontSize: '0.86rem', padding: '10px 20px' }}
+                    >
+                      {generatingStudyPlan ? '✨ Generating Modules with AI...' : '🤖 Generate AI Course Modules'}
+                    </button>
+                    <button
+                      onClick={handleStartKnowledgeMap}
+                      disabled={generatingStudyPlan}
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.86rem', padding: '10px 18px' }}
+                    >
+                      🗺️ Build Visual Concept Map
+                    </button>
+                  </div>
+                </div>
+              ) : curriculum.length > 0 && !selectedConcept ? (
+                /* Curriculum exists — show it as the default study view */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {concepts.length > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => setTopicMode(topicMode === 'course' ? 'self_directed' : 'course')}
+                        className="btn btn-secondary"
+                        style={{ fontSize: '0.75rem', padding: '4px 12px' }}
+                      >
+                        {topicMode === 'course' ? '🗺️ Switch to Knowledge Map' : '📚 Switch to Curriculum'}
+                      </button>
+                    </div>
+                  )}
+                  {topicMode === 'course' || concepts.length === 0 ? (
+                    <CurriculumView
+                      curriculum={curriculum}
+                      topicTitle={title}
+                      onPracticeModule={(mod) => setSelectedConcept({ id: mod.id, title: mod.title })}
+                      onSaveCurriculum={handleSaveCurriculum}
+                      onImportToSubtasks={async (titles) => {
+                        const existingTitles = new Set(subtasks.map(s => s.title.toLowerCase()));
+                        const newSubs: Subtask[] = titles
+                          .filter(t => !existingTitles.has(t.toLowerCase()))
+                          .map(title => ({
+                            id: Math.random().toString(36).substring(2, 9),
+                            title,
+                            completed: false,
+                            createdAt: new Date().toISOString(),
+                          }));
+                        if (newSubs.length > 0) {
+                          await updateSubtasksAndProgress([...subtasks, ...newSubs]);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <KnowledgeMap
+                      concepts={concepts}
+                      topicTitle={title}
+                      onSaveConcepts={handleSaveConcepts}
+                      onSelectConcept={(c) => setSelectedConcept(c)}
+                      selectedConceptId={selectedConcept?.id}
+                    />
+                  )}
+                </div>
+              ) : selectedConcept ? (
+                /* A concept is selected — show Socratic Coach */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <button
+                    onClick={() => setSelectedConcept(null)}
+                    className="btn btn-secondary"
+                    style={{ alignSelf: 'flex-start', fontSize: '0.75rem', padding: '6px 12px' }}
+                  >
+                    ← Back to Study Plan
+                  </button>
+                  <SocraticCoach
+                    concept={selectedConcept}
+                    topicId={params.id}
                     topicTitle={title}
-                    onSaveConcepts={handleSaveConcepts}
-                    onSelectConcept={(c) => setSelectedConcept(c)}
-                    selectedConceptId={selectedConcept?.id}
+                    onSaveProgress={handleSaveSocraticProgress}
+                    explanationsRead={explanationsRead}
+                    onIncrementExplanationsRead={() => setExplanationsRead(prev => prev + 1)}
+                    onResetExplanationsRead={() => setExplanationsRead(0)}
                   />
-                )
+                </div>
+              ) : (
+                /* Concepts exist but no concept selected — show Knowledge Map */
+                <KnowledgeMap
+                  concepts={concepts}
+                  topicTitle={title}
+                  onSaveConcepts={handleSaveConcepts}
+                  onSelectConcept={(c) => setSelectedConcept(c)}
+                  selectedConceptId={selectedConcept?.id}
+                />
               )}
 
             </div>
@@ -873,113 +1148,119 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
             />
           )}
 
+          {/* Materials Tab */}
           {activeTab === 'materials' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              
-              {/* Resources list */}
               <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div className="flex-between">
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>📚 Reference Resources</h3>
-                  <button
-                    onClick={() => setShowAddRes(!showAddRes)}
-                    className="btn btn-secondary"
-                    style={{ padding: '6px 12px', fontSize: '0.75rem' }}
-                  >
-                    {showAddRes ? 'Cancel' : '➕ Add Resource'}
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>📚 Bookmarks & Learning Materials</h3>
+                  <button onClick={() => setShowAddRes(!showAddRes)} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.78rem' }}>
+                    {showAddRes ? 'Cancel' : '➕ Add Material'}
                   </button>
                 </div>
 
                 {showAddRes && (
-                  <form onSubmit={handleAddResource} className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.2)' }}>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="Title"
-                      value={newResTitle}
-                      onChange={(e) => setNewResTitle(e.target.value)}
-                      required
-                    />
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <form onSubmit={handleAddResource} style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="url"
+                        className="form-input"
+                        placeholder="Paste URL (e.g. https://docs.example.com)..."
+                        value={newResUrl}
+                        onChange={(e) => setNewResUrl(e.target.value)}
+                        style={{ flex: 1 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleScrapeLink}
+                        disabled={scrapingLink || !newResUrl.trim()}
+                        className="btn btn-secondary"
+                        style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                      >
+                        {scrapingLink ? 'Fetching...' : '🔍 Auto-Fetch Info'}
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Resource Title..."
+                        value={newResTitle}
+                        onChange={(e) => setNewResTitle(e.target.value)}
+                        required
+                      />
                       <select
                         className="form-input"
                         value={newResType}
                         onChange={(e) => setNewResType(e.target.value)}
                         style={{ background: '#121218' }}
                       >
-                        <option value="BOOK">Book</option>
-                        <option value="COURSE">Course</option>
-                        <option value="VIDEO">Video</option>
-                        <option value="ARTICLE">Article</option>
-                        <option value="DOCUMENTATION">Docs</option>
-                        <option value="PAPER">Paper</option>
-                        <option value="WEBSITE">Website</option>
-                        <option value="PEOPLE_EXPERT">Expert</option>
+                        <option value="ARTICLE">Article / Doc</option>
+                        <option value="VIDEO">Video / Course</option>
+                        <option value="BOOK">Book / Chapter</option>
+                        <option value="PAPER">Paper / Spec</option>
+                        <option value="TOOL">Tool / Sandbox</option>
+                        <option value="OTHER">Other</option>
                       </select>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <input
-                          type="url"
-                          className="form-input"
-                          placeholder="URL"
-                          value={newResUrl}
-                          onChange={(e) => setNewResUrl(e.target.value)}
-                        />
-                        {newResUrl && (
-                          <button
-                            type="button"
-                            onClick={handleScrapeLink}
-                            disabled={scrapingLink}
-                            className="btn btn-secondary"
-                            style={{ padding: '4px 8px', fontSize: '0.7rem' }}
-                          >
-                            {scrapingLink ? '🔍' : 'Fill'}
-                          </button>
-                        )}
-                      </div>
                     </div>
 
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="Role / Purpose (e.g. Primary Explanation, Reference...)"
+                      placeholder="Why is this material relevant?"
                       value={newResPurpose}
                       onChange={(e) => setNewResPurpose(e.target.value)}
                     />
 
-                    <textarea
-                      className="form-input"
-                      placeholder="Quick summary notes..."
-                      value={newResNotes}
-                      onChange={(e) => setNewResNotes(e.target.value)}
-                      style={{ height: '50px', resize: 'none' }}
-                    />
-
-                    <button type="submit" className="btn btn-primary" style={{ padding: '8px' }}>Add to Stack</button>
+                    <button type="submit" className="btn btn-primary">Save Bookmark</button>
                   </form>
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {resources.map((res, idx) => (
-                    <div key={idx} className="glass-card" style={{ padding: '12px', background: 'rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <div className="flex-between">
-                        <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--color-primary-light)' }}>{res.type}</span>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button onClick={() => handleToggleResourceStatus(idx)} className="btn btn-secondary" style={{ padding: '2px 6px', fontSize: '0.65rem' }}>
-                            {res.status}
-                          </button>
-                          <button onClick={() => handleDeleteResource(idx)} style={{ color: 'var(--color-danger)', fontSize: '0.8rem' }}>×</button>
+                  {resources.map((res, i) => (
+                    <div key={i} className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,0,0,0.15)' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--color-primary-light)', fontWeight: 700 }}>
+                            {res.type}
+                          </span>
+                          <a href={res.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-primary-light)' }}>
+                            {res.title} ↗
+                          </a>
                         </div>
+                        {res.purpose && <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{res.purpose}</p>}
                       </div>
-                      <h4 style={{ fontSize: '0.85rem', fontWeight: 600 }}>{res.url ? <a href={res.url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>{res.title}</a> : res.title}</h4>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>Role: {res.purpose || 'General Reference'}</p>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          onClick={() => handleToggleResourceStatus(i)}
+                          style={{
+                            fontSize: '0.7rem',
+                            padding: '4px 8px',
+                            borderRadius: '9999px',
+                            background: res.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.15)' : res.status === 'IN_PROGRESS' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.05)',
+                            color: res.status === 'COMPLETED' ? '#10b981' : res.status === 'IN_PROGRESS' ? '#f59e0b' : 'var(--color-text-muted)',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {res.status}
+                        </button>
+                        <button onClick={() => handleDeleteResource(i)} style={{ color: 'var(--color-danger)', fontSize: '1rem' }}>×</button>
+                      </div>
                     </div>
                   ))}
+                  {resources.length === 0 && !showAddRes && (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '12px 0' }}>
+                      No bookmarks saved yet. Click "+ Add Material" above to bookmark documentation or guides.
+                    </p>
+                  )}
                 </div>
               </div>
 
               {/* Subtask checklist */}
               <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>📋 Milestones & Exercises</h3>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>📋 Milestones & Practical Exercises</h3>
                 
                 <form onSubmit={handleAddSubtask} style={{ display: 'flex', gap: '8px' }}>
                   <input
@@ -1063,115 +1344,115 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
 
         </div>
 
-        {/* RIGHT SIDE FOCUS timer & detail configs */}
+        {/* RIGHT SIDE FOCUS COMPANION */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* General info card */}
-          <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>📌 Study Context Card</h3>
-            
-            <div style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <p><strong>Area:</strong> {area}</p>
-              <p><strong>Stage:</strong> {currentStage}</p>
-              <p><strong>Target Depth:</strong> {depthTarget}</p>
-              <p><strong>Estimated Effort:</strong> {contract?.estimatedEffort || 0} Hours</p>
-              <p><strong>Last Touched:</strong> {topic?.lastTouchedDate ? new Date(topic.lastTouchedDate).toLocaleDateString() : '—'}</p>
-            </div>
-            
-            {/* Stage Stepper progress */}
-            <div style={{ marginTop: '10px' }}>
-              <span className="form-label" style={{ fontSize: '0.7rem' }}>STAGE PROGRESSION</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-                {STAGES.map((st) => {
-                  const isPassed = STAGES.indexOf(currentStage) >= STAGES.indexOf(st);
-                  return (
-                    <div key={st} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: isPassed ? '#fff' : 'var(--color-text-muted)' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isPassed ? 'var(--color-success)' : 'rgba(255,255,255,0.08)' }}></div>
-                      <span>{st}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Pomodoro Timer widget */}
+          {/* Focus Timer Widget */}
           {(status === 'active' || status === 'paused') && (
-            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>⏱️</span> Study Focus Timer
-              </h3>
+            <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', borderLeft: '3px solid var(--color-primary)' }}>
+              <div className="flex-between">
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary-light)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  ⏱️ Focus Sprint Timer
+                </span>
+                <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                  {timerMode === 'study' ? '25m Sprint' : '5m Break'}
+                </span>
+              </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <button type="button" onClick={() => resetTimer('study')} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.7rem', justifyContent: 'flex-start', background: timerMode === 'study' ? 'rgba(99,102,241,0.1)' : 'transparent' }}>🔥 Study</button>
-                  <button type="button" onClick={() => resetTimer('shortBreak')} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.7rem', justifyContent: 'flex-start', background: timerMode === 'shortBreak' ? 'rgba(20,184,166,0.1)' : 'transparent' }}>☕ Break</button>
-                </div>
-
-                <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ fontSize: '2.2rem', fontWeight: 700, fontFamily: 'monospace' }}>{formatTimerTime(secondsRemaining)}</span>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button type="button" onClick={() => setTimerActive(!timerActive)} className="btn btn-primary" style={{ padding: '2px 8px', fontSize: '0.7rem' }}>
-                      {timerActive ? 'Pause' : 'Start'}
-                    </button>
-                    <button type="button" onClick={() => resetTimer(timerMode)} className="btn btn-secondary" style={{ padding: '2px 8px', fontSize: '0.7rem' }}>Reset</button>
-                  </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                <span style={{ fontSize: '2.5rem', fontWeight: 800, fontFamily: 'monospace', color: '#fff' }}>
+                  {formatTimerTime(secondsRemaining)}
+                </span>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setTimerActive(!timerActive)}
+                    className="btn btn-primary"
+                    style={{ padding: '6px 14px', fontSize: '0.8rem' }}
+                  >
+                    {timerActive ? '⏸ Pause' : '▶ Start'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => resetTimer(timerMode)}
+                    className="btn btn-secondary"
+                    style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                  >
+                    ↺
+                  </button>
                 </div>
               </div>
 
-              {/* Manual Log Session button */}
               <button
                 type="button"
                 onClick={() => { setTimerElapsedMinutes(Math.round((25 * 60 - secondsRemaining) / 60) || 25); setShowDebrief(true); }}
                 className="btn btn-secondary"
                 style={{ width: '100%', fontSize: '0.75rem', padding: '6px', borderStyle: 'dashed' }}
               >
-                📝 Log a Session Manually
+                📝 Log Study Session & Insights
               </button>
-
-              {/* Topic mode toggle */}
-              <div style={{ paddingTop: '8px', borderTop: '1px solid var(--border-color)' }}>
-                <p style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Learning Mode</p>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button
-                    type="button"
-                    onClick={async () => { setTopicMode('self_directed'); await fetch(`/api/topics/${params.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topicMode: 'self_directed' }) }); }}
-                    style={{ flex: 1, padding: '6px 4px', fontSize: '0.7rem', borderRadius: 'var(--radius-sm)', border: topicMode === 'self_directed' ? '1.5px solid var(--color-primary)' : '1.5px solid var(--border-color)', background: topicMode === 'self_directed' ? 'rgba(99,102,241,0.12)' : 'transparent', color: topicMode === 'self_directed' ? 'var(--color-primary-light)' : 'var(--color-text-muted)', cursor: 'pointer' }}
-                  >🧭 Self-Directed</button>
-                  <button
-                    type="button"
-                    onClick={async () => { setTopicMode('course'); await fetch(`/api/topics/${params.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topicMode: 'course' }) }); }}
-                    style={{ flex: 1, padding: '6px 4px', fontSize: '0.7rem', borderRadius: 'var(--radius-sm)', border: topicMode === 'course' ? '1.5px solid #a855f7' : '1.5px solid var(--border-color)', background: topicMode === 'course' ? 'rgba(168,85,247,0.12)' : 'transparent', color: topicMode === 'course' ? '#c084fc' : 'var(--color-text-muted)', cursor: 'pointer' }}
-                  >📚 Course</button>
-                </div>
-              </div>
             </div>
           )}
 
-          {/* Direct Configs form panel */}
-          <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>⚙️ Quick Action Configs</h3>
+          {/* Quick Notes Side-Drawer */}
+          <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="flex-between">
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff' }}>📝 Quick Scratchpad & Notes</span>
+              <button
+                onClick={() => handleSaveNotes(notes)}
+                className="btn btn-secondary"
+                style={{ fontSize: '0.7rem', padding: '2px 8px' }}
+                disabled={saving}
+              >
+                💾 Save
+              </button>
+            </div>
+            <textarea
+              className="form-input"
+              rows={6}
+              placeholder="Jot down quick thoughts, formulas, or key takeaways as you study..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              style={{ resize: 'vertical', fontSize: '0.82rem', lineHeight: 1.5, background: 'rgba(0,0,0,0.2)' }}
+            />
+          </div>
+
+          {/* Compact Study Context & Stage Selection */}
+          <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="flex-between">
+              <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#fff' }}>📌 Topic Milestone Stage</h4>
+              <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '9999px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', fontWeight: 600 }}>
+                {depthTarget || 'Proficiency'}
+              </span>
+            </div>
             
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '0.7rem' }}>NEXT CONCRETE ACTION</label>
-              <input type="text" className="form-input" value={nextAction} onChange={(e) => setNextAction(e.target.value)} style={{ fontSize: '0.8rem', padding: '6px 10px' }} />
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '0.7rem' }}>STAGE</label>
-              <select className="form-input" value={currentStage} onChange={(e) => setCurrentStage(e.target.value)} style={{ fontSize: '0.8rem', padding: '6px 10px', background: '#121218' }}>
-                {STAGES.map((st) => <option key={st} value={st}>{st}</option>)}
+              <label className="form-label" style={{ fontSize: '0.7rem' }}>CURRENT MASTERY STAGE</label>
+              <select
+                className="form-input"
+                value={currentStage}
+                onChange={async (e) => {
+                  const newSt = e.target.value;
+                  setCurrentStage(newSt);
+                  try {
+                    await fetch(`/api/topics/${params.id}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ currentStage: newSt }),
+                    });
+                  } catch (err) {}
+                }}
+                style={{ background: '#121218', fontSize: '0.82rem' }}
+              >
+                {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
 
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '0.7rem' }}>PROGRESS PERCENT (%)</label>
-              <input type="number" className="form-input" min="0" max="100" value={progressPct} onChange={(e) => setProgressPct(Number(e.target.value))} style={{ fontSize: '0.8rem', padding: '6px 10px' }} />
+            <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+              <p><strong>Category:</strong> {area}</p>
+              <p><strong>Target Effort:</strong> {contract?.estimatedEffort || 0} Hours</p>
+              <p><strong>Last Activity:</strong> {topic?.lastTouchedDate ? new Date(topic.lastTouchedDate).toLocaleDateString() : '—'}</p>
             </div>
-
-            <button onClick={() => handleSave()} disabled={saving} className="btn btn-primary" style={{ width: '100%', fontSize: '0.8rem' }}>
-              💾 Sync Topic Changes
-            </button>
           </div>
 
         </div>
@@ -1187,6 +1468,9 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
           onClose={() => setShowReactivation(false)}
         />
       )}
+
+      {/* Global Custom Dialog Modal (Replaces browser alert, confirm, prompt) */}
+      <CustomDialog {...dialogConfig} />
 
       {/* Session Debrief Modal overlay */}
       {showDebrief && (

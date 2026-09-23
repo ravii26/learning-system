@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { isAuthenticated } from '@/lib/auth';
+import { validateTopicPayload } from '@/lib/validations/topic';
+import { buildTopicUpdateData } from '@/lib/topicUpdate';
 
 function checkAuth() {
   if (!isAuthenticated()) {
@@ -71,8 +73,12 @@ export async function PUT(
 
   try {
     const id = params.id;
-    const body = await request.json();
-    console.log('API PUT topic ID:', id, 'body:', body);
+    const rawBody = await request.json();
+    const validation = validateTopicPayload(rawBody, false);
+    if (!validation.isValid || !validation.payload) {
+      return NextResponse.json({ error: validation.error || 'Invalid payload' }, { status: 400 });
+    }
+    const body = validation.payload;
 
     // Fetch existing topic
     const existing = await db.topic.findUnique({ where: { id } });
@@ -81,11 +87,9 @@ export async function PUT(
     }
 
     const newStatus = body.status || existing.status;
-    const newStage = body.currentStage || existing.currentStage;
     const newNextAction = body.nextAction !== undefined ? body.nextAction : existing.nextAction;
     const newWhy = body.why !== undefined ? body.why : existing.why;
     const newDepth = body.depthTarget !== undefined ? body.depthTarget : existing.depthTarget;
-    const newProgress = body.progressPct !== undefined ? body.progressPct : existing.progressPct;
 
     // 1. Enforce Transition Rules (if status is changing)
     if (body.status && body.status !== existing.status) {
@@ -143,34 +147,23 @@ export async function PUT(
     }
 
     // 5. Update Topic
-    const updated = await db.topic.update({
-      where: { id },
-      data: {
-        title: body.title !== undefined ? body.title : existing.title,
-        area: body.area !== undefined ? body.area : existing.area,
-        why: newWhy,
-        depthTarget: newDepth,
-        status: newStatus,
-        progressPct: newProgress,
-        currentStage: newStage,
-        lastCompleted: body.lastCompleted !== undefined ? body.lastCompleted : existing.lastCompleted,
-        nextAction: newNextAction,
-        proofOfLearning: body.proofOfLearning !== undefined ? body.proofOfLearning : existing.proofOfLearning,
-        resources: body.resources !== undefined ? body.resources : existing.resources,
-        subtasks: body.subtasks !== undefined ? body.subtasks : existing.subtasks,
-        notes: body.notes !== undefined ? body.notes : existing.notes,
-        startedDate,
-        contract: body.contract !== undefined ? body.contract : existing.contract,
-        knowledgeMap: body.knowledgeMap !== undefined ? body.knowledgeMap : existing.knowledgeMap,
-        confusions: body.confusions !== undefined ? body.confusions : existing.confusions,
-        mistakes: body.mistakes !== undefined ? body.mistakes : existing.mistakes,
-        pauseHistory: body.pauseHistory !== undefined ? body.pauseHistory : existing.pauseHistory,
-        activeSlotType: finalActiveSlotType,
-        sessionLogs: body.sessionLogs !== undefined ? body.sessionLogs : (existing as any).sessionLogs,
-        topicMode: body.topicMode !== undefined ? body.topicMode : (existing as any).topicMode,
-        curriculum: body.curriculum !== undefined ? body.curriculum : (existing as any).curriculum,
-      },
+    //
+    // Only write columns the client actually sent.
+    //
+    // This previously wrote EVERY column on every PUT, falling back to the
+    // value read by the findUnique above. Two ways that lost data:
+    //   1. Any write landing between that read and this update was silently
+    //      reverted — /api/review/spaced writes knowledgeMap, so an unrelated
+    //      autosave here would roll back review scheduling.
+    //   2. It made a full-object PUT look harmless, so the client sends one.
+    // A key absent from the body must leave its column untouched.
+    const data = buildTopicUpdateData(body, {
+      status: newStatus,
+      activeSlotType: finalActiveSlotType,
+      startedDate,
     });
+
+    const updated = await db.topic.update({ where: { id }, data });
 
     // 6. Track changes in ActivityLog
     const fieldsToTrack: Array<keyof typeof existing> = ['status', 'currentStage', 'nextAction', 'progressPct', 'title'];
