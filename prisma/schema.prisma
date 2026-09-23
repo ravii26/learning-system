@@ -7,14 +7,43 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum MasteryLevel {
+  Unknown
+  Exposed
+  Understood
+  CanRecall
+  CanApply
+  CanSolve
+  CanExplain
+  CanTeach
+  CanCreate
+}
+
+enum FsrsState {
+  New
+  Learning
+  Review
+  Relearning
+}
+
+enum Grade {
+  Again
+  Hard
+  Good
+  Easy
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String?  @unique
   createdAt DateTime @default(now())
 
-  topics       Topic[]
-  activityLogs ActivityLog[]
-  reviewLogs   ReviewLog[]
+  topics         Topic[]
+  activityLogs   ActivityLog[]
+  reviewSessions ReviewSession[]
+  concepts       Concept[]
+  conceptLinks   ConceptLink[]
+  reviewLogs     ReviewLog[]
 }
 
 model Topic {
@@ -41,7 +70,11 @@ model Topic {
 
   // Advanced learning science structures
   contract        Json?          // { estimatedEffort, successCriterion, currentLevel, prerequisites: [{ title, status }] }
-  knowledgeMap    Json?          // { concepts: [{ id, title, parentId, status, difficulty, importance, nextReviewDate, reviewIntervalDays, consecutiveRecalls }] }
+  // Concept is now the source of truth (see Concept model below). This JSON
+  // is a generated mirror, kept in sync by src/lib/conceptSync.ts so the
+  // pre-migration UI (KnowledgeMap.tsx, KnowledgeGraph.tsx) keeps working
+  // unchanged. Do not hand-edit; write Concept rows and re-sync instead.
+  knowledgeMap    Json?          // { concepts: [{ id, title, parentId, status, difficulty, importance }] }
   confusions      Json?          // [{ id, text, resolved, resolvedAt, answer }]
   mistakes        Json?          // [{ id, concept, mistake, whyMade, correctUnderstanding, example, howToAvoid, createdAt }]
   pauseHistory    Json?          // [{ id, pausedAt, resumedAt, reason, completedConcepts, currentConcept, openQuestion, reactivationScore }]
@@ -51,6 +84,7 @@ model Topic {
   curriculum      Json?          // [{ id, order, title, estimatedMinutes, completed, completedAt, notes }]
 
   activityLogs    ActivityLog[]
+  concepts        Concept[]
 }
 
 model ActivityLog {
@@ -65,12 +99,109 @@ model ActivityLog {
   timestamp    DateTime @default(now())
 }
 
-model ReviewLog {
+/// The weekly-audit snapshot. Was named ReviewLog until this migration;
+/// renamed (not dropped+recreated — see the migration SQL) to free that
+/// name for the new per-concept ReviewLog below.
+model ReviewSession {
   id             String   @id @default(uuid())
   userId         String
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   reviewedAt     DateTime @default(now())
   topicsReviewed Json     // Snapshot of decisions made: [{topicId, title, decision}]
+}
+
+/// A concept: the atom of knowledge, promoted out of Topic.knowledgeMap's
+/// JSON array into a real row so it can be scheduled by an indexed query
+/// (see @@index below) instead of a full table scan in JS, and so it can
+/// eventually be linked across topics (ConceptLink) and rolled into a
+/// skill's mastery score.
+model Concept {
+  id            String       @id @default(uuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId       String
+  topic         Topic        @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  title         String
+  parentId      String?
+  parent        Concept?     @relation("ConceptTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children      Concept[]    @relation("ConceptTree")
+
+  masteryLevel  MasteryLevel @default(Unknown)
+  difficultyTag String?      // 'Low' | 'Medium' | 'High' — the user's own hint, distinct from FSRS difficulty below
+  importance    String?      // 'Low' | 'Medium' | 'High'
+
+  // FSRS scheduler state
+  state         FsrsState    @default(New)
+  stability     Float?       // days
+  difficulty    Float?       // FSRS 1..10, NOT difficultyTag
+  reps          Int          @default(0)
+  lapses        Int          @default(0)
+  lastReview    DateTime?
+  nextReview    DateTime?
+  elapsedDays   Int          @default(0)
+  scheduledDays Int          @default(0)
+  suspended     Boolean      @default(false) // soft-removed via the knowledgeMap JSON sync; preserves review history
+
+  // The old Math.random()-generated id from the JSON array, kept for
+  // backfill idempotency and so the JSON<->row sync (src/lib/conceptSync.ts)
+  // can match a concept across both representations.
+  legacyId         String?
+  seededFromLegacy Boolean   @default(false)
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  reviewLogs    ReviewLog[]
+  outgoingLinks ConceptLink[] @relation("ConceptLinkFrom")
+  incomingLinks ConceptLink[] @relation("ConceptLinkTo")
+
+  // The due-concepts query: replaces the full-topic-scan in
+  // api/review/spaced/route.ts with an indexed lookup.
+  @@index([userId, suspended, nextReview])
+  @@index([userId, topicId, masteryLevel])
+  @@index([topicId, legacyId])
+}
+
+model ConceptLink {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromId    String
+  from      Concept  @relation("ConceptLinkFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  toId      String
+  to        Concept  @relation("ConceptLinkTo", fields: [toId], references: [id], onDelete: Cascade)
+  kind      String   @default("related") // related | prerequisite | contrasts | example-of
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([fromId, toId, kind])
+  @@index([userId, toId])
+}
+
+/// Per-concept review event, append-only — the retention dataset. Replaces
+/// the interval-doubling math that used to live inline in
+/// api/review/spaced/route.ts; see src/lib/fsrs.ts for the scheduler.
+model ReviewLog {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conceptId       String
+  concept         Concept   @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  reviewedAt      DateTime  @default(now())
+  grade           Grade
+  stateBefore     FsrsState
+  stateAfter      FsrsState
+  stabilityBefore Float?
+  stabilityAfter  Float?
+  difficultyAfter Float?
+  elapsedDays     Int
+  scheduledDays   Int
+  nextReview      DateTime
+
+  @@index([userId, reviewedAt])
+  @@index([conceptId, reviewedAt])
 }
 
 model SystemSetting {

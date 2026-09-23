@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useToast } from '@/components/ToastProvider';
+
+type Grade = 'Again' | 'Hard' | 'Good' | 'Easy';
 
 interface DueConcept {
   topicId: string;
@@ -25,21 +28,29 @@ const TEMPLATES: Record<string, string> = {
   'caching & content delivery networks (cdn)': 'Caches store reads to offload DBs. CDNs edge cache globally. Cache invalidation is the main complexity.',
 };
 
+const GRADE_BUTTONS: Array<{ grade: Grade; key: string; label: string; emoji: string; activeBg: string; activeBorder: string; activeColor: string }> = [
+  { grade: 'Again', key: '1', label: 'Again', emoji: '❌', activeBg: 'rgba(239, 68, 68, 0.15)', activeBorder: 'var(--color-danger)', activeColor: 'var(--color-danger)' },
+  { grade: 'Hard', key: '2', label: 'Hard', emoji: '😓', activeBg: 'rgba(245, 158, 11, 0.15)', activeBorder: 'var(--color-warning)', activeColor: 'var(--color-warning)' },
+  { grade: 'Good', key: '3', label: 'Good', emoji: '✅', activeBg: 'rgba(16, 185, 129, 0.15)', activeBorder: 'var(--color-success)', activeColor: 'var(--color-success)' },
+  { grade: 'Easy', key: '4', label: 'Easy', emoji: '⚡', activeBg: 'rgba(99, 102, 241, 0.15)', activeBorder: 'var(--color-primary)', activeColor: 'var(--color-primary-light)' },
+];
+
 export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueueProps) {
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [dueConcepts, setDueConcepts] = useState<DueConcept[]>([]);
-  
+
   // Active Test State
   const [testingConcept, setTestingConcept] = useState<DueConcept | null>(null);
   const [recallText, setRecallText] = useState('');
   const [revealed, setRevealed] = useState(false);
-  const [selfSuccess, setSelfSuccess] = useState<boolean | null>(null);
-  
+  const [selfGrade, setSelfGrade] = useState<Grade | null>(null);
+
   // Mistake bank logger sub-inputs
   const [mistakeText, setMistakeText] = useState('');
   const [whyMade, setWhyMade] = useState('');
   const [howToAvoid, setHowToAvoid] = useState('');
-  
+
   // Interleaving sequence state
   const [interleavingList, setInterleavingList] = useState<DueConcept[]>([]);
   const [interleavingIdx, setInterleavingIdx] = useState(0);
@@ -68,7 +79,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
     setTestingConcept(concept);
     setRecallText('');
     setRevealed(false);
-    setSelfSuccess(null);
+    setSelfGrade(null);
     setMistakeText('');
     setWhyMade('');
     setHowToAvoid('');
@@ -84,9 +95,11 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
     handleStartTest(shuffled[0]);
   };
 
-  const handleConcludeTest = async () => {
-    if (!testingConcept || selfSuccess === null) return;
+  const handleConcludeTest = useCallback(async () => {
+    if (!testingConcept || !selfGrade || submitting) return;
     setSubmitting(true);
+
+    const failed = selfGrade === 'Again';
 
     try {
       const res = await fetch('/api/review/spaced', {
@@ -95,8 +108,8 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
         body: JSON.stringify({
           topicId: testingConcept.topicId,
           conceptId: testingConcept.conceptId,
-          success: selfSuccess,
-          mistakeText: !selfSuccess ? mistakeText || `Forgotten: ${testingConcept.conceptTitle}` : undefined,
+          grade: selfGrade,
+          mistakeText: failed ? mistakeText || `Forgotten: ${testingConcept.conceptTitle}` : undefined,
           whyMade: whyMade,
           howToAvoid: howToAvoid,
         }),
@@ -105,7 +118,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
       if (res.ok) {
         await fetchDueConcepts();
         onReviewSaved();
-        
+
         // Handle interleaved transition
         if (isInterleavedMode) {
           const nextIdx = interleavingIdx + 1;
@@ -113,7 +126,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
             setInterleavingIdx(nextIdx);
             handleStartTest(interleavingList[nextIdx]);
           } else {
-            alert('Interleaved review complete! Focus pathways reinforced.');
+            toast.success('Interleaved review complete! Focus pathways reinforced.');
             setIsInterleavedMode(false);
             setTestingConcept(null);
           }
@@ -121,15 +134,43 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
           setTestingConcept(null);
         }
       } else {
-        alert('Failed to save spaced review log.');
+        toast.error('Failed to save spaced review log.');
       }
     } catch (e) {
       console.error(e);
-      alert('Error connecting to API');
+      toast.error('Error connecting to API');
     } finally {
       setSubmitting(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [testingConcept, selfGrade, submitting, mistakeText, whyMade, howToAvoid, isInterleavedMode, interleavingIdx, interleavingList, onReviewSaved]);
+
+  // Keyboard grading: 1-4 pick a grade once the answer is revealed, Enter
+  // submits once a grade is chosen. This was advertised in the UI before
+  // ("Press 1 for No, 2 for Yes") with no listener actually wired up.
+  useEffect(() => {
+    if (!revealed || !testingConcept) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+
+      const match = GRADE_BUTTONS.find((b) => b.key === e.key);
+      if (match) {
+        e.preventDefault();
+        setSelfGrade(match.grade);
+        return;
+      }
+      if (e.key === 'Enter' && selfGrade) {
+        e.preventDefault();
+        handleConcludeTest();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [revealed, testingConcept, selfGrade, handleConcludeTest]);
 
   if (loading) {
     return <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '16px' }}>Loading memory queue...</div>;
@@ -143,11 +184,11 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      
+
       {/* Test overlay pane */}
       {testingConcept && (
         <div className="glass-panel" style={{ padding: '24px', borderLeft: '4px solid var(--color-primary)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          
+
           <div className="flex-between">
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-primary-light)' }}>
               {isInterleavedMode ? `Interleaved Practice: ${interleavingIdx + 1} of ${interleavingList.length}` : 'Active Spaced Retrieval'}
@@ -184,7 +225,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
               <button
                 onClick={() => {
                   if (recallText.trim().length < 8) {
-                    alert('Please make an effort to write a recall summary.');
+                    toast.warning('Please make an effort to write a recall summary.');
                     return;
                   }
                   setRevealed(true);
@@ -197,7 +238,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <span className="form-label" style={{ fontSize: '0.7rem' }}>YOUR RECALL</span>
@@ -213,39 +254,33 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
                 </div>
               </div>
 
-              {/* Success assessment selector */}
+              {/* Grade selector */}
               <div>
-                <label className="form-label" style={{ fontSize: '0.7rem' }}>DID YOU RECALL IT CORRECTLY?</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label className="form-label" style={{ fontSize: '0.7rem', marginBottom: 0 }}>HOW WELL DID YOU RECALL IT?</label>
+                  <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>Press <kbd style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '3px' }}>1-4</kbd> to grade, <kbd style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '3px' }}>Enter</kbd> to save</span>
+                </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => { setSelfSuccess(true); }}
-                    className="btn"
-                    style={{
-                      flex: 1, fontSize: '0.75rem', padding: '6px',
-                      background: selfSuccess === true ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255,255,255,0.02)',
-                      border: selfSuccess === true ? '1px solid var(--color-success)' : '1px solid var(--border-color)',
-                      color: selfSuccess === true ? 'var(--color-success)' : 'var(--color-text-secondary)',
-                    }}
-                  >
-                    ✅ Yes, Correct
-                  </button>
-                  <button
-                    onClick={() => { setSelfSuccess(false); }}
-                    className="btn"
-                    style={{
-                      flex: 1, fontSize: '0.75rem', padding: '6px',
-                      background: selfSuccess === false ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255,255,255,0.02)',
-                      border: selfSuccess === false ? '1px solid var(--color-danger)' : '1px solid var(--border-color)',
-                      color: selfSuccess === false ? 'var(--color-danger)' : 'var(--color-text-secondary)',
-                    }}
-                  >
-                    ❌ No, Forgot
-                  </button>
+                  {GRADE_BUTTONS.map((b) => (
+                    <button
+                      key={b.grade}
+                      onClick={() => setSelfGrade(b.grade)}
+                      className="btn"
+                      style={{
+                        flex: 1, fontSize: '0.75rem', padding: '6px',
+                        background: selfGrade === b.grade ? b.activeBg : 'rgba(255,255,255,0.02)',
+                        border: selfGrade === b.grade ? `1px solid ${b.activeBorder}` : '1px solid var(--border-color)',
+                        color: selfGrade === b.grade ? b.activeColor : 'var(--color-text-secondary)',
+                      }}
+                    >
+                      {b.emoji} {b.label} [{b.key}]
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* If incorrect, inline log to mistake bank */}
-              {selfSuccess === false && (
+              {/* If forgotten, inline log to mistake bank */}
+              {selfGrade === 'Again' && (
                 <div className="glass-panel" style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(239, 68, 68, 0.02)' }}>
                   <span className="form-label" style={{ color: 'var(--color-danger)', fontSize: '0.7rem', marginBottom: 0 }}>LOG TO MISTAKE BANK</span>
                   <input
@@ -279,7 +314,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
 
               <button
                 onClick={handleConcludeTest}
-                disabled={selfSuccess === null || submitting}
+                disabled={selfGrade === null || submitting}
                 className="btn btn-primary"
                 style={{ alignSelf: 'flex-end', padding: '6px 14px', fontSize: '0.8rem' }}
               >
@@ -295,7 +330,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
       {/* Main Spaced review queue grid lists */}
       {!testingConcept && (
         <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          
+
           <div className="flex-between">
             <div>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -305,7 +340,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
                 Spacing and active recall prevent cognitive decay. Mix reviews to avoid pattern memorization.
               </p>
             </div>
-            
+
             <div style={{ display: 'flex', gap: '6px' }}>
               <button
                 onClick={handleStartInterleaved}
@@ -337,10 +372,10 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
                     <span className={`badge badge-${c.topicArea.toLowerCase()}`}>{c.topicArea}</span>
                     <span>Interval: {c.reviewIntervalDays}d</span>
-                    <span>Recalls: {c.consecutiveRecalls}</span>
+                    <span>Reviews: {c.consecutiveRecalls}</span>
                   </div>
                 </div>
-                
+
                 <button
                   onClick={() => handleStartTest(c)}
                   className="btn btn-secondary"

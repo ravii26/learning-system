@@ -8,7 +8,7 @@ export async function GET() {
   const { userId } = auth;
 
   try {
-    const logs = await db.reviewLog.findMany({
+    const logs = await db.reviewSession.findMany({
       where: { userId },
       orderBy: { reviewedAt: 'desc' },
       take: 20,
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     }
 
     // Save review log
-    const log = await db.reviewLog.create({
+    const log = await db.reviewSession.create({
       data: {
         userId,
         topicsReviewed: reviews,

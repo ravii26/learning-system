@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { validateTopicPayload } from '@/lib/validations/topic';
 import { buildTopicUpdateData } from '@/lib/topicUpdate';
+import { syncConceptsFromJson } from '@/lib/conceptSync';
 
 // Enforce SOW state transitions
 function isValidTransition(from: string, to: string): boolean {
@@ -140,6 +141,20 @@ export async function PUT(
     let startedDate = existing.startedDate;
     if (newStatus === 'active' && !existing.startedDate) {
       startedDate = new Date();
+    }
+
+    // 4.5. Structural concept-map edits (add/delete a concept in
+    // KnowledgeMap.tsx, or the AI-generate-map flow) PUT the client's whole
+    // concepts array here, unchanged since before this migration. Concept
+    // rows are the source of truth as of Phase 3, so reconcile rows against
+    // the incoming array and replace body.knowledgeMap with the rebuilt
+    // canonical JSON before it's written — never trust the client's array
+    // verbatim once rows exist. See src/lib/conceptSync.ts.
+    if (body.knowledgeMap && Array.isArray((body.knowledgeMap as any).concepts)) {
+      const synced = await db.$transaction((tx) =>
+        syncConceptsFromJson(tx, userId, id, (body.knowledgeMap as any).concepts)
+      );
+      body.knowledgeMap = synced.json;
     }
 
     // 5. Update Topic

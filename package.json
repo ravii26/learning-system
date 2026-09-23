@@ -34,9 +34,11 @@
     "@types/node": "^20.11.24",
     "@types/react": "^18.2.61",
     "@types/react-dom": "^18.2.19",
+    "dotenv": "^18.0.3",
     "eslint": "^8.57.0",
     "eslint-config-next": "^14.1.0",
     "prisma": "^5.10.2",
+    "tsx": "^4.23.15",
     "typescript": "^5.3.3",
     "vitest": "^2.1.9"
   }

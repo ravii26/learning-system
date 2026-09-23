@@ -35,8 +35,10 @@ export async function GET() {
       }
     }
 
-    // Get the most recent review log
-    const lastReview = await db.reviewLog.findFirst({
+    // Get the most recent weekly-audit review session. ReviewSession is the
+    // renamed ReviewLog (see the Phase 3 migration) — db.reviewLog now
+    // means per-concept spaced-review events, a different thing.
+    const lastReview = await db.reviewSession.findFirst({
       where: { userId },
       orderBy: { reviewedAt: 'desc' },
     });
