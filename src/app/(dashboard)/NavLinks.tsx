@@ -7,7 +7,8 @@ export default function NavLinks() {
   const pathname = usePathname();
 
   const links = [
-    { name: 'Dashboard', href: '/', icon: '📊' },
+    { name: 'Today', href: '/', icon: '☀️' },
+    { name: 'Plan', href: '/plan', icon: '📊' },
     { name: 'Weekly Review', href: '/review', icon: '🔄' },
     { name: 'Exploration Mode', href: '/explore', icon: '⏱️' },
   ];
