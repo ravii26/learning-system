@@ -33,6 +33,12 @@ enum Grade {
   Easy
 }
 
+enum SkillKind {
+  area
+  skill
+  subskill
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String?  @unique
@@ -48,6 +54,7 @@ model User {
   topicPauses    TopicPause[]
   confusions     Confusion[]
   mistakes       Mistake[]
+  skills         Skill[]
 }
 
 model Topic {
@@ -55,7 +62,9 @@ model Topic {
   userId          String
   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   title           String
-  area            String         // Tech, Business, Finance, Creative, Personal, Other
+  area            String         // Tech, Business, Finance, Creative, Personal, Other — kept as-is; skillId below is additive, not a replacement
+  skillId         String?
+  skill           Skill?         @relation(fields: [skillId], references: [id], onDelete: SetNull)
   why             String?        // Required before moving to active
   depthTarget     String?        // Awareness, Working Knowledge, Proficiency, Deep, Mastery (required before active)
   status          String         // inbox, queued, active, paused, maintenance, reference, dropped
@@ -194,6 +203,52 @@ model ConceptLink {
 
   @@unique([fromId, toId, kind])
   @@index([userId, toId])
+}
+
+/// Area -> Skill -> sub-skill, one self-referencing table rather than three
+/// fixed levels (a 3-level tree is a trap — the levels will grow). `path`
+/// is a materialized array of ancestor ids, root-first, so a subtree
+/// rollup ("every skill under this one") is one indexed query
+/// (`path has skillId` OR `id = skillId`) instead of a recursive CTE.
+///
+/// masteryScore/masteryLevel/evidenceCount/computedAt are ALL derived —
+/// see src/lib/mastery.ts. Never write them from a form; targetLevel is
+/// the one field a user sets directly (an aspiration, not a claim).
+model Skill {
+  id     String    @id @default(uuid())
+  userId String
+  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name     String
+  slug     String
+  kind     SkillKind @default(skill)
+  parentId String?
+  parent   Skill?    @relation("SkillTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Skill[]   @relation("SkillTree")
+
+  path  String[] @default([]) // ancestor ids, root-first, NOT including this skill's own id
+  depth Int      @default(0)
+
+  // Evidence-earned mastery — see src/lib/mastery.ts. computedAt is null
+  // until the first recompute; a stale computedAt with no error is how a
+  // partial-failure recompute is caught, so never silently skip setting it.
+  masteryScore     Float         @default(0) // 0..1
+  masteryLevel     MasteryLevel  @default(Unknown)
+  evidenceCount    Int           @default(0)
+  lastEvidenceAt   DateTime?
+  computedAt       DateTime?
+  masteryBreakdown Json?         // { retention, coverage, ... } — cached explanation, always shown next to the score, never just the number alone
+
+  targetLevel MasteryLevel? // the one user-set field: an aspiration, not a claim
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  topics Topic[]
+
+  @@unique([userId, slug])
+  @@index([userId, parentId])
+  @@index([userId, kind])
 }
 
 /// Per-concept review event, append-only — the retention dataset. Replaces
