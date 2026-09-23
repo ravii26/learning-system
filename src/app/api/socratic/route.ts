@@ -4,7 +4,7 @@ import { callAIContent, hasAnyAIProviderConfigured } from '@/lib/ai/aiClient';
 
 async function callAiTutor(messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>, responseFormatJson = true) {
   if (!hasAnyAIProviderConfigured()) {
-    throw new Error('No AI provider is configured (OPENROUTER_API_KEY / GROQ_API_KEY)');
+    throw new Error('No AI provider is configured (AICREDITS_API_KEY / GROQ_API_KEY)');
   }
   const { content } = await callAIContent(messages, { temperature: 0.5, jsonMode: responseFormatJson });
   return content;
