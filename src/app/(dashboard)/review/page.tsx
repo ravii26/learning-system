@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useStudyTimer } from '@/lib/useStudyTimer';
 
 interface Topic {
   id: string;
@@ -14,6 +15,17 @@ interface Topic {
   nextAction: string | null;
   lastTouchedDate: string;
   progressPct: number;
+}
+
+interface DueConcept {
+  topicId: string;
+  topicTitle: string;
+  topicArea: string;
+  conceptId: string;
+  conceptTitle: string;
+  conceptStatus: string;
+  difficulty: string;
+  importance: string;
 }
 
 interface ReviewDecision {
@@ -30,14 +42,21 @@ export default function ReviewPage() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [activePaused, setActivePaused] = useState<Topic[]>([]);
   const [queuedTopics, setQueuedTopics] = useState<Topic[]>([]);
+  const [dueConcepts, setDueConcepts] = useState<DueConcept[]>([]);
+  const [currentConceptIdx, setCurrentConceptIdx] = useState(0);
+  const [revealedAnswer, setRevealedAnswer] = useState(false);
+
+  // Focus mode tab: 'spaced_sprint' | 'weekly_audit' | 'pomodoro'
+  const [activeTab, setActiveTab] = useState<'spaced_sprint' | 'weekly_audit' | 'pomodoro'>('spaced_sprint');
   
-  // Wizard State
-  // 'intro' | 'reviewing' | 'promote' | 'completed'
+  // Timer Hook
+  const { secondsRemaining, isActive, mode, formattedTime, startTimer, pauseTimer, resetTimer, isCompleted } = useStudyTimer();
+
+  // Wizard State for weekly audit
   const [step, setStep] = useState<'intro' | 'reviewing' | 'promote' | 'completed'>('intro');
   const [currentIdx, setCurrentIdx] = useState(0);
   const [decisions, setDecisions] = useState<ReviewDecision[]>([]);
   
-  // Form values for the current topic under review
   const [currentDecision, setCurrentDecision] = useState<'continue' | 'pause' | 'drop' | 'maintenance'>('continue');
   const [currentNextAction, setCurrentNextAction] = useState('');
   const [reviewError, setReviewError] = useState<string | null>(null);
@@ -52,16 +71,21 @@ export default function ReviewPage() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch('/api/topics');
-      if (res.ok) {
-        const data: Topic[] = await res.json();
+      const [topicsRes, spacedRes] = await Promise.all([
+        fetch('/api/topics'),
+        fetch('/api/review/spaced')
+      ]);
+
+      if (topicsRes.ok) {
+        const data: Topic[] = await topicsRes.json();
         setTopics(data);
-        
-        const ap = data.filter(t => t.status === 'active' || t.status === 'paused');
-        setActivePaused(ap);
-        
-        const q = data.filter(t => t.status === 'queued');
-        setQueuedTopics(q);
+        setActivePaused(data.filter(t => t.status === 'active' || t.status === 'paused'));
+        setQueuedTopics(data.filter(t => t.status === 'queued'));
+      }
+
+      if (spacedRes.ok) {
+        const spacedData = await spacedRes.json();
+        setDueConcepts(spacedData.dueConcepts || []);
       }
     } catch (e) {
       console.error(e);
@@ -73,6 +97,33 @@ export default function ReviewPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleLogSpacedReview = async (success: boolean) => {
+    const concept = dueConcepts[currentConceptIdx];
+    if (!concept) return;
+
+    try {
+      await fetch('/api/review/spaced', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topicId: concept.topicId,
+          conceptId: concept.conceptId,
+          success,
+        }),
+      });
+
+      setRevealedAnswer(false);
+      if (currentConceptIdx + 1 < dueConcepts.length) {
+        setCurrentConceptIdx(prev => prev + 1);
+      } else {
+        await fetchData();
+        setCurrentConceptIdx(0);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const startReview = () => {
     if (activePaused.length === 0) {
@@ -217,22 +268,158 @@ export default function ReviewPage() {
   };
 
   if (loading) {
-    return <div className="flex-center" style={{ minHeight: '60vh' }}>Processing Review...</div>;
+    return <div className="flex-center" style={{ minHeight: '60vh' }}>Processing Workspace...</div>;
   }
 
   return (
-    <div style={{ maxWidth: '650px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+    <div style={{ maxWidth: '720px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
-      {/* HEADER */}
-      <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Weekly Focus Review</h1>
-        <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-          Evaluate active/paused topics and decide what to learn next.
-        </p>
+      {/* HEADER & NAVIGATION TABS */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+        <div>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Daily Focus & Review Workspace</h1>
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+            Execute active recall sprints, monitor focus commitments, and manage study timers.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+          <button
+            onClick={() => setActiveTab('spaced_sprint')}
+            className={`btn ${activeTab === 'spaced_sprint' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '0.8rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            ⚡ Spaced Recall Sprint ({dueConcepts.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('weekly_audit')}
+            className={`btn ${activeTab === 'weekly_audit' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '0.8rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            🔄 Weekly Focus Audit
+          </button>
+
+          <button
+            onClick={() => setActiveTab('pomodoro')}
+            className={`btn ${activeTab === 'pomodoro' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontSize: '0.8rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            ⏱️ Pomodoro Sprint ({formattedTime})
+          </button>
+        </div>
       </div>
 
-      {/* STEP: Intro */}
-      {step === 'intro' && (
+      {/* TAB 1: SPACED RECALL SPRINT */}
+      {activeTab === 'spaced_sprint' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {dueConcepts.length === 0 ? (
+            <div className="glass-panel" style={{ padding: '40px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+              <div style={{ fontSize: '3rem' }}>🎉</div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>All Concept Reviews Completed!</h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', maxWidth: '400px' }}>
+                You have no due concepts in your spaced repetition queue right now. Great job keeping your memory fresh!
+              </p>
+              <Link href="/" className="btn btn-secondary" style={{ marginTop: '8px' }}>← Back to Dashboard</Link>
+            </div>
+          ) : (
+            <div className="glass-panel" style={{ padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div className="flex-between">
+                <span className="badge badge-tech" style={{ fontSize: '0.72rem' }}>
+                  {dueConcepts[currentConceptIdx].topicTitle}
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  Card {currentConceptIdx + 1} of {dueConcepts.length}
+                </span>
+              </div>
+
+              <div style={{ textAlign: 'center', padding: '24px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Active Recall Prompt
+                </span>
+                <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginTop: '8px', color: '#fff' }}>
+                  Can you explain or define: "{dueConcepts[currentConceptIdx].conceptTitle}"?
+                </h2>
+
+                {revealedAnswer && (
+                  <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed var(--border-color)', color: 'var(--color-primary-light)', fontSize: '0.88rem' }}>
+                    Status: <strong>{dueConcepts[currentConceptIdx].conceptStatus}</strong> | Difficulty: <strong>{dueConcepts[currentConceptIdx].difficulty}</strong>
+                  </div>
+                )}
+              </div>
+
+              {!revealedAnswer ? (
+                <button
+                  onClick={() => setRevealedAnswer(true)}
+                  className="btn btn-primary"
+                  style={{ alignSelf: 'center', padding: '10px 24px' }}
+                >
+                  👁️ Reveal Mastery Answer / Self-Assess
+                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                  <button
+                    onClick={() => handleLogSpacedReview(false)}
+                    className="btn"
+                    style={{ background: 'rgba(239,68,68,0.15)', borderColor: '#ef4444', color: '#ef4444', flex: 1, padding: '12px' }}
+                  >
+                    ❌ Failed / Forgot (Reset to 1d)
+                  </button>
+                  <button
+                    onClick={() => handleLogSpacedReview(true)}
+                    className="btn"
+                    style={{ background: 'rgba(16,185,129,0.15)', borderColor: '#10b981', color: '#10b981', flex: 1, padding: '12px' }}
+                  >
+                    ✅ Recalled Successfully (+Interval)
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: POMODORO TIMER WORKSPACE */}
+      {activeTab === 'pomodoro' && (
+        <div className="glass-panel" style={{ padding: '36px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-primary-light)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            {mode === 'study' ? '🧠 Deep Study Sprint' : mode === 'shortBreak' ? '☕ Short Break' : '🌴 Long Break'}
+          </span>
+          <div style={{ fontSize: '4.5rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '2px', color: '#fff' }}>
+            {formattedTime}
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {!isActive ? (
+              <button onClick={startTimer} className="btn btn-primary" style={{ padding: '10px 24px', fontSize: '0.9rem' }}>
+                ▶ Start Focus Timer
+              </button>
+            ) : (
+              <button onClick={pauseTimer} className="btn btn-secondary" style={{ padding: '10px 24px', fontSize: '0.9rem' }}>
+                ⏸ Pause
+              </button>
+            )}
+            <button onClick={() => resetTimer('study')} className="btn btn-secondary" style={{ padding: '10px 16px', fontSize: '0.85rem' }}>
+              ↺ Reset 25m
+            </button>
+            <button onClick={() => resetTimer('shortBreak')} className="btn btn-secondary" style={{ padding: '10px 16px', fontSize: '0.85rem' }}>
+              ☕ 5m Break
+            </button>
+          </div>
+
+          {isCompleted && (
+            <div style={{ padding: '12px 18px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', borderRadius: 'var(--radius-sm)', color: '#10b981', fontSize: '0.85rem' }}>
+              🎉 Pomodoro sprint complete! Great focus effort.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: WEEKLY FOCUS AUDIT */}
+      {activeTab === 'weekly_audit' && (
+        <>
+          {/* STEP: Intro */}
+          {step === 'intro' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
           {/* Stats strip */}
@@ -540,10 +727,9 @@ export default function ReviewPage() {
             </div>
           </div>
           
-          <button onClick={() => { router.push('/'); router.refresh(); }} className="btn btn-primary" style={{ alignSelf: 'center', marginTop: '12px' }}>
-            Return to Dashboard
-          </button>
         </div>
+      )}
+        </>
       )}
 
     </div>
