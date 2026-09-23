@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/apiAuth';
 import { schedule, type Grade } from '@/lib/fsrs';
 import { enumToLabel, MASTERY_ENUM_VALUES } from '@/lib/masteryLevel';
 import { mirrorConceptsToJson } from '@/lib/conceptSync';
+import { createMistakeRow, mirrorMistakesToJson } from '@/lib/mistakeSync';
 
 export async function GET() {
   const auth = requireAuth();
@@ -162,31 +163,27 @@ export async function POST(request: Request) {
         },
       });
 
-      // Mistake-bank logging — unchanged, stays a Json column.
+      // Mistake-bank logging: a real Mistake row, attached to this exact
+      // concept (no title-matching needed — createMistakeRow is for
+      // exactly this case, see src/lib/mistakeSync.ts).
       if (!success && mistakeText) {
-        const existingMistakes = (topic.mistakes as any[]) || [];
-        const newMistake = {
-          id: Math.random().toString(36).substring(2, 9),
-          concept: concept!.title,
+        await createMistakeRow(tx, userId, topicId_, conceptId_, concept!.title, {
           mistake: String(mistakeText).trim(),
           whyMade: (whyMade || '').trim(),
-          correctUnderstanding: 'Verify concept rules and constraints.',
-          example: '',
           howToAvoid: (howToAvoid || '').trim(),
-          createdAt: new Date().toISOString(),
-        };
-        await tx.topic.update({
-          where: { id: topicId_ },
-          data: { mistakes: [...existingMistakes, newMistake] },
         });
       }
 
-      // Mirror the row change back into the JSON blob the pre-migration UI
-      // (KnowledgeMap.tsx, KnowledgeGraph.tsx) still reads directly.
-      const mirrored = await mirrorConceptsToJson(tx, topicId_);
+      // Mirror row changes back into the JSON blobs the pre-migration UI
+      // (KnowledgeMap.tsx, KnowledgeGraph.tsx, ConfusionMistakeBank.tsx)
+      // still reads directly.
+      const [mirroredConcepts, mirroredMistakes] = await Promise.all([
+        mirrorConceptsToJson(tx, topicId_),
+        mirrorMistakesToJson(tx, topicId_),
+      ]);
       await tx.topic.update({
         where: { id: topicId_ },
-        data: { knowledgeMap: mirrored as object, lastTouchedDate: new Date() },
+        data: { knowledgeMap: mirroredConcepts as object, mistakes: mirroredMistakes as object[], lastTouchedDate: new Date() },
       });
     });
 

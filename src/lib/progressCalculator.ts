@@ -48,3 +48,26 @@ export function calculateTopicProgress(topic: TopicProgressData): number {
 
   return Math.min(100, Math.max(0, Math.round(weightedSum / totalWeight)));
 }
+
+/**
+ * Mode-aware entry point, per the project plan's Part 3 progress table
+ * (syllabus / practice / accretion / reference each mean something
+ * different by "progress"). Only `syllabus` has real underlying data
+ * today — PracticeRep (practice) and Note (accretion) don't exist until
+ * Phases 8/9, and no UI can set a topic to a non-syllabus mode yet (every
+ * topic defaults to 'syllabus' — see the Phase 5 migration). The other
+ * three branches currently delegate to the same calculation as syllabus;
+ * they're separated here so the mode dispatch exists and each branch has
+ * an obvious place to diverge once its backing feature lands, rather than
+ * bolting mode-awareness on later as a bigger change.
+ */
+export function calculateTopicProgressForMode(mode: string, topic: TopicProgressData): number {
+  switch (mode) {
+    case 'practice': // TODO(Phase 9): rep cadence x rubric trend, rendered as a curve, not this weighted blend
+    case 'accretion': // TODO(Phase 8): note/link growth, capped, never 100%
+    case 'reference': // TODO: no percentage at all once there's a UI that can show that — see below
+    case 'syllabus':
+    default:
+      return calculateTopicProgress(topic);
+  }
+}

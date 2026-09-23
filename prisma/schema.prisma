@@ -44,6 +44,10 @@ model User {
   concepts       Concept[]
   conceptLinks   ConceptLink[]
   reviewLogs     ReviewLog[]
+  sessionLogs    SessionLog[]
+  topicPauses    TopicPause[]
+  confusions     Confusion[]
+  mistakes       Mistake[]
 }
 
 model Topic {
@@ -75,16 +79,28 @@ model Topic {
   // pre-migration UI (KnowledgeMap.tsx, KnowledgeGraph.tsx) keeps working
   // unchanged. Do not hand-edit; write Concept rows and re-sync instead.
   knowledgeMap    Json?          // { concepts: [{ id, title, parentId, status, difficulty, importance }] }
+  // Below: mirrors of their respective row tables, kept in sync the same
+  // way knowledgeMap<->Concept is (src/lib/conceptSync.ts and its sibling
+  // sync modules). Do not hand-edit; write rows and re-sync instead.
   confusions      Json?          // [{ id, text, resolved, resolvedAt, answer }]
   mistakes        Json?          // [{ id, concept, mistake, whyMade, correctUnderstanding, example, howToAvoid, createdAt }]
   pauseHistory    Json?          // [{ id, pausedAt, resumedAt, reason, completedConcepts, currentConcept, openQuestion, reactivationScore }]
   activeSlotType  String?        // 'primary' | 'secondary' | null
   sessionLogs     Json?          // [{ id, activityType, whatDone, oneInsight, whatWasHard, nextAction, durationMinutes, moduleId?, timestamp }]
-  topicMode       String?        // 'self_directed' | 'course'
+  topicMode       String?        // 'self_directed' | 'course' — the existing self-directed/course toggle, untouched
+  // syllabus | practice | accretion | reference — see the project plan's
+  // Part 3. Not yet settable from any UI (that's Phase 8/9); exists so
+  // progressCalculator.ts can branch on it. Backfilled from topicMode:
+  // self_directed/course -> syllabus, everything else -> syllabus for now.
+  mode            String         @default("syllabus")
   curriculum      Json?          // [{ id, order, title, estimatedMinutes, completed, completedAt, notes }]
 
   activityLogs    ActivityLog[]
   concepts        Concept[]
+  sessionLogRows  SessionLog[]
+  topicPauseRows  TopicPause[]
+  confusionRows   Confusion[]
+  mistakeRows     Mistake[]
 }
 
 model ActivityLog {
@@ -155,6 +171,7 @@ model Concept {
   reviewLogs    ReviewLog[]
   outgoingLinks ConceptLink[] @relation("ConceptLinkFrom")
   incomingLinks ConceptLink[] @relation("ConceptLinkTo")
+  mistakes      Mistake[]
 
   // The due-concepts query: replaces the full-topic-scan in
   // api/review/spaced/route.ts with an indexed lookup.
@@ -202,6 +219,125 @@ model ReviewLog {
 
   @@index([userId, reviewedAt])
   @@index([conceptId, reviewedAt])
+}
+
+/// A timeboxed study session's debrief. Promoted out of Topic.sessionLogs
+/// JSON — see src/lib/sessionLogSync.ts.
+model SessionLog {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId         String
+  topic           Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  activityType    String   // read_watch | write_practice | speak_converse | drill_repeat | course_module | free_explore
+  whatDone        String
+  oneInsight      String
+  whatWasHard     String
+  nextAction      String
+  durationMinutes Int
+  moduleId        String?
+  timestamp       DateTime
+
+  // Soft-delete only — see the note on Confusion.removed below for why the
+  // array<->row sync never hard-deletes on "missing from the incoming array".
+  removed         Boolean  @default(false)
+
+  legacyId        String?
+  createdAt       DateTime @default(now())
+
+  @@index([userId, topicId, timestamp])
+  @@index([userId, timestamp])
+}
+
+/// A pause/resume cycle. Promoted out of Topic.pauseHistory JSON — see
+/// src/lib/topicPauseSync.ts.
+model TopicPause {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId           String
+  topic             Topic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  pausedAt          DateTime
+  resumedAt         DateTime?
+  reason            String?
+  completedConcepts String[]  @default([]) // concept titles at the moment of pausing — a point-in-time label snapshot, not a live relation
+  currentConcept    String?
+  openQuestion      String?
+  // Despite the name, this is a short descriptive string ("Flagged 2
+  // forgotten"), not a numeric score — matches the legacy JSON shape.
+  reactivationScore String?
+
+  removed           Boolean   @default(false)
+
+  legacyId          String?
+  createdAt         DateTime  @default(now())
+
+  @@index([userId, topicId, pausedAt])
+}
+
+/// A logged "I don't understand X" note. Promoted out of Topic.confusions
+/// JSON — see src/lib/confusionSync.ts.
+model Confusion {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId    String
+  topic      Topic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  text       String
+  resolved   Boolean   @default(false)
+  resolvedAt DateTime?
+  answer     String?
+
+  // Soft-delete, not hard-delete: the JSON<->row sync reconciles this
+  // topic's whole confusions array on every PUT. A stale client (a second
+  // tab, or a request that raced a concurrent write) sending an array that
+  // doesn't yet include a just-created row must never cause that row to be
+  // hard-deleted for looking "missing" — see src/lib/confusionSync.ts. The
+  // explicit delete affordance in ConfusionMistakeBank.tsx still works: the
+  // mirror omits removed rows, so a deleted item disappears from the UI
+  // exactly as before.
+  removed    Boolean   @default(false)
+
+  legacyId   String?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, topicId, resolved])
+}
+
+/// A logged mistake. Promoted out of Topic.mistakes JSON — see
+/// src/lib/mistakeSync.ts. Also written directly by api/review/spaced's
+/// fail-a-review flow, which already targets a real Concept.
+model Mistake {
+  id                   String   @id @default(uuid())
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId              String
+  topic                Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  conceptId            String?
+  concept              Concept? @relation(fields: [conceptId], references: [id], onDelete: SetNull)
+
+  // Free-text concept label from the legacy JSON's `concept` field. Kept
+  // even when conceptId resolves, since not every mistake maps cleanly to
+  // a Concept row (an exact-title match only — see the sync module).
+  conceptLabel         String
+  mistake              String
+  whyMade              String?
+  correctUnderstanding String?
+  example              String?
+  howToAvoid           String?
+
+  // Maps to the legacy JSON's `createdAt` field. Named occurredAt here so
+  // it doesn't collide with this row's own createdAt audit column below.
+  occurredAt           DateTime
+  removed              Boolean  @default(false) // see Confusion.removed — same race, same fix
+  legacyId             String?
+  createdAt            DateTime @default(now())
+
+  @@index([userId, topicId, occurredAt])
+  @@index([userId, conceptId])
 }
 
 model SystemSetting {

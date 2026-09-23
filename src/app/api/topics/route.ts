@@ -59,9 +59,8 @@ export async function POST(request: Request) {
       area, 
       why, 
       depthTarget, 
-      status = 'inbox', 
-      progressPct = 0, 
-      currentStage = 'Define', 
+      status = 'inbox',
+      currentStage = 'Define',
       nextAction, 
       proofOfLearning, 
       resources, 
@@ -127,7 +126,11 @@ export async function POST(request: Request) {
         why,
         depthTarget,
         status,
-        progressPct,
+        // Always 0 on creation, regardless of what the client sends — a
+        // brand-new topic has no subtasks/curriculum/concepts yet, so 0 is
+        // always correct, and progressPct is server-derived from here on
+        // (see the PUT route's recompute-on-every-write logic).
+        progressPct: 0,
         currentStage,
         nextAction,
         proofOfLearning,

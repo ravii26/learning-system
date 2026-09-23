@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateTopicProgress } from './progressCalculator';
+import { calculateTopicProgress, calculateTopicProgressForMode } from './progressCalculator';
 
 /**
  * Regression net for the weighted progress model.
@@ -152,6 +152,22 @@ describe('calculateTopicProgress', () => {
         expect(result).toBeLessThanOrEqual(100);
         expect(Number.isInteger(result)).toBe(true);
       }
+    });
+  });
+
+  describe('calculateTopicProgressForMode', () => {
+    const data = { subtasks: [{ completed: true }, { completed: false }] };
+
+    it('every known mode currently agrees with the base calculation (no mode has its own data source yet)', () => {
+      const base = calculateTopicProgress(data);
+      for (const mode of ['syllabus', 'practice', 'accretion', 'reference']) {
+        expect(calculateTopicProgressForMode(mode, data)).toBe(base);
+      }
+    });
+
+    it('falls back to the base calculation for an unrecognized mode rather than throwing', () => {
+      expect(() => calculateTopicProgressForMode('something_future', data)).not.toThrow();
+      expect(calculateTopicProgressForMode('something_future', data)).toBe(calculateTopicProgress(data));
     });
   });
 });

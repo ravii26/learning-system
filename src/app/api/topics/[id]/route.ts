@@ -4,6 +4,12 @@ import { requireAuth } from '@/lib/apiAuth';
 import { validateTopicPayload } from '@/lib/validations/topic';
 import { buildTopicUpdateData } from '@/lib/topicUpdate';
 import { syncConceptsFromJson } from '@/lib/conceptSync';
+import { syncSessionLogsFromJson } from '@/lib/sessionLogSync';
+import { syncTopicPausesFromJson } from '@/lib/topicPauseSync';
+import { syncConfusionsFromJson } from '@/lib/confusionSync';
+import { syncMistakesFromJson } from '@/lib/mistakeSync';
+import { calculateTopicProgressForMode } from '@/lib/progressCalculator';
+import { enumToLabel } from '@/lib/masteryLevel';
 
 // Enforce SOW state transitions
 function isValidTransition(from: string, to: string): boolean {
@@ -157,6 +163,41 @@ export async function PUT(
       body.knowledgeMap = synced.json;
     }
 
+    // 4.6. Same pattern as 4.5, for the four Phase-5 extractions. Each of
+    // these is always PUT as a whole array from a single client call site
+    // (see src/lib/*Sync.ts headers for exactly which), so the sync
+    // reconciles rows against the incoming array and the rebuilt JSON is
+    // what actually gets written.
+    if (Array.isArray(body.sessionLogs)) {
+      body.sessionLogs = await db.$transaction((tx) => syncSessionLogsFromJson(tx, userId, id, body.sessionLogs as any));
+    }
+    if (Array.isArray(body.pauseHistory)) {
+      body.pauseHistory = await db.$transaction((tx) => syncTopicPausesFromJson(tx, userId, id, body.pauseHistory as any));
+    }
+    if (Array.isArray(body.confusions)) {
+      body.confusions = await db.$transaction((tx) => syncConfusionsFromJson(tx, userId, id, body.confusions as any));
+    }
+    if (Array.isArray(body.mistakes)) {
+      body.mistakes = await db.$transaction((tx) => syncMistakesFromJson(tx, userId, id, body.mistakes as any));
+    }
+
+    // 4.7. Recompute progress server-side on every PUT, from real current
+    // state — not whatever the client sends. progressCalculator.ts existed
+    // correctly designed but was never called (see the project plan); the
+    // app derived progress from subtasks alone, client-side, which meant
+    // checking every box could carry a topic to 100% with zero retained
+    // concepts. Concepts now come from a fresh, non-suspended row query —
+    // the source of truth — not the (possibly stale) knowledgeMap mirror.
+    const conceptsForProgress = await db.concept.findMany({
+      where: { topicId: id, suspended: false },
+      select: { masteryLevel: true },
+    });
+    const computedProgressPct = calculateTopicProgressForMode(existing.mode, {
+      subtasks: (body.subtasks !== undefined ? body.subtasks : existing.subtasks) as any,
+      curriculum: (body.curriculum !== undefined ? body.curriculum : existing.curriculum) as any,
+      knowledgeMap: { concepts: conceptsForProgress.map((c) => ({ status: enumToLabel(c.masteryLevel) })) },
+    });
+
     // 5. Update Topic
     //
     // Only write columns the client actually sent.
@@ -173,6 +214,10 @@ export async function PUT(
       activeSlotType: finalActiveSlotType,
       startedDate,
     });
+    // progressPct is server-derived (see 4.7 above) — overrides whatever
+    // buildTopicUpdateData copied from the client, or fills it in if the
+    // client didn't send one at all.
+    data.progressPct = computedProgressPct;
 
     const updated = await db.topic.update({ where: { id }, data });
 
