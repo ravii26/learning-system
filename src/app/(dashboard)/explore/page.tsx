@@ -5,6 +5,14 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { renderMarkdown } from '@/lib/markdown';
 
+const OUTCOME_LABELS: Record<string, string> = {
+  interesting: 'Queued for later',
+  useful: 'Queued for later',
+  important: 'High Priority Queue',
+  useless: 'Dropped/Not useful',
+  curiosity: 'Curiosity Reference Only',
+};
+
 export default function ExplorePage() {
   const router = useRouter();
 
@@ -25,16 +33,28 @@ export default function ExplorePage() {
   const [saving, setSaving] = useState(false);
 
   // Recent explorations
-  const [recentExplorations, setRecentExplorations] = useState<Array<{ id: string; title: string; status: string; lastTouchedDate: string }>>([]);
+  const [recentExplorations, setRecentExplorations] = useState<Array<{ id: string; title: string; status: string; lastTouchedDate: string; outcomeLabel: string }>>([]);
 
   useEffect(() => {
-    // Fetch topics that were saved from explorations (contain '[Explored:' in title)
-    fetch('/api/topics')
-      .then(r => r.ok ? r.json() : [])
-      .then((data: Array<{ id: string; title: string; status: string; lastTouchedDate: string }>) => {
-        const explored = data
-          .filter((t: { title: string }) => t.title.includes('[Explored:'))
-          .slice(0, 5);
+    // Recent explorations, via the CaptureItem this flow now creates
+    // alongside each topic (tags: ['explored', outcome]) — a proper
+    // relational link, replacing the previous `title.includes('[Explored:')`
+    // string match. That hack also meant the outcome label had to be
+    // stuffed into the topic's own title forever; it no longer is.
+    Promise.all([
+      fetch('/api/captures?status=processed').then(r => (r.ok ? r.json() : [])),
+      fetch('/api/topics').then(r => (r.ok ? r.json() : [])),
+    ])
+      .then(([captures, topics]: [Array<{ id: string; resultTopicId: string | null; tags: string[] }>, Array<{ id: string; title: string; status: string; lastTouchedDate: string }>]) => {
+        const topicsById = new Map(topics.map((t) => [t.id, t]));
+        const explored = captures
+          .filter((c) => c.tags.includes('explored') && c.resultTopicId && topicsById.has(c.resultTopicId))
+          .slice(0, 5)
+          .map((c) => {
+            const topic = topicsById.get(c.resultTopicId!)!;
+            const outcomeTag = c.tags.find((t) => t !== 'explored') || 'explored';
+            return { id: topic.id, title: topic.title, status: topic.status, lastTouchedDate: topic.lastTouchedDate, outcomeLabel: OUTCOME_LABELS[outcomeTag] || outcomeTag };
+          });
         setRecentExplorations(explored);
       })
       .catch(() => {});
@@ -88,36 +108,19 @@ export default function ExplorePage() {
 
   const handleSaveOutcome = async () => {
     setSaving(true);
-    
+
     // Map outcome to SOW Status
-    // Interesting -> Queue
-    // Useful -> Queue
-    // Important -> Queue (or we can tag as active later)
-    // Not useful (useless) -> Dropped
-    // Just curiosity -> Reference
+    // Interesting/Useful/Important -> Queue · Not useful -> Dropped · Curiosity -> Reference
     let dbStatus = 'queued';
-    let summarySuffix = '';
-    
-    if (outcome === 'interesting' || outcome === 'useful') {
-      dbStatus = 'queued';
-      summarySuffix = ' [Explored: Queued for later]';
-    } else if (outcome === 'important') {
-      dbStatus = 'queued';
-      summarySuffix = ' [Explored: High Priority Queue]';
-    } else if (outcome === 'useless') {
-      dbStatus = 'dropped';
-      summarySuffix = ' [Explored: Dropped/Not useful]';
-    } else if (outcome === 'curiosity') {
-      dbStatus = 'reference';
-      summarySuffix = ' [Explored: Curiosity Reference Only]';
-    }
+    if (outcome === 'useless') dbStatus = 'dropped';
+    else if (outcome === 'curiosity') dbStatus = 'reference';
 
     try {
       const res = await fetch('/api/topics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: topicTitle.trim() + summarySuffix,
+          title: topicTitle.trim(),
           status: dbStatus,
           notes: notes.trim() || 'No exploration notes taken.',
           area: 'Other',
@@ -125,6 +128,37 @@ export default function ExplorePage() {
           depthTarget: 'Awareness',
         }),
       });
+
+      // Record the exploration itself as a processed CaptureItem, linked to
+      // the topic it produced — see the useEffect above for why (replaces
+      // the old `title.includes('[Explored:')` string match). Best-effort:
+      // if this fails, the topic above was still created successfully, so
+      // don't fail the whole save over a tracking record.
+      if (res.ok) {
+        const createdTopic = await res.json().catch(() => null);
+        if (createdTopic?.id) {
+          fetch('/api/captures', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              rawText: `Explored: ${topicTitle.trim()}`,
+              sourceType: 'thought',
+              tags: ['explored', outcome],
+            }),
+          })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((capture) => {
+              if (capture?.id) {
+                return fetch(`/api/captures/${capture.id}/process`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'topic', existingTopicId: createdTopic.id }),
+                });
+              }
+            })
+            .catch(() => {});
+        }
+      }
 
       if (res.ok) {
         setSessionState('saved');
@@ -211,10 +245,6 @@ export default function ExplorePage() {
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {recentExplorations.map(t => {
-                  // Parse outcome badge from title suffix
-                  const outcomeMatch = t.title.match(/\[Explored: ([^\]]+)\]/);
-                  const outcomeLabel = outcomeMatch ? outcomeMatch[1] : 'Explored';
-                  const displayTitle = t.title.replace(/\s*\[Explored:[^\]]+\]/, '');
                   const statusColor: Record<string, string> = {
                     queued: 'var(--color-primary-light)',
                     reference: 'var(--color-text-muted)',
@@ -223,12 +253,12 @@ export default function ExplorePage() {
                   return (
                     <div key={t.id} className="review-preview-card">
                       <span style={{ fontSize: '1rem' }}>🔬</span>
-                      <span style={{ flexGrow: 1, fontSize: '0.85rem', fontWeight: 500 }}>{displayTitle}</span>
+                      <span style={{ flexGrow: 1, fontSize: '0.85rem', fontWeight: 500 }}>{t.title}</span>
                       <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
                         {new Date(t.lastTouchedDate).toLocaleDateString()}
                       </span>
                       <span style={{ fontSize: '0.68rem', fontWeight: 600, color: statusColor[t.status] || 'var(--color-text-muted)' }}>
-                        {outcomeLabel}
+                        {t.outcomeLabel}
                       </span>
                       <a
                         href={`/topics/${t.id}`}

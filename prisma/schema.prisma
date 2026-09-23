@@ -47,6 +47,13 @@ enum GoalStatus {
   paused
 }
 
+enum CaptureStatus {
+  inbox
+  triaged
+  processed
+  archived
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String?  @unique
@@ -65,6 +72,9 @@ model User {
   skills         Skill[]
   goals          Goal[]
   goalLinks      GoalLink[]
+  captures       CaptureItem[]
+  notes          Note[]
+  noteLinks      NoteLink[]
 }
 
 model Topic {
@@ -121,6 +131,9 @@ model Topic {
   confusionRows   Confusion[]
   mistakeRows     Mistake[]
   goalLinks       GoalLink[]
+  // Named linkedNotes, not notes — `notes String?` above is the existing
+  // plain markdown field; this is the accretion-mode Note relation.
+  linkedNotes     Note[]
 }
 
 model ActivityLog {
@@ -192,6 +205,7 @@ model Concept {
   outgoingLinks ConceptLink[] @relation("ConceptLinkFrom")
   incomingLinks ConceptLink[] @relation("ConceptLinkTo")
   mistakes      Mistake[]
+  notes         Note[]
 
   // The due-concepts query: replaces the full-topic-scan in
   // api/review/spaced/route.ts with an indexed lookup.
@@ -257,6 +271,7 @@ model Skill {
 
   topics    Topic[]
   goalLinks GoalLink[]
+  notes     Note[]
 
   @@unique([userId, slug])
   @@index([userId, parentId])
@@ -473,6 +488,99 @@ model GoalLink {
   @@unique([goalId, topicId])
   @@unique([goalId, skillId])
   @@index([userId, goalId, order])
+}
+
+/// A 3-second capture: a URL, a quote, or a passing thought, filed with
+/// zero decision-making at the moment it arrives — the payload for
+/// accretion-mode domains (investing, politics, business — anything with
+/// no syllabus, per the project plan's Example C). Sits in `inbox` until a
+/// weekly triage ritual turns it into a Note, a Concept, a Topic, or
+/// archives it; resultNoteId/resultConceptId/resultTopicId record which.
+model CaptureItem {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  rawText      String? // the thought / quote itself
+  url          String?
+  title        String?
+  sourceType   String? // article | video | book | podcast | conversation | thought
+  sourceAuthor String?
+  sourceMeta   Json? // whatever api/scrape returned for `url` — third-party shape, stays Json
+  highlight    String? // the quoted passage, if any
+  tags         String[] @default([])
+
+  status      CaptureStatus @default(inbox)
+  processedAt DateTime?
+  // Exactly one of these is set once status leaves 'inbox' — which fate
+  // this capture resolved to, per the weekly triage ritual.
+  resultNoteId    String?
+  resultConceptId String?
+  resultTopicId   String?
+
+  createdAt DateTime @default(now())
+
+  notes Note[]
+
+  @@index([userId, status, createdAt])
+}
+
+/// An atomic, linkable note — the Zettelkasten-style knowledge base for
+/// accretion-mode domains. Optionally attaches to a Topic/Concept/Skill
+/// (structured-learning context) and/or the CaptureItem it grew from
+/// (provenance), but stands on its own otherwise: the whole point of
+/// accretion mode is that most notes have no syllabus to hang off of.
+model Note {
+  id    String @id @default(uuid())
+  userId String
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title String
+  body  String // HTML from the existing RichTextEditor component — reused, not rebuilt
+  kind  String   @default("permanent") // fleeting | literature | permanent | index
+  tags  String[] @default([])
+
+  topicId   String?
+  topic     Topic?   @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  conceptId String?
+  concept   Concept? @relation(fields: [conceptId], references: [id], onDelete: SetNull)
+  skillId   String?
+  skill     Skill?   @relation(fields: [skillId], references: [id], onDelete: SetNull)
+
+  sourceCaptureId String?
+  sourceCapture   CaptureItem? @relation(fields: [sourceCaptureId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  outgoing NoteLink[] @relation("NoteLinkFrom")
+  incoming NoteLink[] @relation("NoteLinkTo")
+
+  @@index([userId, updatedAt])
+  @@index([userId, topicId])
+  @@index([userId, skillId])
+  @@index([userId, tags])
+}
+
+/// One row per link, read bidirectionally (`where: OR[{fromId}, {toId}]`) —
+/// two rows per link would be a consistency liability the moment one
+/// delete misses its pair. Parsed from `[[Title]]` references in Note.body
+/// on save; see src/lib/noteLinkSync.ts.
+model NoteLink {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fromId String
+  from   Note   @relation("NoteLinkFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  toId   String
+  to     Note   @relation("NoteLinkTo", fields: [toId], references: [id], onDelete: Cascade)
+  kind   String @default("related")
+
+  createdAt DateTime @default(now())
+
+  @@unique([fromId, toId])
+  @@index([userId, toId])
 }
 
 model SystemSetting {
