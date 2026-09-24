@@ -1,5 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+/* Tailwind (preflight disabled — see tailwind.config.ts). Utilities are
+   emitted at the END of this file so they win over the legacy classes. */
+@tailwind base;
+@tailwind components;
+
 :root {
   --bg-base: #060608;
   --bg-surface: rgba(18, 18, 24, 0.75);
@@ -820,3 +825,6 @@ button {
   border-top: 1px solid var(--border-color);
   margin: 1em 0;
 }
+
+/* Tailwind utilities last, so a utility class overrides legacy component classes. */
+@tailwind utilities;

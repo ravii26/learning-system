@@ -4,6 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useStudyTimer } from '@/lib/useStudyTimer';
+import { Button, ButtonLink, Card, CardLabel, EmptyState } from '@/components/ui';
+import ResurfacedNote from '@/components/ResurfacedNote';
+
+const SPRINT_GRADES = [
+  { grade: 'Again', key: '1', label: '❌ Again', hint: 'Forgot it', cls: 'border-danger bg-[rgba(239,68,68,0.12)] text-danger' },
+  { grade: 'Hard', key: '2', label: '😓 Hard', hint: 'Got it, with effort', cls: 'border-warning bg-[rgba(245,158,11,0.12)] text-warning' },
+  { grade: 'Good', key: '3', label: '✅ Good', hint: 'Recalled fine', cls: 'border-success bg-[rgba(16,185,129,0.12)] text-success' },
+  { grade: 'Easy', key: '4', label: '⚡ Easy', hint: 'Instant', cls: 'border-primary bg-[rgba(99,102,241,0.12)] text-primary-light' },
+] as const;
 
 interface Topic {
   id: string;
@@ -98,7 +107,9 @@ export default function ReviewPage() {
     fetchData();
   }, []);
 
-  const handleLogSpacedReview = async (success: boolean) => {
+  // Four FSRS grades (was pass/fail, which threw away Hard/Easy — the
+  // difference between a 3-day and a 3-week next interval).
+  const handleLogSpacedReview = async (grade: 'Again' | 'Hard' | 'Good' | 'Easy') => {
     const concept = dueConcepts[currentConceptIdx];
     if (!concept) return;
 
@@ -109,7 +120,7 @@ export default function ReviewPage() {
         body: JSON.stringify({
           topicId: concept.topicId,
           conceptId: concept.conceptId,
-          success,
+          grade,
         }),
       });
 
@@ -124,6 +135,29 @@ export default function ReviewPage() {
       console.error(e);
     }
   };
+
+  // Keyboard: Space reveals, 1-4 grades — only on the sprint tab, and never
+  // while typing in a field.
+  useEffect(() => {
+    if (activeTab !== 'spaced_sprint' || dueConcepts.length === 0) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      if (!revealedAnswer && e.key === ' ') {
+        e.preventDefault();
+        setRevealedAnswer(true);
+        return;
+      }
+      const g = revealedAnswer ? SPRINT_GRADES.find((x) => x.key === e.key) : undefined;
+      if (g) {
+        e.preventDefault();
+        handleLogSpacedReview(g.grade);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, revealedAnswer, dueConcepts.length, currentConceptIdx]);
 
   const startReview = () => {
     if (activePaused.length === 0) {
@@ -314,68 +348,50 @@ export default function ReviewPage() {
       {activeTab === 'spaced_sprint' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {dueConcepts.length === 0 ? (
-            <div className="glass-panel" style={{ padding: '40px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-              <div style={{ fontSize: '3rem' }}>🎉</div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>All Concept Reviews Completed!</h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', maxWidth: '400px' }}>
-                You have no due concepts in your spaced repetition queue right now. Great job keeping your memory fresh!
-              </p>
-              <Link href="/" className="btn btn-secondary" style={{ marginTop: '8px' }}>← Back to Dashboard</Link>
-            </div>
+            <EmptyState icon="🎉" title="No concepts due" action={<ButtonLink href="/">← Back to Today</ButtonLink>}>
+              Nothing in your spaced-repetition queue right now. Concepts come back here when FSRS says you&apos;re about to forget them.
+            </EmptyState>
           ) : (
-            <div className="glass-panel" style={{ padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <Card className="flex flex-col gap-5 p-7">
               <div className="flex-between">
-                <span className="badge badge-tech" style={{ fontSize: '0.72rem' }}>
-                  {dueConcepts[currentConceptIdx].topicTitle}
-                </span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                  Card {currentConceptIdx + 1} of {dueConcepts.length}
-                </span>
+                <span className="badge badge-tech text-[0.72rem]">{dueConcepts[currentConceptIdx].topicTitle}</span>
+                <span className="text-[0.75rem] text-fg-muted">Card {currentConceptIdx + 1} of {dueConcepts.length}</span>
               </div>
 
-              <div style={{ textAlign: 'center', padding: '24px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  Active Recall Prompt
-                </span>
-                <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginTop: '8px', color: '#fff' }}>
-                  Can you explain or define: "{dueConcepts[currentConceptIdx].conceptTitle}"?
+              <div className="rounded-md border border-line bg-black/20 px-3 py-6 text-center">
+                <CardLabel>Recall from memory first</CardLabel>
+                <h2 className="mt-2 text-xl font-bold text-white">
+                  Can you explain or define: &quot;{dueConcepts[currentConceptIdx].conceptTitle}&quot;?
                 </h2>
-
                 {revealedAnswer && (
-                  <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed var(--border-color)', color: 'var(--color-primary-light)', fontSize: '0.88rem' }}>
+                  <div className="mt-4 border-t border-dashed border-line pt-4 text-[0.88rem] text-primary-light">
                     Status: <strong>{dueConcepts[currentConceptIdx].conceptStatus}</strong> | Difficulty: <strong>{dueConcepts[currentConceptIdx].difficulty}</strong>
                   </div>
                 )}
               </div>
 
               {!revealedAnswer ? (
-                <button
-                  onClick={() => setRevealedAnswer(true)}
-                  className="btn btn-primary"
-                  style={{ alignSelf: 'center', padding: '10px 24px' }}
-                >
-                  👁️ Reveal Mastery Answer / Self-Assess
-                </button>
+                <Button variant="primary" className="self-center px-6" onClick={() => setRevealedAnswer(true)}>
+                  👁️ I&apos;ve tried — reveal &amp; grade <kbd className="ml-1 rounded bg-white/20 px-1 text-[0.7rem]">Space</kbd>
+                </Button>
               ) : (
-                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                  <button
-                    onClick={() => handleLogSpacedReview(false)}
-                    className="btn"
-                    style={{ background: 'rgba(239,68,68,0.15)', borderColor: '#ef4444', color: '#ef4444', flex: 1, padding: '12px' }}
-                  >
-                    ❌ Failed / Forgot (Reset to 1d)
-                  </button>
-                  <button
-                    onClick={() => handleLogSpacedReview(true)}
-                    className="btn"
-                    style={{ background: 'rgba(16,185,129,0.15)', borderColor: '#10b981', color: '#10b981', flex: 1, padding: '12px' }}
-                  >
-                    ✅ Recalled Successfully (+Interval)
-                  </button>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {SPRINT_GRADES.map((g) => (
+                    <button
+                      key={g.grade}
+                      onClick={() => handleLogSpacedReview(g.grade)}
+                      className={`btn flex-col gap-0.5 border py-3 ${g.cls}`}
+                    >
+                      <span className="text-[0.9rem] font-semibold">{g.label} <kbd className="ml-1 rounded bg-white/10 px-1 text-[0.68rem]">{g.key}</kbd></span>
+                      <span className="text-[0.68rem] opacity-80">{g.hint}</span>
+                    </button>
+                  ))}
                 </div>
               )}
-            </div>
+            </Card>
           )}
+
+          <ResurfacedNote />
         </div>
       )}
 

@@ -21,6 +21,7 @@ export const TOPIC_BODY_FIELDS = [
   'topicMode',
   'mode',
   'skillId',
+  'rubricTemplate',
   // Json columns, each owned by its own client handler
   'resources',
   'subtasks',

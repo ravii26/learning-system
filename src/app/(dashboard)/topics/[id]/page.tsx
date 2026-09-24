@@ -15,6 +15,8 @@ import SessionDebriefModal, { SessionLog } from './SessionDebriefModal';
 import SessionTimeline from './SessionTimeline';
 import CurriculumView, { CourseModule } from './CurriculumView';
 import CustomDialog, { CustomDialogConfig } from '@/components/CustomDialog';
+import { Drawer, Sparkline, StatPill } from '@/components/ui';
+import { computeAccretionStats } from '@/lib/accretionStats';
 
 interface ActivityLog {
   id: string;
@@ -91,12 +93,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
   
   // Learn is the page; Setup (contract, materials, history) is a drawer opened on demand.
   const [setupOpen, setSetupOpen] = useState(false);
-  useEffect(() => {
-    if (!setupOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSetupOpen(false); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [setupOpen]);
+  const closeSetup = useCallback(() => setSetupOpen(false), []);
 
   // Edit fields
   const [title, setTitle] = useState('');
@@ -128,7 +125,8 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
   // progress is measured. Distinct from topicMode below (the legacy
   // curriculum-vs-concept-map view toggle).
   const [learningMode, setLearningMode] = useState<'syllabus' | 'practice' | 'accretion' | 'reference'>('syllabus');
-  const [linkedNotes, setLinkedNotes] = useState<Array<{ id: string; title: string; updatedAt: string }>>([]);
+  const [linkedNotes, setLinkedNotes] = useState<Array<{ id: string; title: string; createdAt: string; updatedAt: string; tags: string[]; _count?: { outgoing: number } }>>([]);
+  const linkedNoteStats = React.useMemo(() => computeAccretionStats(linkedNotes), [linkedNotes]);
 
   useEffect(() => {
     if (learningMode !== 'accretion') return;
@@ -1074,6 +1072,13 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
                 </div>
                 <Link href={`/notes/new?topicId=${params.id}`} className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>+ Note</Link>
               </div>
+              {linkedNotes.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <Sparkline values={linkedNoteStats.weekly} color="#10b981" label={`Notes added per week for this topic, last 8 weeks: ${linkedNoteStats.weekly.join(', ')}`} />
+                  <StatPill value={`+${linkedNoteStats.addedThisWeek}`} label="this week" tone="success" />
+                  <StatPill value={linkedNoteStats.linkCount} label={linkedNoteStats.linkCount === 1 ? 'link' : 'links'} />
+                </div>
+              )}
               {linkedNotes.length > 0 ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {linkedNotes.map((n) => (
@@ -1351,21 +1356,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
       </div>
 
       {/* Setup drawer — contract, materials, history. Touched when activating a topic, rarely after. */}
-      {setupOpen && (
-        <div
-          onClick={() => setSetupOpen(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.55)', display: 'flex', justifyContent: 'flex-end' }}
-        >
-          <aside
-            role="dialog"
-            aria-label="Topic setup"
-            onClick={(e) => e.stopPropagation()}
-            style={{ width: 'min(680px, 100vw)', height: '100%', overflowY: 'auto', background: '#0f0f15', borderLeft: '1px solid var(--border-color)', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '24px' }}
-          >
-            <div className="flex-between">
-              <h2 style={{ fontSize: '1.15rem', fontWeight: 700 }}>⚙️ Setup</h2>
-              <button onClick={() => setSetupOpen(false)} className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 12px' }}>Close ✕</button>
-            </div>
+      <Drawer open={setupOpen} onClose={closeSetup} title="⚙️ Setup" label="Topic setup">
 
             <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>🎯 Focus</h3>
@@ -1611,9 +1602,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
 
             </div>
             </section>
-          </aside>
-        </div>
-      )}
+      </Drawer>
 
       {/* Reactivation Modal overlay */}
       {showReactivation && (

@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/ToastProvider';
 import { pickNextAction, type NextActionPick, type TopicForNextAction } from '@/lib/nextAction';
 import { createCapture } from '@/lib/captureClient';
+import { Button, ButtonLink, Card, CardLabel, EmptyState } from '@/components/ui';
+import ResurfacedNote from '@/components/ResurfacedNote';
 
 /**
  * The Today screen — the front door as of Phase 4 (see the plan's Fix 2).
@@ -136,11 +138,10 @@ export default function TodayPage() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '760px' }}>
-        <div className="skeleton" style={{ height: '52px', borderRadius: '12px' }} />
-        <div className="skeleton" style={{ height: '110px', borderRadius: '12px' }} />
-        <div className="skeleton" style={{ height: '64px', borderRadius: '12px' }} />
-        <div className="skeleton" style={{ height: '160px', borderRadius: '12px' }} />
+      <div className="flex max-w-[760px] flex-col gap-5">
+        {[52, 110, 64, 160].map((h) => (
+          <div key={h} className="skeleton rounded-md" style={{ height: h }} />
+        ))}
       </div>
     );
   }
@@ -148,167 +149,143 @@ export default function TodayPage() {
   const activeTopics = topics.filter((t) => t.status === 'active');
   const pick: NextActionPick | null = pickNextAction(activeTopics);
   const hasPracticeTopic = topics.some((t) => t.mode === 'practice');
+  const linkCls = 'text-primary-light';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '760px' }}>
+    <div className="flex max-w-[760px] flex-col gap-5">
       {/* Capture — always present, works from anywhere (Fix 5) */}
-      <form onSubmit={handleCapture} className="glass-panel" style={{ padding: '14px 18px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>C ▸</span>
+      <form onSubmit={handleCapture} className="glass-panel flex items-center gap-2.5 px-[18px] py-3.5">
+        <span className="whitespace-nowrap text-[0.85rem] font-semibold text-fg-muted">C ▸</span>
         <input
           id="quick-capture-input"
           type="text"
-          className="form-input"
+          className="form-input border-none bg-transparent px-3 py-2 text-[0.9rem]"
           placeholder="capture a thought or paste a link…"
           value={captureTitle}
           onChange={(e) => setCaptureTitle(e.target.value)}
           disabled={capturing}
-          style={{ fontSize: '0.9rem', padding: '8px 12px', border: 'none', background: 'transparent' }}
         />
         {captureTitle.trim() && (
-          <button type="submit" disabled={capturing} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+          <Button type="submit" size="sm" disabled={capturing}>
             {capturing ? 'Capturing…' : 'Capture ▸'}
-          </button>
+          </Button>
         )}
         {inboxCount > 0 && (
-          <Link href="/notes" style={{ fontSize: '0.75rem', color: 'var(--color-primary-light)', whiteSpace: 'nowrap' }}>
-            Inbox ({inboxCount}) ▸
-          </Link>
+          <Link href="/notes" className="whitespace-nowrap text-[0.75rem] text-primary-light">Inbox ({inboxCount}) ▸</Link>
         )}
-        <kbd style={{ background: 'rgba(255,255,255,0.08)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', color: '#818cf8' }}>⌘K</kbd>
+        <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[0.72rem] text-primary-light">⌘K</kbd>
       </form>
 
       {topics.length === 0 && (
-        <div className="glass-panel" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '12px', borderLeft: '4px solid #10b981' }}>
-          <div style={{ fontSize: '1rem', fontWeight: 700 }}>👋 Start here</div>
-          <ol style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', color: 'var(--color-text-secondary)', lineHeight: 1.45 }}>
+        <Card accent="success" className="flex flex-col gap-3">
+          <div className="text-base font-bold">👋 Start here</div>
+          <ol className="m-0 flex flex-col gap-2 pl-[18px] text-[0.85rem] leading-snug text-fg-secondary">
             <li>
-              <strong style={{ color: '#fff' }}>Have a goal?</strong> (&quot;Crack a backend interview by June&quot;){' '}
-              <Link href="/goals" style={{ color: 'var(--color-primary-light)' }}>Goals</Link> turns it into a roadmap of topics.
+              <strong className="text-white">Have a goal?</strong> (&quot;Crack a backend interview by June&quot;){' '}
+              <Link href="/goals" className={linkCls}>Goals</Link> turns it into a roadmap of topics.
             </li>
             <li>
-              <strong style={{ color: '#fff' }}>Just a subject?</strong> Add it on the{' '}
-              <Link href="/plan" style={{ color: 'var(--color-primary-light)' }}>Plan</Link> board, then open it and pick how you learn it in <em>Setup</em>:
+              <strong className="text-white">Just a subject?</strong> Add it on the{' '}
+              <Link href="/plan" className={linkCls}>Plan</Link> board, then open it and pick how you learn it in <em>Setup</em>:
               Syllabus (DSA, React), Practice (spoken English), Accretion (investing, politics) or Reference.
             </li>
             <li>
-              <strong style={{ color: '#fff' }}>Only 2 topics can be active at once.</strong> Activate the ones you&apos;re studying now; this screen then picks your next 25 minutes.
+              <strong className="text-white">Only 2 topics can be active at once.</strong> Activate the ones you&apos;re studying now; this screen then picks your next 25 minutes.
             </li>
             <li>
-              <strong style={{ color: '#fff' }}>Came across something?</strong> Type it in the box above — it waits in the inbox until you decide what it is.
+              <strong className="text-white">Came across something?</strong> Type it in the box above — it waits in the inbox until you decide what it is.
             </li>
           </ol>
-        </div>
+        </Card>
       )}
 
       {/* Next 25 minutes — the one choice */}
-      <div className="glass-panel" style={{ padding: '20px', borderLeft: '4px solid var(--color-primary)' }}>
-        <span style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--color-primary-light)', textTransform: 'uppercase' }}>
-          ▸ Next 25 minutes
-        </span>
+      <Card accent="primary">
+        <CardLabel tone="primary">▸ Next 25 minutes</CardLabel>
         {pick ? (
-          <div style={{ marginTop: '10px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
+          <div className="mt-2.5 flex items-start justify-between gap-4">
             <div>
-              <div style={{ fontSize: '1rem', fontWeight: 700 }}>{pick.topicTitle}</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>→ {pick.nextAction}</div>
-              <div style={{ fontSize: '0.72rem', color: pick.isStale ? 'var(--color-danger)' : 'var(--color-text-muted)', marginTop: '8px' }}>
-                why this: {pick.reason}
-              </div>
+              <div className="text-base font-bold">{pick.topicTitle}</div>
+              <div className="mt-0.5 text-[0.85rem] text-fg-secondary">→ {pick.nextAction}</div>
+              <div className={`mt-2 text-[0.72rem] ${pick.isStale ? 'text-danger' : 'text-fg-muted'}`}>why this: {pick.reason}</div>
             </div>
-            <button onClick={() => router.push(`/topics/${pick.topicId}`)} className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>
-              Start ▸
-            </button>
+            <Button variant="primary" onClick={() => router.push(`/topics/${pick.topicId}`)}>Start ▸</Button>
           </div>
         ) : (
-          <div style={{ marginTop: '10px', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+          <div className="mt-2.5 text-[0.85rem] text-fg-muted">
             No active topic has a concrete next action queued.{' '}
-            <Link href="/plan" style={{ color: 'var(--color-primary-light)' }}>Open the board</Link> to set one.
+            <Link href="/plan" className={linkCls}>Open the board</Link> to set one.
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Due reviews + pomodoro + daily rep — link out, one choice each */}
-      <div style={{ display: 'grid', gridTemplateColumns: hasPracticeTopic ? 'repeat(3, 1fr)' : '1fr 1fr', gap: '14px' }}>
-        <div className="glass-panel" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+      <div className={`grid grid-cols-1 gap-3.5 sm:grid-cols-2 ${hasPracticeTopic ? 'lg:grid-cols-3' : ''}`}>
+        <Card className="flex items-center justify-between gap-3 px-[18px] py-4">
           <div>
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
-              ▸ Due reviews
-            </span>
-            <div style={{ fontSize: '0.9rem', marginTop: '4px' }}>
+            <CardLabel>▸ Due reviews</CardLabel>
+            <div className="mt-1 text-[0.9rem]">
               {dueCount > 0 ? `${dueCount} concept${dueCount === 1 ? '' : 's'} · ~${Math.max(1, Math.ceil(dueCount * 0.7))} min` : 'Queue is clear'}
             </div>
           </div>
-          <Link href="/review" className="btn btn-secondary" style={{ whiteSpace: 'nowrap' }}>Review ▸</Link>
-        </div>
+          <ButtonLink href="/review">Review ▸</ButtonLink>
+        </Card>
 
-        <div className="glass-panel" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+        <Card className="flex items-center justify-between gap-3 px-[18px] py-4">
           <div>
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
-              ▸ Focus timer
-            </span>
-            <div style={{ fontSize: '0.9rem', marginTop: '4px' }}>25-minute pomodoro block</div>
+            <CardLabel>▸ Focus timer</CardLabel>
+            <div className="mt-1 text-[0.9rem]">25-minute pomodoro block</div>
           </div>
-          <Link href="/review" className="btn btn-secondary" style={{ whiteSpace: 'nowrap' }}>Start ▸</Link>
-        </div>
+          <ButtonLink href="/review">Start ▸</ButtonLink>
+        </Card>
 
         {hasPracticeTopic && (
-          <div className="glass-panel" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <Card className="flex items-center justify-between gap-3 px-[18px] py-4">
             <div>
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
-                ▸ Daily rep
-              </span>
-              <div style={{ fontSize: '0.9rem', marginTop: '4px' }}>{repLoggedToday ? 'Logged today ✓' : '2-min impromptu'}</div>
+              <CardLabel>▸ Daily rep</CardLabel>
+              <div className="mt-1 text-[0.9rem]">{repLoggedToday ? 'Logged today ✓' : '2-min impromptu'}</div>
             </div>
-            <Link href="/practice" className="btn btn-secondary" style={{ whiteSpace: 'nowrap' }}>
-              {repLoggedToday ? 'View ▸' : 'Record ▸'}
-            </Link>
-          </div>
+            <ButtonLink href="/practice">{repLoggedToday ? 'View ▸' : 'Record ▸'}</ButtonLink>
+          </Card>
         )}
       </div>
 
+      {/* Accretion review: one older note shown back to you (renders nothing if none is due) */}
+      <ResurfacedNote />
+
       {/* NOW — the WIP-limited active slots */}
       <div>
-        <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '10px' }}>
-          Now ({activeTopics.length}/2)
-        </div>
+        <div className="mb-2.5"><CardLabel>Now ({activeTopics.length}/2)</CardLabel></div>
         {activeTopics.length === 0 ? (
-          <div className="glass-panel" style={{ padding: '20px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-            No active topics. <Link href="/plan" style={{ color: 'var(--color-primary-light)' }}>Open the board</Link> to activate one.
-          </div>
+          <EmptyState title="No active topics">
+            <Link href="/plan" className={linkCls}>Open the board</Link> to activate one, or open a topic and use Setup › Save &amp; make active.
+          </EmptyState>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${activeTopics.length}, 1fr)`, gap: '14px' }}>
+          <div className={`grid grid-cols-1 gap-3.5 ${activeTopics.length > 1 ? 'sm:grid-cols-2' : ''}`}>
             {activeTopics.map((t) => (
               <Link
                 key={t.id}
                 href={`/topics/${t.id}`}
-                className="glass-card"
-                style={{
-                  padding: '14px 16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
-                  borderLeft: t.activeSlotType === 'primary' ? '3px solid var(--color-primary)' : '3px solid var(--color-accent)',
-                }}
+                className={`glass-card flex flex-col gap-1.5 px-4 py-3.5 border-l-[3px] ${t.activeSlotType === 'primary' ? 'border-l-primary' : 'border-l-accent'}`}
               >
-                <span style={{ fontSize: '0.9rem', fontWeight: 700 }}>{t.title}</span>
-                <span className={`badge badge-${t.area.toLowerCase()}`} style={{ fontSize: '0.65rem', alignSelf: 'flex-start' }}>{t.area}</span>
-                {t.nextAction && (
-                  <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>next: {t.nextAction}</span>
+                <span className="text-[0.9rem] font-bold">{t.title}</span>
+                <span className={`badge badge-${t.area.toLowerCase()} self-start text-[0.65rem]`}>{t.area}</span>
+                {t.nextAction && <span className="text-[0.75rem] text-fg-secondary">next: {t.nextAction}</span>}
+                {/* Only syllabus topics have a finish line — practice/accretion never show a % bar. */}
+                {t.mode === 'syllabus' ? (
+                  <div className="progress-bar-mini mt-1">
+                    <div className="progress-bar-mini-fill" style={{ width: `${Math.max(t.progressPct || 0, 2)}%` }} />
+                  </div>
+                ) : (
+                  <span className="text-[0.7rem] text-fg-muted">{t.mode} topic — no finish line</span>
                 )}
-                <div className="progress-bar-mini" style={{ marginTop: '4px' }}>
-                  <div className="progress-bar-mini-fill" style={{ width: `${Math.max(t.progressPct || 0, 2)}%` }} />
-                </div>
               </Link>
             ))}
           </div>
         )}
       </div>
 
-      <Link
-        href="/plan"
-        style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '8px' }}
-      >
-        View full board →
-      </Link>
+      <Link href="/plan" className="p-2 text-center text-[0.8rem] text-fg-muted">View full board →</Link>
     </div>
   );
 }

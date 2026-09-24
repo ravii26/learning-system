@@ -7,13 +7,14 @@ export function looksLikeUrl(text: string): boolean {
   return /^https?:\/\//i.test(text.trim());
 }
 
-export async function createCapture(rawInput: string): Promise<Response> {
+export async function createCapture(rawInput: string, knownTitle?: string | null): Promise<Response> {
   const text = rawInput.trim();
   const isUrl = looksLikeUrl(text);
-  let title: string | null = null;
+  let title: string | null = knownTitle?.trim() || null;
   let sourceMeta: unknown = null;
 
-  if (isUrl) {
+  // A bookmarklet already knows the page title — no need to re-fetch it.
+  if (isUrl && !title) {
     try {
       const scrapeRes = await fetch('/api/scrape', {
         method: 'POST',

@@ -85,6 +85,7 @@ export async function POST(request: Request) {
       curriculum,
       mode,
       skillId,
+      rubricTemplate,
     } = body;
 
     if (!title) {
@@ -160,6 +161,7 @@ export async function POST(request: Request) {
         topicMode: topicMode || null,
         curriculum: curriculum || [],
         mode: mode || 'syllabus',
+        rubricTemplate: rubricTemplate || null,
         skillId: skillId || (await ensureAreaSkillId(db, userId, finalArea)),
       },
     });

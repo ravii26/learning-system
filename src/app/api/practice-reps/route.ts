@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { computeRepScore } from '@/lib/practiceScore';
+import { getRubricTemplate, validateRubricScores } from '@/lib/practiceRubrics';
 
 export async function GET(request: Request) {
   const auth = requireAuth();
@@ -30,12 +31,11 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { topicId, promptText, promptConceptId, rubricScores, invertedKeys, recordingUrl, transcript, aiFeedback, durationSeconds } = body as {
+    const { topicId, promptText, promptConceptId, rubricScores, recordingUrl, transcript, aiFeedback, durationSeconds } = body as {
       topicId?: string;
       promptText?: string;
       promptConceptId?: string;
       rubricScores?: Record<string, number>;
-      invertedKeys?: string[];
       recordingUrl?: string;
       transcript?: string;
       aiFeedback?: string;
@@ -48,14 +48,19 @@ export async function POST(request: Request) {
     if (!promptText || !promptText.trim()) {
       return NextResponse.json({ error: 'promptText is required' }, { status: 400 });
     }
-    if (!rubricScores || Object.keys(rubricScores).length === 0) {
-      return NextResponse.json({ error: 'rubricScores must have at least one dimension' }, { status: 400 });
-    }
-
     const topic = await db.topic.findFirst({ where: { id: topicId, userId, deletedAt: null } });
     if (!topic) {
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }
+
+    // Scores are checked against the topic's rubric template, and which
+    // dimensions are inverted comes from the template — never the client.
+    const template = getRubricTemplate(topic.rubricTemplate);
+    const scoreError = validateRubricScores(template, rubricScores);
+    if (scoreError || !rubricScores) {
+      return NextResponse.json({ error: scoreError || 'rubricScores is required' }, { status: 400 });
+    }
+    const invertedKeys = template.dimensions.filter((d) => d.inverted).map((d) => d.key);
 
     if (promptConceptId) {
       const concept = await db.concept.findFirst({ where: { id: promptConceptId, userId } });
@@ -64,7 +69,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const score = computeRepScore({ scores: rubricScores, invertedKeys: invertedKeys || [] });
+    const score = computeRepScore({ scores: rubricScores, invertedKeys });
 
     const rep = await db.practiceRep.create({
       data: {
@@ -73,7 +78,7 @@ export async function POST(request: Request) {
         promptText: promptText.trim(),
         promptConceptId: promptConceptId || null,
         rubricScores,
-        invertedKeys: invertedKeys || [],
+        invertedKeys,
         score,
         recordingUrl: recordingUrl || null,
         transcript: transcript || null,

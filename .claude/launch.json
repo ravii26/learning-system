@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "learning-os-dev-alt",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [".claude/dev-alt.js"],
+      "port": 3001
     }
   ]
 }

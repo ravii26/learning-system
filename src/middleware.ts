@@ -20,6 +20,9 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/login') ||
     pathname.startsWith('/api/auth') ||
+    // Phone-shortcut capture: authenticates itself with a bearer token
+    // (CAPTURE_TOKEN), not the session cookie — see that route.
+    pathname === '/api/capture-hook' ||
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico'
   ) {

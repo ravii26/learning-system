@@ -131,6 +131,9 @@ model Topic {
   // progressCalculator.ts can branch on it. Backfilled from topicMode:
   // self_directed/course -> syllabus, everything else -> syllabus for now.
   mode            String         @default("syllabus")
+  // Practice mode only: which rubric template reps are scored against —
+  // a key into src/lib/practiceRubrics.ts. Null = the default template.
+  rubricTemplate  String?
   curriculum      Json?          // [{ id, order, title, estimatedMinutes, completed, completedAt, notes }]
 
   activityLogs    ActivityLog[]
@@ -562,6 +565,11 @@ model Note {
 
   sourceCaptureId String?
   sourceCapture   CaptureItem? @relation(fields: [sourceCaptureId], references: [id], onDelete: SetNull)
+
+  // Resurfacing (src/lib/noteResurface.ts): when this note was last shown
+  // back to you, so the same note isn't resurfaced every day.
+  lastResurfacedAt DateTime?
+  resurfaceCount   Int       @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

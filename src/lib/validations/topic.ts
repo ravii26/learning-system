@@ -1,3 +1,5 @@
+import { isValidRubricKey } from '../practiceRubrics';
+
 export interface TopicPayload {
   title?: string;
   area?: string;
@@ -23,6 +25,7 @@ export interface TopicPayload {
   curriculum?: any[];
   mode?: 'syllabus' | 'practice' | 'accretion' | 'reference';
   skillId?: string | null;
+  rubricTemplate?: string | null;
 }
 
 export const VALID_MODES = ['syllabus', 'practice', 'accretion', 'reference'];
@@ -46,6 +49,10 @@ export function validateTopicPayload(body: any, isCreate = false): { isValid: bo
 
   if (body.mode && !VALID_MODES.includes(body.mode)) {
     return { isValid: false, error: `Invalid mode: ${body.mode}` };
+  }
+
+  if (body.rubricTemplate !== undefined && body.rubricTemplate !== null && !isValidRubricKey(body.rubricTemplate)) {
+    return { isValid: false, error: `Invalid rubricTemplate: ${body.rubricTemplate}` };
   }
 
   if (body.progressPct !== undefined) {

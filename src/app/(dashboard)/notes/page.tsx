@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/components/ToastProvider';
 import { createCapture } from '@/lib/captureClient';
+import { computeAccretionStats } from '@/lib/accretionStats';
+import { Card, StatPill, Sparkline, Tabs } from '@/components/ui';
 
 /**
  * The accretion-mode home: capture anything in 3 seconds, process the
@@ -26,6 +28,7 @@ interface NoteRow {
   id: string;
   title: string;
   tags: string[];
+  createdAt: string;
   updatedAt: string;
   _count?: { incoming: number; outgoing: number };
 }
@@ -48,6 +51,19 @@ export default function NotesPage() {
 
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [conceptTopicChoice, setConceptTopicChoice] = useState<Record<string, string>>({});
+
+  const stats = useMemo(() => computeAccretionStats(notes), [notes]);
+
+  // The bookmarklet href is a javascript: URL, which React warns about when
+  // passed as a prop — so it's set on the DOM node after mount instead.
+  const bookmarkletRef = useRef<HTMLAnchorElement>(null);
+  const [origin, setOrigin] = useState('');
+  useEffect(() => {
+    const o = window.location.origin;
+    setOrigin(o);
+    const code = `javascript:(()=>{window.open('${o}/capture?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title),'_blank','width=460,height=420')})()`;
+    bookmarkletRef.current?.setAttribute('href', code);
+  }, [loading]); // the anchor only exists once the loading skeleton is gone
 
   const fetchData = useCallback(async () => {
     try {
@@ -153,28 +169,54 @@ export default function NotesPage() {
         )}
       </form>
 
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '2px' }}>
-        <button
-          onClick={() => setTab('inbox')}
-          style={{
-            padding: '8px 14px', fontSize: '0.82rem', fontWeight: 600, background: 'transparent',
-            color: tab === 'inbox' ? 'var(--color-primary-light)' : 'var(--color-text-secondary)',
-            borderBottom: tab === 'inbox' ? '2px solid var(--color-primary)' : '2px solid transparent',
-          }}
-        >
-          Inbox ({captures.length})
-        </button>
-        <button
-          onClick={() => setTab('notes')}
-          style={{
-            padding: '8px 14px', fontSize: '0.82rem', fontWeight: 600, background: 'transparent',
-            color: tab === 'notes' ? 'var(--color-primary-light)' : 'var(--color-text-secondary)',
-            borderBottom: tab === 'notes' ? '2px solid var(--color-primary)' : '2px solid transparent',
-          }}
-        >
-          Notes ({notes.length})
-        </button>
-      </div>
+      {/* Accretion dashboard — counts and growth, never a percentage */}
+      {notes.length > 0 && (
+        <Card className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
+              <StatPill value={stats.noteCount} label={stats.noteCount === 1 ? 'note' : 'notes'} tone="primary" />
+              <StatPill value={stats.linkCount} label={stats.linkCount === 1 ? 'link' : 'links'} />
+              <StatPill value={captures.length} label="in inbox" tone={captures.length > 0 ? 'warning' : 'neutral'} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Sparkline values={stats.weekly} label={`Notes added per week, last 8 weeks: ${stats.weekly.join(', ')}`} />
+              <span className="text-[0.72rem] text-fg-muted">+{stats.addedThisWeek} this week</span>
+            </div>
+          </div>
+          {(stats.densest || stats.thinnest) && (
+            <div className="flex flex-wrap gap-x-5 gap-y-1 text-[0.78rem] text-fg-secondary">
+              {stats.densest && <span>Densest: <strong className="text-fg">#{stats.densest.tag}</strong> ({stats.densest.count})</span>}
+              {stats.thinnest && <span>Thinnest: <strong className="text-fg">#{stats.thinnest.tag}</strong> ({stats.thinnest.count}) — explore here next</span>}
+            </div>
+          )}
+        </Card>
+      )}
+
+      <details className="glass-panel px-4 py-1">
+        <summary className="cursor-pointer py-2.5 text-[0.82rem] font-semibold text-fg-secondary">📱 Capture from anywhere — browser bookmarklet &amp; phone</summary>
+        <div className="flex flex-col gap-3 pb-3 text-[0.8rem] text-fg-secondary">
+          <div>
+            <strong className="text-fg">Browser:</strong> drag this to your bookmarks bar, then click it on any page to file that page in your inbox:{' '}
+            <a ref={bookmarkletRef} className="btn btn-secondary ml-1 px-2.5 py-1 text-[0.75rem]" onClick={(e) => e.preventDefault()}>⚡ Capture to Learning OS</a>
+          </div>
+          <div>
+            <strong className="text-fg">Phone (same Wi-Fi):</strong> open <code className="text-primary-light">{origin || 'http://<your-computer-ip>:3000'}/capture</code> and add it to your home screen — a one-box capture that uses your login.
+          </div>
+          <div>
+            <strong className="text-fg">Phone shortcut (no login):</strong> set <code>CAPTURE_TOKEN</code> in <code>.env</code>, then have iOS Shortcuts / Android HTTP Shortcuts send{' '}
+            <code>POST /api/capture-hook</code> with header <code>Authorization: Bearer &lt;token&gt;</code> and JSON <code>{'{"text": "...", "url": "..."}'}</code>.
+          </div>
+        </div>
+      </details>
+
+      <Tabs
+        active={tab}
+        onChange={setTab}
+        tabs={[
+          { key: 'inbox', label: `Inbox (${captures.length})` },
+          { key: 'notes', label: `Notes (${notes.length})` },
+        ]}
+      />
 
       {tab === 'inbox' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
