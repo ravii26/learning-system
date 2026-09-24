@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { useToast } from '@/components/ToastProvider';
 
@@ -18,34 +20,6 @@ interface SocraticCoachProps {
   onIncrementExplanationsRead: () => void;
   onResetExplanationsRead: () => void;
 }
-
-// Predefined database of high-fidelity tutoring content for common topics
-const SOCRATIC_LIBRARY: Record<string, {
-  explain: string;
-  demonstrate: string;
-  connect: string;
-  question: string;
-  apply: string;
-  idealAnswer: string;
-  isAi?: boolean;
-}> = {
-  'distributed fundamentals (cap theorem)': {
-    explain: 'The CAP Theorem states that in any distributed data store, you can only guarantee two out of three characteristics at the same time: Consistency (every read gets the latest write), Availability (every non-failing node returns a response), and Partition Tolerance (the system operates despite network failures). In practice, since network partitions (P) are inevitable, you must choose between Consistency (C) or Availability (A).',
-    demonstrate: 'Imagine Node A and Node B. A partition occurs, cutting the link between them. A client writes "X=5" to Node A. Node A cannot sync this to B. If another client reads from Node B, B must either: (1) Fail the read to maintain Consistency (CP choice), or (2) Return the old value "X=null" to maintain Availability (AP choice).',
-    connect: 'This connects directly to database replicas. If you run a globally sharded database, you must accept eventual consistency (AP) for non-critical assets (like social media likes) but enforce strong consistency (CP) for account balances or checkout transactions.',
-    question: 'In your own words, explain why a distributed system cannot guarantee both Consistency and Availability during a network partition.',
-    apply: 'You are designing the cart system for an online retailer. During a major sales event, a network split occurs between the European and US datacenters. Should you configure the cart database as AP (let customers add items but risk stock-level drift) or CP (block additions to guarantee accurate inventory)? Justify your decision.',
-    idealAnswer: 'In an e-commerce checkout, availability is revenue. Most retailers choose AP (Availability) for the shopping cart, allowing users to add items. If inventory oversells due to eventual consistency, they resolve it after the fact (e.g., emailing the customer, shipping late). Blocking the user from adding items (CP) destroys sales conversion. However, for the final payment transaction, CP must be enforced to avoid double-charging.',
-  },
-  'database replication & consistency': {
-    explain: 'Replication is copying data across multiple nodes to ensure high availability and durability. The consistency model defines when and how all replicas see the latest updates. High-fidelity models range from Single-Leader (where writes go to one node and stream to replicas asynchronously or synchronously) to Multi-Leader and Leaderless replication (where writes require a quorum of nodes to agree).',
-    demonstrate: 'In synchronous replication, Leader blocks the write until all Follower replicas acknowledge. In asynchronous replication, Leader writes locally and responds to the client immediately, streaming logs to Followers in the background. Asynchronous replication is fast but risks data loss if the Leader crashes before replicas catch up.',
-    connect: 'Connect this to database latency. If you need sub-millisecond writes, you must use asynchronous replication, which introduces "read-after-write" consistency issues (users update a profile, refresh, and see their old profile because the read hit a lagging replica).',
-    question: 'What is the "replication lag" problem, and how does it manifest to an end-user in an asynchronous single-leader setup?',
-    apply: 'Design a replication system for a banking system ledger where transactions must never be lost, and a read must always reflect the absolute current balance. Which replication mode and consistency configurations will you select?',
-    idealAnswer: 'You must use synchronous replication on at least one backup replica (semi-synchronous setup) or use a leaderless quorum write (W + R > N, e.g., writing to 2 out of 3 nodes and reading from 2 out of 3). This guarantees that at least one node in the read quorum has the latest transaction update, ensuring strong read-after-write consistency.',
-  },
-};
 
 export default function SocraticCoach({
   concept,
@@ -99,11 +73,8 @@ export default function SocraticCoach({
   const [aiEval, setAiEval] = useState<{ captured?: string; missed?: string; tip?: string } | null>(null);
   const [loadingEval, setLoadingEval] = useState(false);
 
-  // Dynamic fallback generator
-  const getDynamicFallback = (cTitle: string) => {
-    const titleKey = cTitle.toLowerCase();
-    if (SOCRATIC_LIBRARY[titleKey]) return SOCRATIC_LIBRARY[titleKey];
-
+  // Generic offline template, used only when the AI call fails
+  const getDynamicFallback = (cTitle: string): NonNullable<typeof aiTemplate> => {
     const topicName = topicTitle || 'your subject';
     return {
       explain: `Let's break down "${cTitle}" within ${topicName}.\n\n"${cTitle}" represents a core mechanism that controls data flow, execution rules, or architectural decisions. Mastering this ensures your implementations in ${topicName} remain predictable, scalable, and resilient.`,
@@ -312,7 +283,7 @@ export default function SocraticCoach({
                 fontWeight: 600,
               }}
             >
-              {template.isAi ? '✨ Live LLM Tutor' : '⚡ Smart Socratic Assistant'}
+              {template.isAi ? '✨ Live LLM Tutor' : '⚠️ Offline template — AI unavailable'}
             </span>
           </div>
 

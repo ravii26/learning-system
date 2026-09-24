@@ -1,17 +1,50 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/apiAuth';
 import { callAIContent, hasAnyAIProviderConfigured } from '@/lib/ai/aiClient';
+import { db } from '@/lib/db';
+
+/** Every cached lesson for a topic, keyed by moduleId — CurriculumView loads this on mount so a remount doesn't lose (or re-bill for) already-generated lessons. */
+export async function GET(request: Request) {
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
+
+  try {
+    const topicId = new URL(request.url).searchParams.get('topicId');
+    if (!topicId) {
+      return NextResponse.json({ error: 'topicId is required' }, { status: 400 });
+    }
+    const rows = await db.generatedLesson.findMany({ where: { userId, topicId } });
+    const lessons: Record<string, unknown> = {};
+    for (const r of rows) lessons[r.moduleId] = r.content;
+    return NextResponse.json({ lessons });
+  } catch (e) {
+    console.error('Failed to load cached lessons:', e);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   const auth = requireAuth();
   if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
 
   try {
     const body = await request.json();
-    const { moduleTitle, topicTitle, area = 'Tech' } = body;
+    const { moduleTitle, topicTitle, area = 'Tech', topicId, moduleId, regenerate = false } = body;
 
     if (!moduleTitle) {
       return NextResponse.json({ error: 'moduleTitle is required' }, { status: 400 });
+    }
+
+    // Persistence is opt-in via topicId+moduleId; without both this behaves
+    // exactly as before (generate, return, store nothing).
+    const canPersist = Boolean(topicId && moduleId);
+    if (canPersist && !regenerate) {
+      const cached = await db.generatedLesson.findFirst({ where: { userId, topicId, moduleId } });
+      if (cached) {
+        return NextResponse.json({ ...(cached.content as object), cached: true });
+      }
     }
 
     if (!hasAnyAIProviderConfigured()) {
@@ -77,11 +110,24 @@ Generate valid JSON matching this structure:
 
 RETURN VALID JSON ONLY. NO MARKDOWN WRAPPERS OR EXTRA TEXT.`;
 
-    const { content: rawContent } = await callAIContent([
+    const { content: rawContent, provider } = await callAIContent([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: `Generate the complete lesson content and quiz for "${moduleTitle}".` },
     ], { temperature: 0.3 });
     const parsed = JSON.parse(rawContent);
+
+    if (canPersist) {
+      // Only reached with real AI output — every canned fallback returns
+      // earlier or from the catch below, so filler is never cached.
+      const topic = await db.topic.findFirst({ where: { id: topicId, userId, deletedAt: null }, select: { id: true } });
+      if (topic) {
+        await db.generatedLesson.upsert({
+          where: { topicId_moduleId: { topicId, moduleId } },
+          create: { userId, topicId, moduleId, moduleTitle, content: parsed, provider },
+          update: { moduleTitle, content: parsed, provider },
+        });
+      }
+    }
 
     return NextResponse.json(parsed);
   } catch (error: any) {

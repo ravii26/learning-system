@@ -18,9 +18,10 @@ interface CurriculumViewProps {
   onImportToSubtasks?: (moduleTitles: string[]) => Promise<void>;
   onPracticeModule?: (mod: CourseModule) => void;
   topicTitle?: string;
+  topicId?: string;
 }
 
-export default function CurriculumView({ curriculum, onSaveCurriculum, onImportToSubtasks, onPracticeModule, topicTitle }: CurriculumViewProps) {
+export default function CurriculumView({ curriculum, onSaveCurriculum, onImportToSubtasks, onPracticeModule, topicTitle, topicId }: CurriculumViewProps) {
   const [modules, setModules] = useState<CourseModule[]>(
     [...curriculum].sort((a, b) => a.order - b.order)
   );
@@ -75,6 +76,20 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
   const [generatingLessonId, setGeneratingLessonId] = useState<string | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
 
+  // Previously-generated lessons are persisted server-side, so a remount
+  // restores them instead of re-billing the AI provider for identical content.
+  React.useEffect(() => {
+    if (!topicId) return;
+    let cancelled = false;
+    fetch(`/api/generate-lesson?topicId=${topicId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.lessons) setModuleLessons((prev) => ({ ...data.lessons, ...prev }));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [topicId]);
+
   const completedCount = modules.filter(m => m.completed).length;
   const progressPct = modules.length > 0 ? Math.round((completedCount / modules.length) * 100) : 0;
   const currentModule = modules.find(m => !m.completed);
@@ -88,7 +103,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
     setTimeout(() => setImported(false), 3000);
   };
 
-  const handleGenerateLesson = async (mod: CourseModule) => {
+  const handleGenerateLesson = async (mod: CourseModule, regenerate = false) => {
     setGeneratingLessonId(mod.id);
     try {
       const res = await fetch('/api/generate-lesson', {
@@ -96,6 +111,10 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           moduleTitle: mod.title,
+          topicTitle,
+          topicId,
+          moduleId: mod.id,
+          regenerate,
         }),
       });
 
@@ -358,6 +377,21 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
 
                   {lessonData && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {lessonData.fallback && (
+                        <div style={{ padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                          <span style={{ fontSize: '0.78rem', color: 'var(--color-warning)' }}>
+                            ⚠️ Placeholder content — the AI provider was unavailable, so this is generic filler, not a real lesson. It wasn&apos;t saved.
+                          </span>
+                          <button
+                            onClick={() => handleGenerateLesson(mod, true)}
+                            disabled={isGenerating}
+                            className="btn btn-secondary"
+                            style={{ fontSize: '0.72rem', padding: '4px 10px', whiteSpace: 'nowrap' }}
+                          >
+                            Retry
+                          </button>
+                        </div>
+                      )}
                       {/* Summary & Takeaways */}
                       <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
                         <p style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-primary-light)', marginBottom: '4px' }}>

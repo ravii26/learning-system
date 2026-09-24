@@ -1061,6 +1061,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
                     <CurriculumView
                       curriculum={curriculum}
                       topicTitle={title}
+                      topicId={params.id}
                       onPracticeModule={(mod) => setSelectedConcept({ id: mod.id, title: mod.title })}
                       onSaveCurriculum={handleSaveCurriculum}
                       onImportToSubtasks={async (titles) => {

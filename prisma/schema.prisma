@@ -77,6 +77,7 @@ model User {
   noteLinks      NoteLink[]
   practiceReps   PracticeRep[]
   artifacts      Artifact[]
+  generatedLessons GeneratedLesson[]
 }
 
 model Topic {
@@ -144,6 +145,7 @@ model Topic {
   linkedNotes     Note[]
   practiceReps    PracticeRep[]
   artifacts       Artifact[]
+  generatedLessons GeneratedLesson[]
 }
 
 model ActivityLog {
@@ -656,6 +658,32 @@ model Artifact {
   createdAt  DateTime @default(now())
 
   @@index([userId, topicId, occurredAt])
+}
+
+/// An AI-generated lesson+quiz for one curriculum module, persisted so a
+/// remount doesn't re-bill the AI provider for identical content (it used
+/// to live only in CurriculumView component state). Only real AI output is
+/// ever stored — the canned `fallback: true` filler is never cached.
+/// moduleId is the legacy per-topic random id from Topic.curriculum's JSON
+/// (unique only within a topic), so uniqueness is (topicId, moduleId).
+model GeneratedLesson {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  moduleId    String
+  moduleTitle String
+  content     Json // { title, summary, keyTakeaways, explanation, codeOrExample, quiz } — AI-shaped, stays Json
+  provider    String? // aicredits | groq
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([topicId, moduleId])
+  @@index([userId, topicId])
 }
 
 model SystemSetting {
