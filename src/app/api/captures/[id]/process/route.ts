@@ -28,12 +28,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const defaultTitle = capture.title || capture.rawText?.slice(0, 80) || 'Untitled';
 
     if (action === 'note') {
+      // Optional: attach the note to a topic (e.g. an accretion topic like
+      // "Investing") — picked in the inbox's topic dropdown.
+      const { topicId } = body as { topicId?: string };
+      if (topicId && !(await db.topic.findFirst({ where: { id: topicId, userId, deletedAt: null }, select: { id: true } }))) {
+        return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
+      }
       const note = await db.note.create({
         data: {
           userId,
           title: (body.title || defaultTitle).trim(),
-          body: body.body || capture.highlight || capture.rawText || '',
+          body: body.body || capture.highlight || capture.url || capture.rawText || '',
           tags: capture.tags,
+          topicId: topicId || null,
           sourceCaptureId: capture.id,
         },
       });

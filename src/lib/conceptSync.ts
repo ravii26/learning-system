@@ -23,19 +23,9 @@
  * A concept missing from the incoming array is soft-removed (suspended =
  * true), never hard-deleted, so its review history survives a UI delete.
  *
- * KNOWN GAP (found during Phase 5, not fixed there — see the project
- * memory / commit history for the reasoning): topics/[id]/page.tsx's
- * handleConfirmReactivation flow tries to reset "forgotten" concepts by
- * sending status: 'Exposed' + a reset interval through this same
- * knowledgeMap PUT path. Because this function never touches masteryLevel
- * on an existing row, that reset is silently ignored — the concept keeps
- * its real FSRS state, and the next mirror rebuild overwrites the client's
- * optimistic local update. A real fix needs a narrow, deliberate exception
- * (e.g. treat an incoming ladder DOWNGRADE as intentional and reset FSRS
- * state to match) rather than a blanket "trust the client" loosening — that
- * was judged too risky to add inline while building the rest of this
- * phase, since it's logic every structural edit runs through, not just
- * reactivation.
+ * Mastery/FSRS changes go through POST /api/review/spaced instead — e.g.
+ * the reactivation flow's "forgotten" reset logs an Again review with
+ * `forgotten: true` rather than sending a modified knowledgeMap here.
  */
 import type { PrismaClient, Prisma, MasteryLevel } from '@prisma/client';
 import { labelToEnum, enumToLabel } from './masteryLevel';

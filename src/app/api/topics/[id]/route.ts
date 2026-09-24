@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { validateTopicPayload } from '@/lib/validations/topic';
 import { buildTopicUpdateData } from '@/lib/topicUpdate';
+import { ensureAreaSkillId } from '@/lib/areaSkill';
 import { syncConceptsFromJson } from '@/lib/conceptSync';
 import { syncSessionLogsFromJson } from '@/lib/sessionLogSync';
 import { syncTopicPausesFromJson } from '@/lib/topicPauseSync';
@@ -212,6 +213,17 @@ export async function PUT(
     //      autosave here would roll back review scheduling.
     //   2. It made a full-object PUT look harmless, so the client sends one.
     // A key absent from the body must leave its column untouched.
+    // Area changed without an explicit skill: follow the new area's root,
+    // unless the topic was deliberately linked to a finer-grained skill.
+    if (body.area !== undefined && body.area !== existing.area && body.skillId === undefined) {
+      const current = existing.skillId
+        ? await db.skill.findFirst({ where: { id: existing.skillId, userId }, select: { kind: true } })
+        : null;
+      if (!current || current.kind === 'area') {
+        body.skillId = await ensureAreaSkillId(db, userId, body.area);
+      }
+    }
+
     const data = buildTopicUpdateData(body, {
       status: newStatus,
       activeSlotType: finalActiveSlotType,

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/ToastProvider';
 // Reused as-is from the topic detail page — a generic TipTap wrapper with
 // no topic-specific coupling. Not moved/renamed, to avoid touching its
@@ -36,8 +36,10 @@ interface NoteDetail {
 export default function NoteDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
   const isNew = params.id === 'new';
+  const attachTopicId = searchParams.get('topicId');
 
   const [note, setNote] = useState<NoteDetail | null>(null);
   const [loading, setLoading] = useState(!isNew);
@@ -80,7 +82,7 @@ export default function NoteDetailPage() {
       const res = await fetch('/api/notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim(), body, tags: parsedTags() }),
+        body: JSON.stringify({ title: title.trim(), body, tags: parsedTags(), topicId: attachTopicId || undefined }),
       });
       if (res.ok) {
         const created = await res.json();

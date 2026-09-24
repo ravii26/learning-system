@@ -71,6 +71,13 @@ interface Topic {
 }
 
 const STAGES = ['Define', 'Map', 'Fundamentals', 'Core Knowledge', 'Application', 'Advanced', 'Proof'];
+
+const LEARNING_MODES = [
+  { key: 'syllabus', label: '📚 Syllabus', hint: 'A body of material with a finish line — DSA, React, a course.' },
+  { key: 'practice', label: '🎙️ Practice', hint: 'A skill built by reps — speaking, writing. Tracked as a trend.' },
+  { key: 'accretion', label: '🌱 Accretion', hint: 'Knowledge that arrives randomly — investing, politics. Grows as notes.' },
+  { key: 'reference', label: '📖 Reference', hint: 'Look it up when needed. No progress tracked.' },
+] as const;
 const DEPTHS = ['Awareness', 'Working Knowledge', 'Proficiency', 'Deep', 'Mastery'];
 const AREAS = ['Tech', 'Business', 'Finance', 'Creative', 'Personal', 'Other'];
 const STATUSES = ['inbox', 'queued', 'active', 'paused', 'maintenance', 'reference', 'dropped'];
@@ -116,6 +123,56 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
   const [sessionLogs, setSessionLogs] = useState<SessionLog[]>([]);
   const [showDebrief, setShowDebrief] = useState(false);
   const [timerElapsedMinutes, setTimerElapsedMinutes] = useState(25);
+
+  // How this topic is learned (Topic.mode) — drives what Learn shows and how
+  // progress is measured. Distinct from topicMode below (the legacy
+  // curriculum-vs-concept-map view toggle).
+  const [learningMode, setLearningMode] = useState<'syllabus' | 'practice' | 'accretion' | 'reference'>('syllabus');
+  const [linkedNotes, setLinkedNotes] = useState<Array<{ id: string; title: string; updatedAt: string }>>([]);
+
+  useEffect(() => {
+    if (learningMode !== 'accretion') return;
+    fetch(`/api/notes?topicId=${params.id}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows) => setLinkedNotes(Array.isArray(rows) ? rows : []))
+      .catch(() => setLinkedNotes([]));
+  }, [learningMode, params.id]);
+
+  // Why / depth / next action — the three fields activation requires. The
+  // hero card sends users here to set them; Setup previously had no editor.
+  const [focusSaving, setFocusSaving] = useState(false);
+  const handleSaveFocus = async (activate: boolean) => {
+    setFocusSaving(true);
+    try {
+      const res = await fetch(`/api/topics/${params.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ why, depthTarget, nextAction, ...(activate ? { status: 'active' } : {}) }),
+      });
+      if (res.ok) {
+        await fetchTopic();
+        if (activate) setSetupOpen(false);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setDialogConfig({ isOpen: true, type: 'error', title: activate ? 'Could not activate' : 'Could not save', message: data.error || 'Save failed', onConfirm: () => setDialogConfig((p) => ({ ...p, isOpen: false })) });
+      }
+    } catch {
+      setDialogConfig({ isOpen: true, type: 'error', title: 'Connection Error', message: 'Could not reach the server', onConfirm: () => setDialogConfig((p) => ({ ...p, isOpen: false })) });
+    } finally {
+      setFocusSaving(false);
+    }
+  };
+
+  const handleChangeLearningMode = async (next: typeof learningMode) => {
+    const prev = learningMode;
+    setLearningMode(next);
+    const res = await fetch(`/api/topics/${params.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: next }),
+    }).catch(() => null);
+    if (!res || !res.ok) setLearningMode(prev);
+  };
 
   // Course Mode state
   const [topicMode, setTopicMode] = useState<'self_directed' | 'course'>('self_directed');
@@ -174,6 +231,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
         setActiveSlotType(data.activeSlotType || null);
         setSessionLogs(Array.isArray(data.sessionLogs) ? data.sessionLogs : []);
         setTopicMode(data.topicMode || 'self_directed');
+        setLearningMode(data.mode || 'syllabus');
         setCurriculum(Array.isArray(data.curriculum) ? data.curriculum : []);
 
         // Parse resources & subtasks JSON
@@ -362,21 +420,17 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
 
   // Reactivation success handler
   const handleConfirmReactivation = async (forgottenIds: string[], reactivationNotes: string) => {
-    // Update concepts status for forgotten ones to 'Exposed' and reset spaced review dates
-    const updatedConcepts = concepts.map((c) => {
-      if (forgottenIds.includes(c.id)) {
-        const nextReview = new Date();
-        nextReview.setDate(nextReview.getDate() + 1); // due tomorrow
-        return {
-          ...c,
-          status: 'Exposed',
-          reviewIntervalDays: 1,
-          consecutiveRecalls: 0,
-          nextReviewDate: nextReview.toISOString(),
-        };
-      }
-      return c;
-    });
+    // Each forgotten concept is logged as an FSRS "Again" review with the
+    // explicit forgotten flag (drops it to Exposed, reschedules it soon).
+    // Concept rows own mastery/FSRS state, so sending a modified
+    // knowledgeMap here (the old approach) was silently ignored.
+    for (const conceptId of forgottenIds) {
+      await fetch('/api/review/spaced', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topicId: params.id, conceptId, grade: 'Again', forgotten: true }),
+      });
+    }
 
     // Update pause logs
     const updatedPauseHistory = pauseHistory.map((ph, idx) => {
@@ -396,7 +450,6 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: 'active',
-          knowledgeMap: { concepts: updatedConcepts },
           pauseHistory: updatedPauseHistory,
           nextAction: nextAction || 'Continue study map concepts',
         }),
@@ -997,7 +1050,53 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
         
         {/* LEFT WORKSPACE PANELS */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
+
+          {learningMode === 'practice' && (
+            <div className="glass-panel" style={{ padding: '20px', borderLeft: '4px solid var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+              <div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>🎙️ Practice topic</div>
+                <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                  Progress here is a trend across reps, not a checklist. Log today&apos;s rep and see your curve on the Practice page.
+                </p>
+              </div>
+              <Link href="/practice" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>Log a rep ▸</Link>
+            </div>
+          )}
+
+          {learningMode === 'accretion' && (
+            <div className="glass-panel" style={{ padding: '20px', borderLeft: '4px solid #10b981', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="flex-between" style={{ gap: '12px' }}>
+                <div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>🌱 Accretion topic — {linkedNotes.length} note{linkedNotes.length === 1 ? '' : 's'}</div>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                    No syllabus and no finish line. Capture what you come across, then turn the keepers into linked notes.
+                  </p>
+                </div>
+                <Link href={`/notes/new?topicId=${params.id}`} className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>+ Note</Link>
+              </div>
+              {linkedNotes.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {linkedNotes.map((n) => (
+                    <Link key={n.id} href={`/notes/${n.id}`} style={{ fontSize: '0.78rem', padding: '3px 10px', borderRadius: '9999px', background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>
+                      {n.title}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+                  No notes yet. Capture a link or thought from Today or <Link href="/notes" style={{ color: 'var(--color-primary-light)' }}>Notes</Link>, or start one above.
+                </p>
+              )}
+            </div>
+          )}
+
+          {learningMode === 'reference' && concepts.length === 0 && curriculum.length === 0 && (
+            <div className="glass-panel" style={{ padding: '16px 20px', fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
+              📖 Reference topic — nothing to complete. Keep resources in Setup and your scratchpad on the right.
+            </div>
+          )}
+
+          {(learningMode === 'syllabus' || concepts.length > 0 || curriculum.length > 0) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
               {/* Show Curriculum when no concepts yet, otherwise Knowledge Map + Socratic Coach */}
@@ -1108,6 +1207,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
               )}
 
             </div>
+          )}
 
           {/* Confusions & mistakes — inline, no tab switch mid-thought */}
           <details className="glass-panel" style={{ padding: '4px 16px' }}>
@@ -1266,6 +1366,55 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
               <h2 style={{ fontSize: '1.15rem', fontWeight: 700 }}>⚙️ Setup</h2>
               <button onClick={() => setSetupOpen(false)} className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 12px' }}>Close ✕</button>
             </div>
+
+            <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>🎯 Focus</h3>
+              <label className="form-label" style={{ fontSize: '0.72rem', marginBottom: 0 }}>WHY ARE YOU LEARNING THIS?</label>
+              <input type="text" className="form-input" value={why} onChange={(e) => setWhy(e.target.value)} placeholder="e.g. Needed for the backend interview in June" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px' }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.72rem' }}>HOW DEEP</label>
+                  <select className="form-input" value={depthTarget} onChange={(e) => setDepthTarget(e.target.value)} style={{ background: '#121218' }}>
+                    {['Awareness', 'Working Knowledge', 'Proficiency', 'Deep', 'Mastery'].map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.72rem' }}>NEXT ACTION (CONCRETE, VERB-FIRST)</label>
+                  <input type="text" className="form-input" value={nextAction} onChange={(e) => setNextAction(e.target.value)} placeholder="e.g. Solve 2 sliding-window mediums" />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button onClick={() => handleSaveFocus(false)} disabled={focusSaving} className="btn btn-secondary" style={{ fontSize: '0.8rem' }}>
+                  {focusSaving ? 'Saving…' : 'Save'}
+                </button>
+                {status !== 'active' && (
+                  <button onClick={() => handleSaveFocus(true)} disabled={focusSaving || !why.trim() || !nextAction.trim()} className="btn btn-primary" style={{ fontSize: '0.8rem' }}>
+                    Save & make active (uses 1 of 2 slots)
+                  </button>
+                )}
+              </div>
+            </section>
+
+            <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>🧭 How you learn this</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                {LEARNING_MODES.map((m) => (
+                  <button
+                    key={m.key}
+                    onClick={() => handleChangeLearningMode(m.key)}
+                    aria-pressed={learningMode === m.key}
+                    style={{
+                      textAlign: 'left', padding: '10px 12px', borderRadius: 'var(--radius-sm)',
+                      border: learningMode === m.key ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
+                      background: learningMode === m.key ? 'rgba(99,102,241,0.12)' : 'transparent',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{m.label}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{m.hint}</div>
+                  </button>
+                ))}
+              </div>
+            </section>
 
             <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>🎯 Goal & Progress</h3>

@@ -12,8 +12,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
     const tag = searchParams.get('tag');
+    const topicId = searchParams.get('topicId');
 
     const where: Record<string, unknown> = { userId };
+    if (topicId) {
+      where.topicId = topicId;
+    }
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
@@ -48,6 +52,9 @@ export async function POST(request: Request) {
 
     if (!title || !title.trim()) {
       return NextResponse.json({ error: 'title is required' }, { status: 400 });
+    }
+    if (topicId && !(await db.topic.findFirst({ where: { id: topicId, userId, deletedAt: null }, select: { id: true } }))) {
+      return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }
 
     const note = await db.note.create({

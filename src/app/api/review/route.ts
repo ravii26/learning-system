@@ -69,7 +69,7 @@ export async function POST(request: Request) {
         // Active Topic Limit validation during review
         if (newStatus === 'active' && topic.status !== 'active') {
           const activeCount = await db.topic.count({
-            where: { status: 'active', userId },
+            where: { status: 'active', userId, deletedAt: null },
           });
           if (activeCount >= 2) {
             return NextResponse.json(

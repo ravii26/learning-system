@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { validateTopicPayload } from '@/lib/validations/topic';
+import { ensureAreaSkillId } from '@/lib/areaSkill';
 
 export async function GET(request: Request) {
   const auth = requireAuth();
@@ -159,7 +160,7 @@ export async function POST(request: Request) {
         topicMode: topicMode || null,
         curriculum: curriculum || [],
         mode: mode || 'syllabus',
-        skillId: skillId || null,
+        skillId: skillId || (await ensureAreaSkillId(db, userId, finalArea)),
       },
     });
 

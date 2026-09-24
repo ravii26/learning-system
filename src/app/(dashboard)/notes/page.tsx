@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/components/ToastProvider';
+import { createCapture } from '@/lib/captureClient';
 
 /**
  * The accretion-mode home: capture anything in 3 seconds, process the
@@ -69,49 +70,13 @@ export default function NotesPage() {
     fetchData();
   }, [fetchData]);
 
-  // Looks like a URL? Offer to scrape it for a title, same as the topic
-  // resources flow — reusing api/scrape, not a second copy of it.
-  const looksLikeUrl = /^https?:\/\//i.test(captureText.trim());
-
   const handleCapture = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = captureText.trim();
     if (!text) return;
     setCapturing(true);
     try {
-      let url: string | null = null;
-      let title: string | null = null;
-      let sourceMeta: unknown = null;
-
-      if (looksLikeUrl) {
-        url = text;
-        try {
-          const scrapeRes = await fetch('/api/scrape', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: text }),
-          });
-          if (scrapeRes.ok) {
-            const scraped = await scrapeRes.json();
-            title = scraped.title || null;
-            sourceMeta = scraped;
-          }
-        } catch {
-          // scrape failing is fine — the capture still saves with just the URL
-        }
-      }
-
-      const res = await fetch('/api/captures', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rawText: looksLikeUrl ? null : text,
-          url,
-          title,
-          sourceMeta,
-          sourceType: looksLikeUrl ? 'article' : 'thought',
-        }),
-      });
+      const res = await createCapture(text);
 
       if (res.ok) {
         setCaptureText('');
@@ -234,7 +199,7 @@ export default function NotesPage() {
                     className="form-input"
                     style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 8px', background: '#121218' }}
                   >
-                    <option value="">Pick a topic…</option>
+                    <option value="">Topic (optional for note, needed for concept)…</option>
                     {topics.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
                   </select>
                   <button onClick={() => handleProcess(c.id, 'concept')} disabled={processingId === c.id} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.72rem' }}>→ Concept</button>

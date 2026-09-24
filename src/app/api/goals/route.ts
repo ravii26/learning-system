@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { slugifySkillName } from '@/lib/skillSlug';
+import { ensureAreaSkillId } from '@/lib/areaSkill';
 import { recomputeGoalReadiness } from '@/lib/goalReadinessRecompute';
 
 /**
@@ -94,22 +95,21 @@ export async function POST(request: Request) {
       });
 
       const existingActive = await tx.topic.findMany({
-        where: { userId, status: 'active' },
+        where: { userId, status: 'active', deletedAt: null },
         select: { activeSlotType: true },
       });
       let activeSlotsUsed = existingActive.length;
       let primaryTaken = existingActive.some((t) => t.activeSlotType === 'primary');
 
-      // Skill roots are looked up, not created, if missing — a goal
-      // shouldn't silently invent new areas the Phase 6 backfill didn't
-      // seed. Falls back to no skill link rather than guessing.
-      const skillCache = new Map<string, string | null>();
-      const resolveSkillId = async (area: string): Promise<string | null> => {
+      // Area roots are created on demand (ensureAreaSkillId) — only the 6
+      // known areas, unknown ones fold into "Other", so nothing is invented.
+      const skillCache = new Map<string, string>();
+      const resolveSkillId = async (area: string): Promise<string> => {
         const slug = slugifySkillName(area || 'other');
         if (skillCache.has(slug)) return skillCache.get(slug)!;
-        const skill = await tx.skill.findFirst({ where: { userId, slug }, select: { id: true } });
-        skillCache.set(slug, skill?.id ?? null);
-        return skill?.id ?? null;
+        const id = await ensureAreaSkillId(tx, userId, area);
+        skillCache.set(slug, id);
+        return id;
       };
 
       for (let i = 0; i < topics.length; i++) {

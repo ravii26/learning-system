@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/ToastProvider';
 import { pickNextAction, type NextActionPick, type TopicForNextAction } from '@/lib/nextAction';
+import { createCapture } from '@/lib/captureClient';
 
 /**
  * The Today screen — the front door as of Phase 4 (see the plan's Fix 2).
@@ -37,6 +38,7 @@ export default function TodayPage() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [dueCount, setDueCount] = useState(0);
   const [repLoggedToday, setRepLoggedToday] = useState(false);
+  const [inboxCount, setInboxCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const [captureTitle, setCaptureTitle] = useState('');
@@ -44,10 +46,15 @@ export default function TodayPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [topicsRes, spacedRes] = await Promise.all([
+      const [topicsRes, spacedRes, inboxRes] = await Promise.all([
         fetch('/api/topics'),
         fetch('/api/review/spaced'),
+        fetch('/api/captures?status=inbox'),
       ]);
+      if (inboxRes.ok) {
+        const inbox = await inboxRes.json();
+        setInboxCount(Array.isArray(inbox) ? inbox.length : 0);
+      }
       let allTopics: Topic[] = [];
       if (topicsRes.ok) {
         allTopics = await topicsRes.json();
@@ -108,14 +115,13 @@ export default function TodayPage() {
     if (!title) return;
     setCapturing(true);
     try {
-      const res = await fetch('/api/topics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, status: 'inbox' }),
-      });
+      // Same inbox as /notes: a capture is triaged later into a note, a
+      // concept, a topic, or nothing — it no longer becomes a board topic
+      // the moment it's typed.
+      const res = await createCapture(title);
       if (res.ok) {
         setCaptureTitle('');
-        toast.success(`"${title}" captured to Inbox`);
+        toast.success('Captured — triage it later in Notes › Inbox');
         await fetchData();
       } else {
         const data = await res.json();
@@ -152,7 +158,7 @@ export default function TodayPage() {
           id="quick-capture-input"
           type="text"
           className="form-input"
-          placeholder="capture anything… (goes to Inbox)"
+          placeholder="capture a thought or paste a link…"
           value={captureTitle}
           onChange={(e) => setCaptureTitle(e.target.value)}
           disabled={capturing}
@@ -163,8 +169,36 @@ export default function TodayPage() {
             {capturing ? 'Capturing…' : 'Capture ▸'}
           </button>
         )}
+        {inboxCount > 0 && (
+          <Link href="/notes" style={{ fontSize: '0.75rem', color: 'var(--color-primary-light)', whiteSpace: 'nowrap' }}>
+            Inbox ({inboxCount}) ▸
+          </Link>
+        )}
         <kbd style={{ background: 'rgba(255,255,255,0.08)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', color: '#818cf8' }}>⌘K</kbd>
       </form>
+
+      {topics.length === 0 && (
+        <div className="glass-panel" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '12px', borderLeft: '4px solid #10b981' }}>
+          <div style={{ fontSize: '1rem', fontWeight: 700 }}>👋 Start here</div>
+          <ol style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', color: 'var(--color-text-secondary)', lineHeight: 1.45 }}>
+            <li>
+              <strong style={{ color: '#fff' }}>Have a goal?</strong> (&quot;Crack a backend interview by June&quot;){' '}
+              <Link href="/goals" style={{ color: 'var(--color-primary-light)' }}>Goals</Link> turns it into a roadmap of topics.
+            </li>
+            <li>
+              <strong style={{ color: '#fff' }}>Just a subject?</strong> Add it on the{' '}
+              <Link href="/plan" style={{ color: 'var(--color-primary-light)' }}>Plan</Link> board, then open it and pick how you learn it in <em>Setup</em>:
+              Syllabus (DSA, React), Practice (spoken English), Accretion (investing, politics) or Reference.
+            </li>
+            <li>
+              <strong style={{ color: '#fff' }}>Only 2 topics can be active at once.</strong> Activate the ones you&apos;re studying now; this screen then picks your next 25 minutes.
+            </li>
+            <li>
+              <strong style={{ color: '#fff' }}>Came across something?</strong> Type it in the box above — it waits in the inbox until you decide what it is.
+            </li>
+          </ol>
+        </div>
+      )}
 
       {/* Next 25 minutes — the one choice */}
       <div className="glass-panel" style={{ padding: '20px', borderLeft: '4px solid var(--color-primary)' }}>

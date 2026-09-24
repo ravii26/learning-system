@@ -122,6 +122,11 @@ export async function POST(request: Request) {
       if (currentIdx !== -1 && currentIdx < ceilingIdx) {
         nextMasteryLevel = MASTERY_ENUM_VALUES[currentIdx + 1];
       }
+    } else if (body.forgotten === true) {
+      // Reactivation after a pause: the user explicitly flagged this as
+      // forgotten, which is stronger than one failed recall — back to
+      // Exposed (never *up* from Unknown).
+      if (currentIdx > MASTERY_ENUM_VALUES.indexOf('Exposed')) nextMasteryLevel = 'Exposed';
     } else if (concept.masteryLevel === 'CanRecall' || concept.masteryLevel === 'CanApply') {
       nextMasteryLevel = 'Understood';
     }
