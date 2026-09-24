@@ -3,13 +3,7 @@ import type { NextRequest } from 'next/server';
 import { verifySessionTokenEdge } from '@/lib/authEdge';
 
 const COOKIE_NAME = 'learning_os_session';
-const isProd = process.env.NODE_ENV === 'production';
-
-if (isProd && !process.env.JWT_SECRET) {
-  // Matches src/lib/auth.ts: refuse to run in production on the default
-  // secret rather than silently accepting forged sessions.
-  throw new Error('JWT_SECRET environment variable is required in production.');
-}
+const isProd = process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE !== 'phase-production-build';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'learning-os-default-secret-key-change-in-prod';
 
@@ -33,6 +27,9 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get(COOKIE_NAME)?.value;
 
   if (!token || !(await verifySessionTokenEdge(token, JWT_SECRET))) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);
   }

@@ -73,16 +73,17 @@ export default function SocraticCoach({
   const [aiEval, setAiEval] = useState<{ captured?: string; missed?: string; tip?: string } | null>(null);
   const [loadingEval, setLoadingEval] = useState(false);
 
-  // Generic offline template, used only when the AI call fails
+  // Dynamic template used as fallback if AI is offline
   const getDynamicFallback = (cTitle: string): NonNullable<typeof aiTemplate> => {
     const topicName = topicTitle || 'your subject';
     return {
-      explain: `Let's break down "${cTitle}" within ${topicName}.\n\n"${cTitle}" represents a core mechanism that controls data flow, execution rules, or architectural decisions. Mastering this ensures your implementations in ${topicName} remain predictable, scalable, and resilient.`,
-      demonstrate: `Consider a real-world scenario of "${cTitle}" in ${topicName}. Under high concurrency or stress, without "${cTitle}", the system encounters latency drift or failure states. Applying it maintains system integrity and consistency.`,
-      connect: `Connect "${cTitle}" to your foundational prerequisites in ${topicName}. Understanding how this component operates enables you to design modular, production-ready solutions.`,
-      question: `What is the primary objective of "${cTitle}" in ${topicName}, and how does it prevent failure?`,
-      apply: `Imagine you are reviewing a production system using ${topicName} that experiences errors with "${cTitle}". Detail your step-by-step approach to diagnose and fix it.`,
-      idealAnswer: `An ideal solution includes:\n1. Isolating the component boundary\n2. Verifying configuration parameters\n3. Applying error logging and validation tests.`,
+      explain: `Let's break down "${cTitle}" within ${topicName}.\n\nAt its core, understanding "${cTitle}" gives you a clear mental model: what rules govern how it works, why it matters, and how to recognize common mistakes before they cause confusion.`,
+      demonstrate: `Consider how "${cTitle}" applies in real practice within ${topicName}. When you apply it properly, your workflow is organized and results are predictable. Overlooking it usually leads to subtle errors and flawed assumptions.`,
+      connect: `Connect "${cTitle}" to foundational principles in ${topicName}. Just like learning the core rules of grammar or math, mastering this concept gives you the intuitive foundation to tackle advanced scenarios with confidence.`,
+      question: `In your own words, what is the primary purpose of "${cTitle}" in ${topicName}, and what common mistake does understanding it prevent?`,
+      apply: `Imagine someone working on ${topicName} asks you for help because they are confused about "${cTitle}". Explain what error they might be making and guide them through how to think about it correctly.`,
+      idealAnswer: `A thorough response will:\n1. Clearly explain what "${cTitle}" means in simple, accessible language.\n2. Point out the specific trap or misunderstanding people fall into.\n3. Provide a concrete step-by-step example showing the right approach.`,
+      isAi: false,
     };
   };
 
@@ -139,6 +140,16 @@ export default function SocraticCoach({
     else if (stage === 'demonstrate') setStage('connect');
     else if (stage === 'connect') setStage('question');
     else if (stage === 'question') setStage('retrieve');
+  };
+
+  const handlePrevStage = () => {
+    setStageError(null);
+    if (stage === 'demonstrate') setStage('explain');
+    else if (stage === 'connect') setStage('demonstrate');
+    else if (stage === 'question') setStage('connect');
+    else if (stage === 'retrieve') setStage('question');
+    else if (stage === 'apply') setStage('retrieve');
+    else if (stage === 'correct') setStage('apply');
   };
 
   const submitRetrieval = () => {
@@ -277,13 +288,25 @@ export default function SocraticCoach({
                 fontSize: '0.68rem',
                 padding: '2px 8px',
                 borderRadius: '9999px',
-                background: template.isAi ? 'rgba(16, 185, 129, 0.15)' : 'rgba(99, 102, 241, 0.15)',
-                border: template.isAi ? '1px solid #10b981' : '1px solid var(--color-primary-light)',
-                color: template.isAi ? '#10b981' : 'var(--color-primary-light)',
+                background: loadingAi
+                  ? 'rgba(234, 179, 8, 0.15)'
+                  : template.isAi
+                  ? 'rgba(16, 185, 129, 0.15)'
+                  : 'rgba(99, 102, 241, 0.15)',
+                border: loadingAi
+                  ? '1px solid #eab308'
+                  : template.isAi
+                  ? '1px solid #10b981'
+                  : '1px solid var(--color-primary-light)',
+                color: loadingAi
+                  ? '#eab308'
+                  : template.isAi
+                  ? '#10b981'
+                  : 'var(--color-primary-light)',
                 fontWeight: 600,
               }}
             >
-              {template.isAi ? '✨ Live LLM Tutor' : '⚠️ Offline template — AI unavailable'}
+              {loadingAi ? '⏳ Generating AI Lesson...' : template.isAi ? '✨ Live LLM Tutor' : '💡 Prepared Lesson'}
             </span>
           </div>
 
@@ -344,52 +367,86 @@ export default function SocraticCoach({
       {/* Stage Progress + Instruction Header */}
       {(() => {
         const stages = [
-          { key: 'explain', step: 1, instruction: '📖 Read this explanation carefully. Take your time.' },
-          { key: 'demonstrate', step: 2, instruction: '🔍 Study this real-world example to see the concept in action.' },
-          { key: 'connect', step: 3, instruction: '🔗 Read how this connects to what you already know.' },
-          { key: 'question', step: 4, instruction: '🤔 Think about the question below. Formulate your answer mentally before moving on.' },
-          { key: 'retrieve', step: 5, instruction: '✍️ Now write what you remember — without looking back. This is the learning.' },
-          { key: 'apply', step: 6, instruction: '🛠️ Apply what you learned. Write your solution to the real-world problem below.' },
-          { key: 'correct', step: 7, instruction: '✅ Compare your answer with the ideal. Honestly assess how you did.' },
+          { key: 'explain', step: 1, name: 'Explain', icon: '📖', instruction: 'Read this explanation carefully. Take your time.' },
+          { key: 'demonstrate', step: 2, name: 'Demonstrate', icon: '🔍', instruction: 'Study this real-world example to see the concept in action.' },
+          { key: 'connect', step: 3, name: 'Connect', icon: '🔗', instruction: 'Read how this connects to what you already know.' },
+          { key: 'question', step: 4, name: 'Question', icon: '🤔', instruction: 'Think about the question below. Formulate your answer mentally.' },
+          { key: 'retrieve', step: 5, name: 'Recall', icon: '✍️', instruction: 'Write what you remember from memory — without looking back.' },
+          { key: 'apply', step: 6, name: 'Apply', icon: '🛠️', instruction: 'Apply what you learned. Write your solution to the challenge below.' },
+          { key: 'correct', step: 7, name: 'Review', icon: '✅', instruction: 'Compare your answer with the ideal answer and assess your understanding.' },
         ];
-        const current = stages.find(s => s.key === stage);
-        if (!current) return null;
+        const current = stages.find(s => s.key === stage) || stages[0];
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {/* Progress bar */}
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-              {stages.map((s) => (
-                <button
-                  key={s.key}
-                  type="button"
-                  onClick={() => setStage(s.key as any)}
-                  title={s.instruction}
-                  style={{
-                    height: '4px',
-                    flex: 1,
-                    borderRadius: '2px',
-                    background: s.step <= current.step ? 'var(--color-primary)' : 'rgba(255,255,255,0.1)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    transition: 'background 0.2s ease',
-                  }}
-                />
-              ))}
-              <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', paddingLeft: '8px' }}>
-                {current.step} / {stages.length}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Step header indicator */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.1rem' }}>{current.icon}</span>
+                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>
+                  Step {current.step} of {stages.length}: {current.name}
+                </span>
+              </div>
+              <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+                {Math.round((current.step / stages.length) * 100)}% complete
               </span>
             </div>
-            {/* Instruction label */}
+
+            {/* Step pills navigation */}
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${stages.length}, 1fr)`, gap: '6px' }}>
+              {stages.map((s) => {
+                const isActive = s.key === stage;
+                const isPassed = s.step < current.step;
+                return (
+                  <button
+                    key={s.key}
+                    type="button"
+                    onClick={() => setStage(s.key as any)}
+                    title={`${s.step}. ${s.name}: ${s.instruction}`}
+                    style={{
+                      padding: '6px 4px',
+                      borderRadius: '6px',
+                      background: isActive
+                        ? 'var(--color-primary)'
+                        : isPassed
+                        ? 'rgba(99, 102, 241, 0.25)'
+                        : 'rgba(255, 255, 255, 0.05)',
+                      border: isActive
+                        ? '1px solid var(--color-primary-light)'
+                        : isPassed
+                        ? '1px solid rgba(99, 102, 241, 0.4)'
+                        : '1px solid rgba(255, 255, 255, 0.08)',
+                      color: isActive ? '#fff' : isPassed ? '#c7d2fe' : 'var(--color-text-muted)',
+                      fontSize: '0.72rem',
+                      fontWeight: isActive ? 700 : 500,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      transition: 'all 0.15s ease',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {s.step}. {s.name}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Instruction banner */}
             <div style={{
-              padding: '10px 14px',
+              padding: '12px 16px',
               borderRadius: 'var(--radius-sm)',
               background: 'rgba(99, 102, 241, 0.08)',
-              border: '1px solid rgba(99, 102, 241, 0.2)',
-              fontSize: '0.82rem',
+              border: '1px solid rgba(99, 102, 241, 0.25)',
+              fontSize: '0.84rem',
               color: '#c7d2fe',
               fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
             }}>
-              {current.instruction}
+              <span>💡</span>
+              <span>{current.instruction}</span>
             </div>
           </div>
         );
@@ -533,47 +590,78 @@ export default function SocraticCoach({
             </div>
 
             {/* Self-Assessment Check */}
-            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '14px' }}>
-              <label className="form-label" style={{ marginBottom: '8px' }}>SELF-ASSESSMENT: HOW DID YOU DO?</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+              <label className="form-label" style={{ marginBottom: '10px', fontSize: '0.82rem', color: '#fff' }}>
+                SELF-ASSESSMENT: HOW DID YOU DO?
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
                 <button
                   type="button"
                   onClick={() => setSelfAssessment('correct')}
                   className="btn"
                   style={{
-                    fontSize: '0.8rem',
-                    background: selfAssessment === 'correct' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255,255,255,0.02)',
-                    border: selfAssessment === 'correct' ? '1px solid var(--color-success)' : '1px solid var(--border-color)',
-                    color: selfAssessment === 'correct' ? 'var(--color-success)' : 'var(--color-text-secondary)',
+                    padding: '14px 16px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '4px',
+                    textAlign: 'left',
+                    background: selfAssessment === 'correct' ? 'rgba(16, 185, 129, 0.18)' : 'rgba(255,255,255,0.03)',
+                    border: selfAssessment === 'correct' ? '2px solid var(--color-success)' : '1px solid var(--border-color)',
+                    color: selfAssessment === 'correct' ? 'var(--color-success)' : 'var(--color-text-primary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
                   }}
                 >
-                  🎯 Nailed It
+                  <span style={{ fontSize: '1rem', fontWeight: 700 }}>🎯 Nailed It</span>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)' }}>Understood the concept & solved the problem accurately</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => setSelfAssessment('partial')}
                   className="btn"
                   style={{
-                    fontSize: '0.8rem',
-                    background: selfAssessment === 'partial' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.02)',
-                    border: selfAssessment === 'partial' ? '1px solid var(--color-warning)' : '1px solid var(--border-color)',
-                    color: selfAssessment === 'partial' ? 'var(--color-warning)' : 'var(--color-text-secondary)',
+                    padding: '14px 16px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '4px',
+                    textAlign: 'left',
+                    background: selfAssessment === 'partial' ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255,255,255,0.03)',
+                    border: selfAssessment === 'partial' ? '2px solid var(--color-warning)' : '1px solid var(--border-color)',
+                    color: selfAssessment === 'partial' ? 'var(--color-warning)' : 'var(--color-text-primary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
                   }}
                 >
-                  ⚠️ Partial Gap
+                  <span style={{ fontSize: '1rem', fontWeight: 700 }}>⚠️ Partial Gap</span>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)' }}>Got the general idea, but missed some key details</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => setSelfAssessment('wrong')}
                   className="btn"
                   style={{
-                    fontSize: '0.8rem',
-                    background: selfAssessment === 'wrong' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255,255,255,0.02)',
-                    border: selfAssessment === 'wrong' ? '1px solid var(--color-danger)' : '1px solid var(--border-color)',
-                    color: selfAssessment === 'wrong' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
+                    padding: '14px 16px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '4px',
+                    textAlign: 'left',
+                    background: selfAssessment === 'wrong' ? 'rgba(239, 68, 68, 0.18)' : 'rgba(255,255,255,0.03)',
+                    border: selfAssessment === 'wrong' ? '2px solid var(--color-danger)' : '1px solid var(--border-color)',
+                    color: selfAssessment === 'wrong' ? 'var(--color-danger)' : 'var(--color-text-primary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
                   }}
                 >
-                  ❌ Made Mistake
+                  <span style={{ fontSize: '1rem', fontWeight: 700 }}>❌ Struggled</span>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)' }}>Found it confusing or had misunderstandings</span>
                 </button>
               </div>
             </div>
@@ -611,14 +699,24 @@ export default function SocraticCoach({
               </div>
             )}
 
-            <button
-              onClick={handleSaveAssessment}
-              disabled={submitting}
-              className="btn btn-primary"
-              style={{ alignSelf: 'flex-end' }}
-            >
-              {submitting ? 'Saving Assessment...' : '💾 Finalize Socratic Step'}
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+              <button
+                type="button"
+                onClick={handlePrevStage}
+                className="btn btn-secondary"
+                style={{ padding: '10px 18px', fontSize: '0.85rem' }}
+              >
+                ← Back to Challenge
+              </button>
+              <button
+                onClick={handleSaveAssessment}
+                disabled={submitting}
+                className="btn btn-primary"
+                style={{ padding: '10px 24px', fontSize: '0.88rem' }}
+              >
+                {submitting ? 'Saving Assessment...' : '💾 Save & Finish Concept →'}
+              </button>
+            </div>
           </div>
         )}
 
@@ -626,15 +724,28 @@ export default function SocraticCoach({
       )}
 
       {/* Footer Nav Controls */}
-      {stage !== 'retrieve' && stage !== 'apply' && stage !== 'correct' && (
-        <button
-          onClick={handleNextStage}
-          className="btn btn-secondary"
-          style={{ alignSelf: 'flex-end', padding: '8px 16px', fontSize: '0.8rem', border: '1px solid var(--color-primary-light)', color: 'var(--color-primary-light)' }}
-        >
-          Next Step ➔
-        </button>
-      )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+        {stage !== 'explain' ? (
+          <button
+            type="button"
+            onClick={handlePrevStage}
+            className="btn btn-secondary"
+            style={{ padding: '8px 18px', fontSize: '0.82rem' }}
+          >
+            ← Previous Step
+          </button>
+        ) : <div />}
+
+        {stage !== 'retrieve' && stage !== 'apply' && stage !== 'correct' && (
+          <button
+            onClick={handleNextStage}
+            className="btn btn-primary"
+            style={{ padding: '8px 20px', fontSize: '0.85rem' }}
+          >
+            Next Step ➔
+          </button>
+        )}
+      </div>
 
     </div>
   );

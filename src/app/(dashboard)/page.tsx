@@ -46,6 +46,10 @@ export default function TodayPage() {
   const [captureTitle, setCaptureTitle] = useState('');
   const [capturing, setCapturing] = useState(false);
 
+  // Quick-start: one input to go from zero to studying
+  const [quickStartTitle, setQuickStartTitle] = useState('');
+  const [quickStarting, setQuickStarting] = useState(false);
+
   const fetchData = useCallback(async () => {
     try {
       const [topicsRes, spacedRes, inboxRes] = await Promise.all([
@@ -136,6 +140,41 @@ export default function TodayPage() {
     }
   };
 
+  const handleQuickStart = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const title = quickStartTitle.trim();
+    if (!title) return;
+    setQuickStarting(true);
+    try {
+      const res = await fetch('/api/topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          area: 'Tech',
+          status: 'active',
+          depthTarget: 'Proficiency',
+          why: `I want to learn ${title}`,
+          nextAction: `Start studying ${title}`,
+          currentStage: 'Fundamentals',
+          mode: 'syllabus',
+        }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        toast.success(`"${title}" created — generating your study plan...`);
+        router.push(`/topics/${created.id}?autostart=1`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || 'Failed to create topic');
+      }
+    } catch {
+      toast.error('Connection error');
+    } finally {
+      setQuickStarting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex max-w-[760px] flex-col gap-5">
@@ -155,12 +194,12 @@ export default function TodayPage() {
     <div className="flex max-w-[760px] flex-col gap-5">
       {/* Capture — always present, works from anywhere (Fix 5) */}
       <form onSubmit={handleCapture} className="glass-panel flex items-center gap-2.5 px-[18px] py-3.5">
-        <span className="whitespace-nowrap text-[0.85rem] font-semibold text-fg-muted">C ▸</span>
+        <span className="whitespace-nowrap text-[0.85rem] font-semibold text-fg-muted">✉️</span>
         <input
           id="quick-capture-input"
           type="text"
           className="form-input border-none bg-transparent px-3 py-2 text-[0.9rem]"
-          placeholder="capture a thought or paste a link…"
+          placeholder="What are you thinking about? (quick capture)"
           value={captureTitle}
           onChange={(e) => setCaptureTitle(e.target.value)}
           disabled={capturing}
@@ -173,29 +212,34 @@ export default function TodayPage() {
         {inboxCount > 0 && (
           <Link href="/notes" className="whitespace-nowrap text-[0.75rem] text-primary-light">Inbox ({inboxCount}) ▸</Link>
         )}
-        <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[0.72rem] text-primary-light">⌘K</kbd>
+
       </form>
 
       {topics.length === 0 && (
-        <Card accent="success" className="flex flex-col gap-3">
-          <div className="text-base font-bold">👋 Start here</div>
-          <ol className="m-0 flex flex-col gap-2 pl-[18px] text-[0.85rem] leading-snug text-fg-secondary">
-            <li>
-              <strong className="text-white">Have a goal?</strong> (&quot;Crack a backend interview by June&quot;){' '}
-              <Link href="/goals" className={linkCls}>Goals</Link> turns it into a roadmap of topics.
-            </li>
-            <li>
-              <strong className="text-white">Just a subject?</strong> Add it on the{' '}
-              <Link href="/plan" className={linkCls}>Plan</Link> board, then open it and pick how you learn it in <em>Setup</em>:
-              Syllabus (DSA, React), Practice (spoken English), Accretion (investing, politics) or Reference.
-            </li>
-            <li>
-              <strong className="text-white">Only 2 topics can be active at once.</strong> Activate the ones you&apos;re studying now; this screen then picks your next 25 minutes.
-            </li>
-            <li>
-              <strong className="text-white">Came across something?</strong> Type it in the box above — it waits in the inbox until you decide what it is.
-            </li>
-          </ol>
+        <Card accent="primary" className="flex flex-col gap-4">
+          <div>
+            <div className="text-lg font-bold">What do you want to learn?</div>
+            <p className="mt-1 text-[0.85rem] text-fg-secondary">
+              Type any subject and we&apos;ll create a study plan for you instantly.
+            </p>
+          </div>
+          <form onSubmit={handleQuickStart} className="flex gap-2.5">
+            <input
+              type="text"
+              className="form-input flex-1 rounded-md border border-white/10 bg-white/5 px-4 py-2.5 text-[0.95rem]"
+              placeholder='e.g. "React", "Data Structures", "Personal Finance", "Guitar"'
+              value={quickStartTitle}
+              onChange={(e) => setQuickStartTitle(e.target.value)}
+              disabled={quickStarting}
+              autoFocus
+            />
+            <Button type="submit" variant="primary" disabled={quickStarting || !quickStartTitle.trim()}>
+              {quickStarting ? 'Creating...' : 'Start Learning ▸'}
+            </Button>
+          </form>
+          <p className="text-[0.75rem] text-fg-muted">
+            Or: <Link href="/goals" className={linkCls}>set a goal with AI roadmap</Link> · <Link href="/plan" className={linkCls}>browse your topic board</Link>
+          </p>
         </Card>
       )}
 

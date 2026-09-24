@@ -79,6 +79,9 @@ export default function PlanPage() {
   const [search, setSearch] = useState('');
   const [selectedArea, setSelectedArea] = useState('All Areas');
 
+  // View Mode: 'list' (clean, intuitive default) vs 'board' (full Kanban)
+  const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
+
   // Show/hide empty columns toggle
   const [showEmptyColumns, setShowEmptyColumns] = useState(false);
 
@@ -438,7 +441,45 @@ export default function PlanPage() {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {/* View Mode Toggle: List vs Board */}
+            <div style={{ display: 'inline-flex', padding: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                style={{
+                  padding: '5px 12px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  borderRadius: '4px',
+                  background: viewMode === 'list' ? 'var(--color-primary)' : 'transparent',
+                  color: viewMode === 'list' ? '#fff' : 'var(--color-text-muted)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                📋 List View
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('board')}
+                style={{
+                  padding: '5px 12px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  borderRadius: '4px',
+                  background: viewMode === 'board' ? 'var(--color-primary)' : 'transparent',
+                  color: viewMode === 'board' ? '#fff' : 'var(--color-text-muted)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                📊 Board View
+              </button>
+            </div>
+
             <button
               onClick={() => setShowRoadmapWizard(true)}
               className="btn btn-secondary"
@@ -542,7 +583,257 @@ export default function PlanPage() {
           </select>
         </div>
 
-        {/* Empty columns toggle */}
+        {viewMode === 'list' ? (
+          /* GROUPED LIST VIEW */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Active Topics */}
+            <div className="glass-panel" style={{ padding: '20px', borderLeft: '4px solid var(--color-primary)' }}>
+              <div className="flex-between" style={{ marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.1rem' }}>⚡</span>
+                  <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Active Topics</h2>
+                  <span style={{ fontSize: '0.72rem', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--color-primary-light)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
+                    {filteredTopics.filter(t => t.status === 'active').length}/2 active
+                  </span>
+                </div>
+              </div>
+
+              {filteredTopics.filter(t => t.status === 'active').length === 0 ? (
+                <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', margin: 0 }}>
+                  No active topics. Pick one from Queued below or capture a new topic above.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {filteredTopics.filter(t => t.status === 'active').map(t => (
+                    <div
+                      key={t.id}
+                      className="glass-card"
+                      style={{
+                        padding: '14px 18px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '16px',
+                        flexWrap: 'wrap',
+                        background: 'rgba(255,255,255,0.02)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '220px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <Link href={`/topics/${t.id}`} style={{ fontSize: '0.98rem', fontWeight: 700, color: '#fff' }}>
+                            {t.title}
+                          </Link>
+                          <span className={`badge badge-${t.area.toLowerCase()}`} style={{ fontSize: '0.65rem' }}>{t.area}</span>
+                          {t.depthTarget && (
+                            <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.04)', padding: '2px 6px', borderRadius: '4px' }}>
+                              {t.depthTarget}
+                            </span>
+                          )}
+                        </div>
+                        {t.nextAction && (
+                          <div style={{ fontSize: '0.82rem', color: 'var(--color-primary-light)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span>→</span> <span>{t.nextAction}</span>
+                          </div>
+                        )}
+                        {t.why && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                            Why: {t.why}
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {t.progressPct > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
+                            <div style={{ width: '48px', height: '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ width: `${t.progressPct}%`, height: '100%', background: 'var(--color-primary)' }} />
+                            </div>
+                            <span>{t.progressPct}%</span>
+                          </div>
+                        )}
+                        <Link href={`/topics/${t.id}`} className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '0.8rem' }}>
+                          Study ▸
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Queued Topics */}
+            <div className="glass-panel" style={{ padding: '20px' }}>
+              <div className="flex-between" style={{ marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.1rem' }}>📋</span>
+                  <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Queued for Next</h2>
+                  <span style={{ fontSize: '0.72rem', background: 'rgba(255, 255, 255, 0.08)', color: 'var(--color-text-secondary)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
+                    {filteredTopics.filter(t => t.status === 'queued').length}
+                  </span>
+                </div>
+              </div>
+
+              {filteredTopics.filter(t => t.status === 'queued').length === 0 ? (
+                <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>
+                  No topics queued. Ready-to-study topics appear here.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {filteredTopics.filter(t => t.status === 'queued').map(t => (
+                    <div
+                      key={t.id}
+                      className="glass-card"
+                      style={{
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, minWidth: '200px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Link href={`/topics/${t.id}`} style={{ fontSize: '0.92rem', fontWeight: 600, color: '#fff' }}>
+                            {t.title}
+                          </Link>
+                          <span className={`badge badge-${t.area.toLowerCase()}`} style={{ fontSize: '0.62rem' }}>{t.area}</span>
+                        </div>
+                        {t.why && (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{t.why}</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleTransition(t, 'active')}
+                          className="btn btn-secondary"
+                          style={{ padding: '5px 12px', fontSize: '0.75rem', color: 'var(--color-primary-light)' }}
+                        >
+                          ⚡ Start Learning
+                        </button>
+                        <Link href={`/topics/${t.id}`} className="btn btn-secondary" style={{ padding: '5px 10px', fontSize: '0.75rem' }}>
+                          View
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Inbox Topics */}
+            {filteredTopics.filter(t => t.status === 'inbox').length > 0 && (
+              <div className="glass-panel" style={{ padding: '20px' }}>
+                <div className="flex-between" style={{ marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '1.1rem' }}>💡</span>
+                    <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Inbox Ideas</h2>
+                    <span style={{ fontSize: '0.72rem', background: 'rgba(255, 255, 255, 0.08)', color: 'var(--color-text-secondary)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
+                      {filteredTopics.filter(t => t.status === 'inbox').length}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {filteredTopics.filter(t => t.status === 'inbox').map(t => (
+                    <div
+                      key={t.id}
+                      className="glass-card"
+                      style={{
+                        padding: '10px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Link href={`/topics/${t.id}`} style={{ fontSize: '0.88rem', fontWeight: 600, color: '#fff' }}>
+                          {t.title}
+                        </Link>
+                        <span className={`badge badge-${t.area.toLowerCase()}`} style={{ fontSize: '0.6rem' }}>{t.area}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleTransition(t, 'queued')}
+                          className="btn btn-secondary"
+                          style={{ padding: '4px 8px', fontSize: '0.72rem' }}
+                        >
+                          📋 Queue
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleTransition(t, 'active')}
+                          className="btn btn-secondary"
+                          style={{ padding: '4px 8px', fontSize: '0.72rem', color: 'var(--color-primary-light)' }}
+                        >
+                          ⚡ Start
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Other Topics (Collapsed by default) */}
+            {(() => {
+              const otherTopics = filteredTopics.filter(t => !['active', 'queued', 'inbox'].includes(t.status));
+              if (otherTopics.length === 0) return null;
+              return (
+                <details className="glass-panel" style={{ padding: '4px 16px' }}>
+                  <summary style={{ cursor: 'pointer', padding: '12px 0', fontSize: '0.88rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>📁 Other Topics ({otherTopics.length})</span>
+                    <span style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>
+                      Paused, Reference, Maintenance, Dropped
+                    </span>
+                  </summary>
+                  <div style={{ paddingBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {otherTopics.map(t => (
+                      <div
+                        key={t.id}
+                        className="glass-card"
+                        style={{
+                          padding: '10px 14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Link href={`/topics/${t.id}`} style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                            {t.title}
+                          </Link>
+                          <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-muted)' }}>
+                            {t.status}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleTransition(t, 'active')}
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '0.72rem' }}
+                          >
+                            ▶️ Activate
+                          </button>
+                          <Link href={`/topics/${t.id}`} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.72rem' }}>
+                            Open ▸
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              );
+            })()}
+          </div>
+        ) : (
+          /* FULL KANBAN BOARD VIEW */
+          <>
+            {/* Empty columns toggle */}
         {hiddenEmptyCount > 0 && !showEmptyColumns && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
             <button
@@ -709,6 +1000,8 @@ export default function PlanPage() {
             );
           })}
         </div>
+        </>
+      )}
 
       </div>
 

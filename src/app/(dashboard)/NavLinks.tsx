@@ -7,14 +7,14 @@ export default function NavLinks() {
   const pathname = usePathname();
 
   const links = [
-    { name: 'Today', href: '/', icon: '☀️' },
-    { name: 'Plan', href: '/plan', icon: '📊' },
-    { name: 'Where You Stand', href: '/skills', icon: '🧭' },
+    { name: 'Home', href: '/', icon: '🏠' },
+    { name: 'My Topics', href: '/plan', icon: '📋' },
+    { name: 'Progress', href: '/skills', icon: '📊' },
     { name: 'Goals', href: '/goals', icon: '🎯' },
     { name: 'Notes', href: '/notes', icon: '📓' },
     { name: 'Practice', href: '/practice', icon: '🎙️' },
-    { name: 'Weekly Review', href: '/review', icon: '🔄' },
-    { name: 'Exploration Mode', href: '/explore', icon: '⏱️' },
+    { name: 'Review', href: '/review', icon: '🔄' },
+    { name: 'Explore', href: '/explore', icon: '🔍' },
   ];
 
   return (

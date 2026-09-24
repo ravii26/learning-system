@@ -371,8 +371,15 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
                               STARTS ACTIVE
                             </span>
                           )}
-                          <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '9999px', background: t.mode === 'course' ? 'rgba(168,85,247,0.15)' : 'rgba(99,102,241,0.15)', color: t.mode === 'course' ? '#c084fc' : 'var(--color-primary-light)', fontWeight: 600 }}>
-                            {t.mode === 'course' ? '📚 Course' : '🧭 Self-Directed'}
+                          <span style={{
+                            fontSize: '0.62rem',
+                            padding: '1px 6px',
+                            borderRadius: '9999px',
+                            background: t.mode === 'course' ? 'rgba(168,85,247,0.15)' : t.mode === 'project' ? 'rgba(245,158,11,0.15)' : 'rgba(99,102,241,0.15)',
+                            color: t.mode === 'course' ? '#c084fc' : t.mode === 'project' ? '#f59e0b' : 'var(--color-primary-light)',
+                            fontWeight: 600,
+                          }}>
+                            {t.mode === 'course' ? '📚 Course' : t.mode === 'project' ? '🛠️ Project' : '🧭 Self-Directed'}
                           </span>
                           {t.area && (
                             <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-muted)' }}>

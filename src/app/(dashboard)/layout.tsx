@@ -76,7 +76,7 @@ export default async function DashboardLayout({
           <header className="app-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>Active Load:</span>
+                <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>📚</span>
                 <div 
                   style={{ 
                     display: 'flex', 
@@ -91,12 +91,12 @@ export default async function DashboardLayout({
                     color: activeCount >= 2 ? 'var(--color-danger)' : 'var(--color-primary-light)'
                   }}
                 >
-                  {activeCount} / 2 Active
+                  {activeCount}/2 topics active
                 </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Last Reviewed:</span>
+                <span style={{ color: 'var(--color-text-secondary)' }}>Last review:</span>
                 {daysSinceLastReview === null ? (
                   <Link
                     href="/review"

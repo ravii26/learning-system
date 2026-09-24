@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { renderMarkdown } from '@/lib/markdown';
 
@@ -69,7 +69,7 @@ interface Topic {
   pauseHistory: any[];
   activeSlotType: string | null;
   sessionLogs: SessionLog[];
-  topicMode: 'self_directed' | 'course';
+  topicMode: 'self_directed' | 'course' | 'project';
   curriculum: CourseModule[];
 }
 
@@ -78,7 +78,7 @@ const STAGES = ['Define', 'Map', 'Fundamentals', 'Core Knowledge', 'Application'
 const LEARNING_MODES = [
   { key: 'syllabus', label: '📚 Syllabus', hint: 'A body of material with a finish line — DSA, React, a course.' },
   { key: 'practice', label: '🎙️ Practice', hint: 'A skill built by reps — speaking, writing. Tracked as a trend.' },
-  { key: 'accretion', label: '🌱 Accretion', hint: 'Knowledge that arrives randomly — investing, politics. Grows as notes.' },
+  { key: 'accretion', label: '🌱 Ongoing', hint: 'Topics you learn bit by bit over time — investing, news, current affairs. Grows as notes.' },
   { key: 'reference', label: '📖 Reference', hint: 'Look it up when needed. No progress tracked.' },
 ] as const;
 const DEPTHS = ['Awareness', 'Working Knowledge', 'Proficiency', 'Deep', 'Mastery'];
@@ -87,11 +87,12 @@ const STATUSES = ['inbox', 'queued', 'active', 'paused', 'maintenance', 'referen
 
 export default function TopicDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [topic, setTopic] = useState<Topic | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Learn is the page; Setup (contract, materials, history) is a drawer opened on demand.
   const [setupOpen, setSetupOpen] = useState(false);
   const closeSetup = useCallback(() => setSetupOpen(false), []);
@@ -108,7 +109,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
   const [nextAction, setNextAction] = useState('');
   const [proofOfLearning, setProofOfLearning] = useState('');
   const [notes, setNotes] = useState('');
-  
+
   // Advanced State variables
   const [contract, setContract] = useState<any>({ outcome: '', estimatedEffort: 0, successCriterion: '', currentLevel: 'Beginner', prerequisites: [] });
   const [concepts, setConcepts] = useState<any[]>([]);
@@ -206,7 +207,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
       if (res.ok) {
         const data = await res.json();
         setTopic(data);
-        
+
         // Populate inputs
         setTitle(data.title);
         setArea(data.area);
@@ -219,7 +220,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
         setNextAction(data.nextAction || '');
         setProofOfLearning(data.proofOfLearning || '');
         setNotes(data.notes || '');
-        
+
         // Populate advanced JSONs
         setContract(data.contract || { outcome: '', estimatedEffort: 0, successCriterion: '', currentLevel: 'Beginner', prerequisites: [] });
         const mapData = data.knowledgeMap || { concepts: [] };
@@ -603,6 +604,18 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
           }));
           await handleSaveCurriculum(generated);
           setTopicMode('course');
+
+          // Auto-set nextAction to the first module if currently empty or generic
+          const currentNext = nextAction?.trim() || '';
+          if (!currentNext || currentNext.startsWith('Start studying') || currentNext.startsWith('I want to learn')) {
+            const firstTitle = `Module 1: ${generated[0].title}`;
+            setNextAction(firstTitle);
+            fetch(`/api/topics/${params.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ nextAction: firstTitle }),
+            }).catch(console.error);
+          }
         }
       }
     } catch (e) {
@@ -611,6 +624,16 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
       setGeneratingStudyPlan(false);
     }
   };
+
+  // Auto-generate study plan if requested via ?autostart=1 from quick-start
+  const autoStartedRef = React.useRef(false);
+  useEffect(() => {
+    if (loading || !topic || autoStartedRef.current) return;
+    if (searchParams.get('autostart') === '1' && curriculum.length === 0 && concepts.length === 0) {
+      autoStartedRef.current = true;
+      handleGenerateStudyPlan();
+    }
+  }, [loading, topic, curriculum.length, concepts.length, searchParams]);
 
   const handleStartKnowledgeMap = async () => {
     setGeneratingStudyPlan(true);
@@ -959,22 +982,31 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
             🏷️ {area}
           </span>
         </div>
-        
-        <div style={{ display: 'flex', gap: '8px' }}>
+
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button
+            onClick={() => setSetupOpen(true)}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            title="Topic settings, why statement, target depth, tasks, resources"
+          >
+            ⚙️ Setup
+          </button>
+
           {topic?.status === 'active' ? (
             <button onClick={handlePause} className="btn btn-secondary" style={{ color: 'var(--color-warning)' }}>
-              ⏸️ Pause Topic
+              ⏸️ Pause
             </button>
           ) : topic?.status === 'paused' ? (
             <button onClick={handleResume} className="btn btn-primary">
-              ▶️ Resume Topic
+              ▶️ Resume
             </button>
           ) : (
             <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', background: 'rgba(255,255,255,0.03)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
               Status: <strong className={`status-${topic?.status}`}>{topic?.status}</strong>
             </span>
           )}
-          
+
           <button onClick={handleDeleteTopic} className="btn btn-secondary" style={{ color: 'var(--color-danger)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
             🗑️ Delete
           </button>
@@ -982,72 +1014,75 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
       </div>
 
       {/* Current Focus Hero Card */}
-      <div className="glass-panel" style={{ padding: '18px 22px', borderLeft: '4px solid var(--color-primary)', background: 'rgba(99, 102, 241, 0.05)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px' }}>
-          <div style={{ flex: 1 }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-primary-light)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              🎯 Your Next Action
-            </span>
-            {nextAction && nextAction.trim() ? (
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: '2px', color: '#fff' }}>
-                {nextAction}
-              </h3>
-            ) : (
-              <div style={{ marginTop: '4px' }}>
-                <p style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)' }}>
-                  You have not set a next action yet.
-                </p>
+      {(() => {
+        const activeModule = curriculum.find(m => !m.completed) || curriculum[0];
+        const displayNextAction = nextAction && nextAction.trim()
+          ? nextAction
+          : activeModule
+            ? `Module ${activeModule.order}: ${activeModule.title}`
+            : null;
+
+        return (
+          <div className="glass-panel" style={{ padding: '18px 22px', borderLeft: '4px solid var(--color-primary)', background: 'rgba(99, 102, 241, 0.05)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-primary-light)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  🎯 Your Next Action
+                </span>
+                {displayNextAction ? (
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: '2px', color: '#fff' }}>
+                    {displayNextAction}
+                  </h3>
+                ) : (
+                  <div style={{ marginTop: '4px' }}>
+                    <p style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)' }}>
+                      Ready to learn? Generate your curriculum modules below to begin.
+                    </p>
+                    <button
+                      onClick={handleGenerateStudyPlan}
+                      disabled={generatingStudyPlan}
+                      className="btn btn-primary"
+                      style={{ marginTop: '8px', fontSize: '0.78rem', padding: '6px 14px' }}
+                    >
+                      {generatingStudyPlan ? '✨ Generating Modules...' : '🤖 Generate AI Course Modules'}
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+                <button
+                  onClick={() => {
+                    setSetupOpen(false);
+                    if (concepts.length > 0) {
+                      setSelectedConcept(concepts[0]);
+                    } else if (curriculum.length > 0) {
+                      const mod = curriculum.find(m => !m.completed) || curriculum[0];
+                      setSelectedConcept({ id: mod.id, title: mod.title });
+                    } else {
+                      handleGenerateStudyPlan();
+                    }
+                  }}
+                  className="btn btn-primary"
+                  style={{ fontSize: '0.78rem', padding: '6px 14px', borderRadius: 'var(--radius-sm)' }}
+                >
+                  🧠 Practice with AI Coach
+                </button>
                 <button
                   onClick={() => setSetupOpen(true)}
-                  style={{ marginTop: '6px', fontSize: '0.78rem', color: 'var(--color-primary-light)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.78rem', padding: '6px 12px', borderRadius: 'var(--radius-sm)' }}
                 >
-                  Open Setup to set one →
+                  📋 Tasks ({subtasks.filter(s => s.completed).length}/{subtasks.length})
                 </button>
               </div>
-            )}
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
-            <button
-              onClick={() => {
-                setSetupOpen(false);
-                if (concepts.length > 0) {
-                  setSelectedConcept(concepts[0]);
-                } else if (curriculum.length > 0) {
-                  setSelectedConcept({ id: curriculum[0].id, title: curriculum[0].title });
-                } else {
-                  handleGenerateStudyPlan();
-                }
-              }}
-              className="btn btn-primary"
-              style={{ fontSize: '0.78rem', padding: '6px 14px', borderRadius: 'var(--radius-sm)' }}
-            >
-              🧠 Practice with AI Coach
-            </button>
-            <button
-              onClick={() => setSetupOpen(true)}
-              className="btn btn-secondary"
-              style={{ fontSize: '0.78rem', padding: '6px 12px', borderRadius: 'var(--radius-sm)' }}
-            >
-              📋 Tasks ({subtasks.filter(s => s.completed).length}/{subtasks.length})
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Learn is the page itself; Setup opens as a drawer */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button
-          onClick={() => setSetupOpen(true)}
-          className="btn btn-secondary"
-          style={{ fontSize: '0.8rem', padding: '6px 14px' }}
-        >
-          ⚙️ Setup — goal, tasks & resources, history
-        </button>
-      </div>
+        );
+      })()}
 
       {/* Main Body Layout Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '32px', alignItems: 'start' }}>
-        
+
         {/* LEFT WORKSPACE PANELS */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
@@ -1067,7 +1102,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
             <div className="glass-panel" style={{ padding: '20px', borderLeft: '4px solid #10b981', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div className="flex-between" style={{ gap: '12px' }}>
                 <div>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>🌱 Accretion topic — {linkedNotes.length} note{linkedNotes.length === 1 ? '' : 's'}</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>🌱 Ongoing topic — {linkedNotes.length} note{linkedNotes.length === 1 ? '' : 's'}</div>
                   <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
                     No syllabus and no finish line. Capture what you come across, then turn the keepers into linked notes.
                   </p>
@@ -1222,12 +1257,12 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
               🧩 Confusions & Mistakes ({confusions.filter((c: any) => !c.resolved).length} open · {mistakes.length} logged)
             </summary>
             <div style={{ paddingBottom: '12px' }}>
-            <ConfusionMistakeBank
-              confusions={confusions}
-              mistakes={mistakes}
-              onSaveConfusions={handleSaveConfusions}
-              onSaveMistakes={handleSaveMistakes}
-            />
+              <ConfusionMistakeBank
+                confusions={confusions}
+                mistakes={mistakes}
+                onSaveConfusions={handleSaveConfusions}
+                onSaveMistakes={handleSaveMistakes}
+              />
             </div>
           </details>
 
@@ -1237,14 +1272,14 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
               📊 Sessions ({sessionLogs.length})
             </summary>
             <div style={{ paddingBottom: '12px' }}>
-            <SessionTimeline sessionLogs={sessionLogs} />
+              <SessionTimeline sessionLogs={sessionLogs} />
             </div>
           </details>
         </div>
 
         {/* RIGHT SIDE FOCUS COMPANION */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
+
           {/* Focus Timer Widget */}
           {(status === 'active' || status === 'paused') && (
             <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', borderLeft: '3px solid var(--color-primary)' }}>
@@ -1323,7 +1358,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
                 {depthTarget || 'Proficiency'}
               </span>
             </div>
-            
+
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ fontSize: '0.7rem' }}>CURRENT MASTERY STAGE</label>
               <select
@@ -1338,7 +1373,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ currentStage: newSt }),
                     });
-                  } catch (err) {}
+                  } catch (err) { }
                 }}
                 style={{ background: '#121218', fontSize: '0.82rem' }}
               >
@@ -1360,250 +1395,250 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
       {/* Setup drawer — contract, materials, history. Touched when activating a topic, rarely after. */}
       <Drawer open={setupOpen} onClose={closeSetup} title="⚙️ Setup" label="Topic setup">
 
-            <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>🎯 Focus</h3>
-              <label className="form-label" style={{ fontSize: '0.72rem', marginBottom: 0 }}>WHY ARE YOU LEARNING THIS?</label>
-              <input type="text" className="form-input" value={why} onChange={(e) => setWhy(e.target.value)} placeholder="e.g. Needed for the backend interview in June" />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px' }}>
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.72rem' }}>HOW DEEP</label>
-                  <select className="form-input" value={depthTarget} onChange={(e) => setDepthTarget(e.target.value)} style={{ background: '#121218' }}>
-                    {['Awareness', 'Working Knowledge', 'Proficiency', 'Deep', 'Mastery'].map((d) => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.72rem' }}>NEXT ACTION (CONCRETE, VERB-FIRST)</label>
-                  <input type="text" className="form-input" value={nextAction} onChange={(e) => setNextAction(e.target.value)} placeholder="e.g. Solve 2 sliding-window mediums" />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <button onClick={() => handleSaveFocus(false)} disabled={focusSaving} className="btn btn-secondary" style={{ fontSize: '0.8rem' }}>
-                  {focusSaving ? 'Saving…' : 'Save'}
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>🎯 Focus</h3>
+          <label className="form-label" style={{ fontSize: '0.72rem', marginBottom: 0 }}>WHY ARE YOU LEARNING THIS?</label>
+          <input type="text" className="form-input" value={why} onChange={(e) => setWhy(e.target.value)} placeholder="e.g. Needed for the backend interview in June" />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px' }}>
+            <div>
+              <label className="form-label" style={{ fontSize: '0.72rem' }}>HOW DEEP</label>
+              <select className="form-input" value={depthTarget} onChange={(e) => setDepthTarget(e.target.value)} style={{ background: '#121218' }}>
+                {['Awareness', 'Working Knowledge', 'Proficiency', 'Deep', 'Mastery'].map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="form-label" style={{ fontSize: '0.72rem' }}>NEXT ACTION (CONCRETE, VERB-FIRST)</label>
+              <input type="text" className="form-input" value={nextAction} onChange={(e) => setNextAction(e.target.value)} placeholder="e.g. Solve 2 sliding-window mediums" />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button onClick={() => handleSaveFocus(false)} disabled={focusSaving} className="btn btn-secondary" style={{ fontSize: '0.8rem' }}>
+              {focusSaving ? 'Saving…' : 'Save'}
+            </button>
+            {status !== 'active' && (
+              <button onClick={() => handleSaveFocus(true)} disabled={focusSaving || !why.trim() || !nextAction.trim()} className="btn btn-primary" style={{ fontSize: '0.8rem' }}>
+                Save & make active (uses 1 of 2 slots)
+              </button>
+            )}
+          </div>
+        </section>
+
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>🧭 How you learn this</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+            {LEARNING_MODES.map((m) => (
+              <button
+                key={m.key}
+                onClick={() => handleChangeLearningMode(m.key)}
+                aria-pressed={learningMode === m.key}
+                style={{
+                  textAlign: 'left', padding: '10px 12px', borderRadius: 'var(--radius-sm)',
+                  border: learningMode === m.key ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
+                  background: learningMode === m.key ? 'rgba(99,102,241,0.12)' : 'transparent',
+                }}
+              >
+                <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{m.label}</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{m.hint}</div>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>🎯 Goal & Progress</h3>
+          <LearningContract
+            contract={contract}
+            onSaveContract={handleSaveContract}
+            concepts={concepts}
+            onDiagnoseConcepts={handleDiagnoseConcepts}
+          />
+        </section>
+
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>📋 Tasks & Resources ({subtasks.length + resources.length})</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="flex-between">
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>📚 Bookmarks & Learning Materials</h3>
+                <button onClick={() => setShowAddRes(!showAddRes)} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.78rem' }}>
+                  {showAddRes ? 'Cancel' : '➕ Add Material'}
                 </button>
-                {status !== 'active' && (
-                  <button onClick={() => handleSaveFocus(true)} disabled={focusSaving || !why.trim() || !nextAction.trim()} className="btn btn-primary" style={{ fontSize: '0.8rem' }}>
-                    Save & make active (uses 1 of 2 slots)
-                  </button>
-                )}
               </div>
-            </section>
 
-            <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>🧭 How you learn this</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
-                {LEARNING_MODES.map((m) => (
-                  <button
-                    key={m.key}
-                    onClick={() => handleChangeLearningMode(m.key)}
-                    aria-pressed={learningMode === m.key}
-                    style={{
-                      textAlign: 'left', padding: '10px 12px', borderRadius: 'var(--radius-sm)',
-                      border: learningMode === m.key ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
-                      background: learningMode === m.key ? 'rgba(99,102,241,0.12)' : 'transparent',
-                    }}
-                  >
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{m.label}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{m.hint}</div>
-                  </button>
-                ))}
-              </div>
-            </section>
+              {showAddRes && (
+                <form onSubmit={handleAddResource} style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="url"
+                      className="form-input"
+                      placeholder="Paste URL (e.g. https://docs.example.com)..."
+                      value={newResUrl}
+                      onChange={(e) => setNewResUrl(e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleScrapeLink}
+                      disabled={scrapingLink || !newResUrl.trim()}
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                    >
+                      {scrapingLink ? 'Fetching...' : '🔍 Auto-Fetch Info'}
+                    </button>
+                  </div>
 
-            <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>🎯 Goal & Progress</h3>
-            <LearningContract
-              contract={contract}
-              onSaveContract={handleSaveContract}
-              concepts={concepts}
-              onDiagnoseConcepts={handleDiagnoseConcepts}
-            />
-            </section>
-
-            <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>📋 Tasks & Resources ({subtasks.length + resources.length})</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div className="flex-between">
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>📚 Bookmarks & Learning Materials</h3>
-                  <button onClick={() => setShowAddRes(!showAddRes)} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.78rem' }}>
-                    {showAddRes ? 'Cancel' : '➕ Add Material'}
-                  </button>
-                </div>
-
-                {showAddRes && (
-                  <form onSubmit={handleAddResource} style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input
-                        type="url"
-                        className="form-input"
-                        placeholder="Paste URL (e.g. https://docs.example.com)..."
-                        value={newResUrl}
-                        onChange={(e) => setNewResUrl(e.target.value)}
-                        style={{ flex: 1 }}
-                      />
-                      <button
-                        type="button"
-                        onClick={handleScrapeLink}
-                        disabled={scrapingLink || !newResUrl.trim()}
-                        className="btn btn-secondary"
-                        style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
-                      >
-                        {scrapingLink ? 'Fetching...' : '🔍 Auto-Fetch Info'}
-                      </button>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="Resource Title..."
-                        value={newResTitle}
-                        onChange={(e) => setNewResTitle(e.target.value)}
-                        required
-                      />
-                      <select
-                        className="form-input"
-                        value={newResType}
-                        onChange={(e) => setNewResType(e.target.value)}
-                        style={{ background: '#121218' }}
-                      >
-                        <option value="ARTICLE">Article / Doc</option>
-                        <option value="VIDEO">Video / Course</option>
-                        <option value="BOOK">Book / Chapter</option>
-                        <option value="PAPER">Paper / Spec</option>
-                        <option value="TOOL">Tool / Sandbox</option>
-                        <option value="OTHER">Other</option>
-                      </select>
-                    </div>
-
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="Why is this material relevant?"
-                      value={newResPurpose}
-                      onChange={(e) => setNewResPurpose(e.target.value)}
+                      placeholder="Resource Title..."
+                      value={newResTitle}
+                      onChange={(e) => setNewResTitle(e.target.value)}
+                      required
                     />
+                    <select
+                      className="form-input"
+                      value={newResType}
+                      onChange={(e) => setNewResType(e.target.value)}
+                      style={{ background: '#121218' }}
+                    >
+                      <option value="ARTICLE">Article / Doc</option>
+                      <option value="VIDEO">Video / Course</option>
+                      <option value="BOOK">Book / Chapter</option>
+                      <option value="PAPER">Paper / Spec</option>
+                      <option value="TOOL">Tool / Sandbox</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                  </div>
 
-                    <button type="submit" className="btn btn-primary">Save Bookmark</button>
-                  </form>
-                )}
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {resources.map((res, i) => (
-                    <div key={i} className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,0,0,0.15)' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--color-primary-light)', fontWeight: 700 }}>
-                            {res.type}
-                          </span>
-                          <a href={res.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-primary-light)' }}>
-                            {res.title} ↗
-                          </a>
-                        </div>
-                        {res.purpose && <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{res.purpose}</p>}
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <button
-                          onClick={() => handleToggleResourceStatus(i)}
-                          style={{
-                            fontSize: '0.7rem',
-                            padding: '4px 8px',
-                            borderRadius: '9999px',
-                            background: res.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.15)' : res.status === 'IN_PROGRESS' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.05)',
-                            color: res.status === 'COMPLETED' ? '#10b981' : res.status === 'IN_PROGRESS' ? '#f59e0b' : 'var(--color-text-muted)',
-                            fontWeight: 600,
-                          }}
-                        >
-                          {res.status}
-                        </button>
-                        <button onClick={() => handleDeleteResource(i)} style={{ color: 'var(--color-danger)', fontSize: '1rem' }}>×</button>
-                      </div>
-                    </div>
-                  ))}
-                  {resources.length === 0 && !showAddRes && (
-                    <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '12px 0' }}>
-                      No bookmarks saved yet. Click "+ Add Material" above to bookmark documentation or guides.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Subtask checklist */}
-              <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>📋 Milestones & Practical Exercises</h3>
-                
-                <form onSubmit={handleAddSubtask} style={{ display: 'flex', gap: '8px' }}>
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Add practice exercise or milestone..."
-                    value={newSubtaskTitle}
-                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                    placeholder="Why is this material relevant?"
+                    value={newResPurpose}
+                    onChange={(e) => setNewResPurpose(e.target.value)}
                   />
-                  <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px' }}>➕ Add</button>
+
+                  <button type="submit" className="btn btn-primary">Save Bookmark</button>
                 </form>
+              )}
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {subtasks.map((task) => (
-                    <div key={task.id} className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(0,0,0,0.15)', opacity: task.completed ? 0.6 : 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <input type="checkbox" checked={task.completed} onChange={() => handleToggleSubtask(task.id)} style={{ width: '15px', height: '15px' }} />
-                        <span style={{ fontSize: '0.85rem', textDecoration: task.completed ? 'line-through' : 'none' }}>{task.title}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {resources.map((res, i) => (
+                  <div key={i} className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,0,0,0.15)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--color-primary-light)', fontWeight: 700 }}>
+                          {res.type}
+                        </span>
+                        <a href={res.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-primary-light)' }}>
+                          {res.title} ↗
+                        </a>
                       </div>
-                      <button onClick={() => handleDeleteSubtask(task.id)} style={{ color: 'var(--color-danger)', fontSize: '1rem' }}>×</button>
+                      {res.purpose && <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{res.purpose}</p>}
                     </div>
-                  ))}
-                </div>
-              </div>
 
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        onClick={() => handleToggleResourceStatus(i)}
+                        style={{
+                          fontSize: '0.7rem',
+                          padding: '4px 8px',
+                          borderRadius: '9999px',
+                          background: res.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.15)' : res.status === 'IN_PROGRESS' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.05)',
+                          color: res.status === 'COMPLETED' ? '#10b981' : res.status === 'IN_PROGRESS' ? '#f59e0b' : 'var(--color-text-muted)',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {res.status}
+                      </button>
+                      <button onClick={() => handleDeleteResource(i)} style={{ color: 'var(--color-danger)', fontSize: '1rem' }}>×</button>
+                    </div>
+                  </div>
+                ))}
+                {resources.length === 0 && !showAddRes && (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '12px 0' }}>
+                    No bookmarks saved yet. Click "+ Add Material" above to bookmark documentation or guides.
+                  </p>
+                )}
+              </div>
             </div>
-            </section>
 
-            <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>📜 History</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              
-              {/* Pause History logs */}
-              <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>⏸️ Pause & Reactivation Logs</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {pauseHistory.map((ph, idx) => (
-                    <div key={ph.id || idx} className="glass-card" style={{ padding: '14px', background: 'rgba(0,0,0,0.15)', fontSize: '0.82rem' }}>
-                      <p style={{ color: 'var(--color-warning)', fontWeight: 600, fontSize: '0.75rem' }}>PAUSE SESSION</p>
-                      <p><strong>Paused on:</strong> {new Date(ph.pausedAt).toLocaleString()}</p>
-                      {ph.resumedAt && <p><strong>Resumed on:</strong> {new Date(ph.resumedAt).toLocaleString()}</p>}
-                      <p><strong>Reason:</strong> {ph.reason}</p>
-                      {ph.currentConcept && <p><strong>Stopped on concept:</strong> {ph.currentConcept}</p>}
-                      {ph.reactivationScore && <p><strong>Reactivation:</strong> {ph.reactivationScore}</p>}
+            {/* Subtask checklist */}
+            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>📋 Milestones & Practical Exercises</h3>
+
+              <form onSubmit={handleAddSubtask} style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Add practice exercise or milestone..."
+                  value={newSubtaskTitle}
+                  onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                />
+                <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px' }}>➕ Add</button>
+              </form>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {subtasks.map((task) => (
+                  <div key={task.id} className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(0,0,0,0.15)', opacity: task.completed ? 0.6 : 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <input type="checkbox" checked={task.completed} onChange={() => handleToggleSubtask(task.id)} style={{ width: '15px', height: '15px' }} />
+                      <span style={{ fontSize: '0.85rem', textDecoration: task.completed ? 'line-through' : 'none' }}>{task.title}</span>
                     </div>
-                  ))}
-                  {pauseHistory.length === 0 && (
-                    <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textAlign: 'center' }}>No pause history recorded.</p>
-                  )}
-                </div>
+                    <button onClick={() => handleDeleteSubtask(task.id)} style={{ color: 'var(--color-danger)', fontSize: '1rem' }}>×</button>
+                  </div>
+                ))}
               </div>
-
-              {/* Activity log timeline */}
-              <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>📜 Activity Timeline</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {(topic?.activityLogs ?? []).map((log) => (
-                    <div key={log.id} style={{ fontSize: '0.8rem', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                      <div className="flex-between" style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '2px' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--color-primary-light)' }}>{log.fieldChanged.toUpperCase()}</span>
-                        <span>{new Date(log.timestamp).toLocaleString()}</span>
-                      </div>
-                      <p style={{ color: 'var(--color-text-primary)' }}>
-                        {log.oldValue === null ? `Initialized as "${log.newValue}"` : `Changed from "${log.oldValue}" to "${log.newValue}"`}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
             </div>
-            </section>
+
+          </div>
+        </section>
+
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>📜 History</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+            {/* Pause History logs */}
+            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>⏸️ Pause & Reactivation Logs</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {pauseHistory.map((ph, idx) => (
+                  <div key={ph.id || idx} className="glass-card" style={{ padding: '14px', background: 'rgba(0,0,0,0.15)', fontSize: '0.82rem' }}>
+                    <p style={{ color: 'var(--color-warning)', fontWeight: 600, fontSize: '0.75rem' }}>PAUSE SESSION</p>
+                    <p><strong>Paused on:</strong> {new Date(ph.pausedAt).toLocaleString()}</p>
+                    {ph.resumedAt && <p><strong>Resumed on:</strong> {new Date(ph.resumedAt).toLocaleString()}</p>}
+                    <p><strong>Reason:</strong> {ph.reason}</p>
+                    {ph.currentConcept && <p><strong>Stopped on concept:</strong> {ph.currentConcept}</p>}
+                    {ph.reactivationScore && <p><strong>Reactivation:</strong> {ph.reactivationScore}</p>}
+                  </div>
+                ))}
+                {pauseHistory.length === 0 && (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textAlign: 'center' }}>No pause history recorded.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Activity log timeline */}
+            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>📜 Activity Timeline</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {(topic?.activityLogs ?? []).map((log) => (
+                  <div key={log.id} style={{ fontSize: '0.8rem', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                    <div className="flex-between" style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '2px' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--color-primary-light)' }}>{log.fieldChanged.toUpperCase()}</span>
+                      <span>{new Date(log.timestamp).toLocaleString()}</span>
+                    </div>
+                    <p style={{ color: 'var(--color-text-primary)' }}>
+                      {log.oldValue === null ? `Initialized as "${log.newValue}"` : `Changed from "${log.oldValue}" to "${log.newValue}"`}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        </section>
       </Drawer>
 
       {/* Reactivation Modal overlay */}
