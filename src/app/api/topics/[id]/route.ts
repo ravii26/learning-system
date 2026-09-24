@@ -9,6 +9,8 @@ import { syncSessionLogsFromJson } from '@/lib/sessionLogSync';
 import { syncTopicPausesFromJson } from '@/lib/topicPauseSync';
 import { syncConfusionsFromJson } from '@/lib/confusionSync';
 import { syncMistakesFromJson } from '@/lib/mistakeSync';
+import { syncCurriculumFromJson } from '@/lib/curriculumSync';
+import { syncResourcesFromJson } from '@/lib/resourceSync';
 import { calculateTopicProgressForMode } from '@/lib/progressCalculator';
 import { enumToLabel } from '@/lib/masteryLevel';
 
@@ -184,6 +186,13 @@ export async function PUT(
     if (Array.isArray(body.mistakes)) {
       body.mistakes = await db.$transaction((tx) => syncMistakesFromJson(tx, userId, id, body.mistakes as any));
     }
+    // Same for curriculum and resources (CurriculumItem / Resource rows).
+    if (Array.isArray(body.curriculum)) {
+      body.curriculum = await db.$transaction((tx) => syncCurriculumFromJson(tx, userId, id, body.curriculum as any));
+    }
+    if (Array.isArray(body.resources)) {
+      body.resources = await db.$transaction((tx) => syncResourcesFromJson(tx, userId, id, body.resources as any));
+    }
 
     // 4.7. Recompute progress server-side on every PUT, from real current
     // state — not whatever the client sends. progressCalculator.ts existed
@@ -192,13 +201,14 @@ export async function PUT(
     // checking every box could carry a topic to 100% with zero retained
     // concepts. Concepts now come from a fresh, non-suspended row query —
     // the source of truth — not the (possibly stale) knowledgeMap mirror.
-    const conceptsForProgress = await db.concept.findMany({
-      where: { topicId: id, suspended: false },
-      select: { masteryLevel: true },
-    });
+    const [conceptsForProgress, curriculumForProgress] = await Promise.all([
+      db.concept.findMany({ where: { topicId: id, suspended: false }, select: { masteryLevel: true } }),
+      // Rows, not the JSON mirror — same reasoning as concepts above.
+      db.curriculumItem.findMany({ where: { topicId: id, removed: false }, select: { completed: true } }),
+    ]);
     const computedProgressPct = calculateTopicProgressForMode(existing.mode, {
       subtasks: (body.subtasks !== undefined ? body.subtasks : existing.subtasks) as any,
-      curriculum: (body.curriculum !== undefined ? body.curriculum : existing.curriculum) as any,
+      curriculum: curriculumForProgress,
       knowledgeMap: { concepts: conceptsForProgress.map((c) => ({ status: enumToLabel(c.masteryLevel) })) },
     });
 

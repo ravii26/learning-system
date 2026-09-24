@@ -27,6 +27,7 @@ interface ActivityLog {
 }
 
 interface Resource {
+  id?: string; // assigned by src/lib/resourceSync.ts; older entries may lack one
   title: string;
   type: string;
   url: string;
@@ -689,6 +690,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
     if (!newResTitle.trim()) return;
 
     const newRes: Resource = {
+      id: `r${Math.random().toString(36).substring(2, 9)}`,
       title: newResTitle.trim(),
       type: newResType,
       url: newResUrl.trim(),

@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { validateTopicPayload } from '@/lib/validations/topic';
 import { ensureAreaSkillId } from '@/lib/areaSkill';
+import { syncTopicListsAndMirror } from '@/lib/topicListSync';
 
 export async function GET(request: Request) {
   const auth = requireAuth();
@@ -131,8 +132,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create the Topic card
-    const topic = await db.topic.create({
+    // Create the Topic card, and its CurriculumItem/Resource rows in the
+    // same transaction (the JSON columns become mirrors of those rows).
+    const resolvedSkillId = skillId || (await ensureAreaSkillId(db, userId, finalArea));
+    const topic = await db.$transaction(async (tx) => {
+      const created = await tx.topic.create({
       data: {
         userId,
         title,
@@ -162,8 +166,11 @@ export async function POST(request: Request) {
         curriculum: curriculum || [],
         mode: mode || 'syllabus',
         rubricTemplate: rubricTemplate || null,
-        skillId: skillId || (await ensureAreaSkillId(db, userId, finalArea)),
+        skillId: resolvedSkillId,
       },
+      });
+      await syncTopicListsAndMirror(tx, userId, created.id, { curriculum: curriculum || [], resources: resources || [] });
+      return tx.topic.findUniqueOrThrow({ where: { id: created.id } });
     });
 
     // Create Activity Log entry for creation

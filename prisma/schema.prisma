@@ -78,6 +78,8 @@ model User {
   practiceReps   PracticeRep[]
   artifacts      Artifact[]
   generatedLessons GeneratedLesson[]
+  curriculumItems  CurriculumItem[]
+  resourceRows     Resource[]
 }
 
 model Topic {
@@ -149,6 +151,10 @@ model Topic {
   practiceReps    PracticeRep[]
   artifacts       Artifact[]
   generatedLessons GeneratedLesson[]
+  // Named to avoid the existing `curriculum` / `resources` Json columns,
+  // which remain as generated mirrors of these rows.
+  curriculumItems CurriculumItem[]
+  resourceRows    Resource[]
 }
 
 model ActivityLog {
@@ -666,6 +672,66 @@ model Artifact {
   createdAt  DateTime @default(now())
 
   @@index([userId, topicId, occurredAt])
+}
+
+/// A syllabus module, promoted out of Topic.curriculum JSON — see
+/// src/lib/curriculumSync.ts. Topic.curriculum stays as a generated mirror
+/// so the existing UI (CurriculumView) keeps working unchanged.
+/// legacyId is the module's JSON id: GeneratedLesson.moduleId and
+/// SessionLog.moduleId reference it, so it must never change.
+model CurriculumItem {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  legacyId         String
+  order            Int
+  title            String
+  estimatedMinutes Int       @default(30)
+  completed        Boolean   @default(false)
+  completedAt      DateTime?
+  notes            String    @default("")
+
+  removed Boolean @default(false) // soft-removal, same reasoning as Confusion.removed
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([topicId, legacyId])
+  @@index([userId, topicId, order])
+}
+
+/// A bookmarked learning material, promoted out of Topic.resources JSON —
+/// see src/lib/resourceSync.ts. The legacy JSON entries had no ids (the UI
+/// edited them by array index), so legacyId is assigned on first sync and
+/// id-less entries are matched to existing rows by title+url+type first.
+model Resource {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  legacyId String
+  order    Int
+  title    String
+  type     String @default("OTHER") // ARTICLE | VIDEO | BOOK | PAPER | TOOL | WEBSITE | OTHER
+  url      String @default("")
+  purpose  String @default("")
+  status   String @default("NOT_STARTED") // NOT_STARTED | IN_PROGRESS | COMPLETED | PAUSED
+  notes    String @default("")
+
+  removed Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([topicId, legacyId])
+  @@index([userId, topicId, order])
 }
 
 /// An AI-generated lesson+quiz for one curriculum module, persisted so a

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
+import { ensureAreaSkillId } from '@/lib/areaSkill';
+import { syncTopicListsAndMirror } from '@/lib/topicListSync';
 
 /**
  * The weekly triage ritual, one capture at a time: turn it into a Note, a
@@ -92,28 +94,40 @@ export async function POST(request: Request, { params }: { params: { id: string 
         return NextResponse.json({ capture: updated, topic: existingTopic });
       }
 
-      const topic = await db.topic.create({
-        data: {
-          userId,
-          title: (body.title || defaultTitle).trim(),
-          area: body.area || 'Other',
-          status: 'inbox',
-          progressPct: 0,
-          currentStage: 'Define',
-          notes: capture.rawText || null,
-          resources: capture.url ? [{ title: capture.title || capture.url, type: 'WEBSITE', url: capture.url, purpose: '', status: 'queued', notes: '' }] : [],
-          subtasks: [],
-          contract: { outcome: '', estimatedEffort: 0, successCriterion: '', currentLevel: 'Beginner', prerequisites: [] },
-          knowledgeMap: { concepts: [] },
-          confusions: [],
-          mistakes: [],
-          pauseHistory: [],
-          curriculum: [],
-        },
-      });
-      const updated = await db.captureItem.update({
-        where: { id: capture.id },
-        data: { status: 'processed', processedAt: new Date(), resultTopicId: topic.id },
+      const area = body.area || 'Other';
+      const skillId = await ensureAreaSkillId(db, userId, area);
+      // A captured URL becomes the topic's first bookmark. NOT_STARTED, not
+      // 'queued' — the resource status the UI cycles through.
+      const resources = capture.url
+        ? [{ title: capture.title || capture.url, type: 'WEBSITE', url: capture.url, purpose: '', status: 'NOT_STARTED', notes: '' }]
+        : [];
+      const { topic, updated } = await db.$transaction(async (tx) => {
+        const created = await tx.topic.create({
+          data: {
+            userId,
+            title: (body.title || defaultTitle).trim(),
+            area,
+            skillId,
+            status: 'inbox',
+            progressPct: 0,
+            currentStage: 'Define',
+            notes: capture.rawText || null,
+            resources,
+            subtasks: [],
+            contract: { outcome: '', estimatedEffort: 0, successCriterion: '', currentLevel: 'Beginner', prerequisites: [] },
+            knowledgeMap: { concepts: [] },
+            confusions: [],
+            mistakes: [],
+            pauseHistory: [],
+            curriculum: [],
+          },
+        });
+        await syncTopicListsAndMirror(tx, userId, created.id, { resources });
+        const captureRow = await tx.captureItem.update({
+          where: { id: capture.id },
+          data: { status: 'processed', processedAt: new Date(), resultTopicId: created.id },
+        });
+        return { topic: await tx.topic.findUniqueOrThrow({ where: { id: created.id } }), updated: captureRow };
       });
       return NextResponse.json({ capture: updated, topic });
     }

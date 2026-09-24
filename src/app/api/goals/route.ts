@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { slugifySkillName } from '@/lib/skillSlug';
 import { ensureAreaSkillId } from '@/lib/areaSkill';
+import { syncTopicListsAndMirror } from '@/lib/topicListSync';
 import { recomputeGoalReadiness } from '@/lib/goalReadinessRecompute';
 
 /**
@@ -173,6 +174,8 @@ export async function POST(request: Request) {
             startedDate: status === 'active' ? new Date() : null,
           },
         });
+
+        await syncTopicListsAndMirror(tx, userId, topic.id, { curriculum: curriculumModules, resources: [] });
 
         await tx.activityLog.create({
           data: { userId, topicId: topic.id, fieldChanged: 'status', oldValue: null, newValue: status },
