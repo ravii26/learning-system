@@ -14,7 +14,6 @@ import ReactivationModal from './ReactivationModal';
 import SessionDebriefModal, { SessionLog } from './SessionDebriefModal';
 import SessionTimeline from './SessionTimeline';
 import CurriculumView, { CourseModule } from './CurriculumView';
-import RichTextEditor from './RichTextEditor';
 import CustomDialog, { CustomDialogConfig } from '@/components/CustomDialog';
 
 interface ActivityLog {
@@ -83,8 +82,14 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Tabs
-  const [activeTab, setActiveTab] = useState<'workspace' | 'contract' | 'materials' | 'confusions' | 'history' | 'notes' | 'sessions'>('workspace');
+  // Learn is the page; Setup (contract, materials, history) is a drawer opened on demand.
+  const [setupOpen, setSetupOpen] = useState(false);
+  useEffect(() => {
+    if (!setupOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSetupOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [setupOpen]);
 
   // Edit fields
   const [title, setTitle] = useState('');
@@ -842,7 +847,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
       setSelectedConcept(null);
       return;
     }
-    setActiveTab('workspace');
+    setSetupOpen(false);
     if (concepts.length > 0) {
       setSelectedConcept(concepts[0]);
     } else {
@@ -940,10 +945,10 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
                   You have not set a next action yet.
                 </p>
                 <button
-                  onClick={() => setActiveTab('contract')}
+                  onClick={() => setSetupOpen(true)}
                   style={{ marginTop: '6px', fontSize: '0.78rem', color: 'var(--color-primary-light)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
                 >
-                  Go to My Goal & Progress to set one →
+                  Open Setup to set one →
                 </button>
               </div>
             )}
@@ -951,7 +956,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
             <button
               onClick={() => {
-                setActiveTab('workspace');
+                setSetupOpen(false);
                 if (concepts.length > 0) {
                   setSelectedConcept(concepts[0]);
                 } else if (curriculum.length > 0) {
@@ -966,7 +971,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
               🧠 Practice with AI Coach
             </button>
             <button
-              onClick={() => setActiveTab('materials')}
+              onClick={() => setSetupOpen(true)}
               className="btn btn-secondary"
               style={{ fontSize: '0.78rem', padding: '6px 12px', borderRadius: 'var(--radius-sm)' }}
             >
@@ -976,32 +981,15 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
         </div>
       </div>
 
-      {/* Main Tab selectors */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', gap: '6px', overflowX: 'auto' }}>
-        {[
-          { key: 'workspace', label: '📖 Study & Practice' },
-          { key: 'materials', label: `📋 Tasks & Resources (${subtasks.length + resources.length})` },
-          { key: 'contract', label: '🎯 My Goal & Progress' },
-          { key: 'sessions', label: `📊 Sessions & Notes (${sessionLogs.length})` },
-        ].map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key as any)}
-            style={{
-              padding: '10px 16px',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              whiteSpace: 'nowrap',
-              color: activeTab === t.key ? '#fff' : 'var(--color-text-secondary)',
-              background: activeTab === t.key ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
-              borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0',
-              borderBottom: activeTab === t.key ? '2px solid var(--color-primary)' : '2px solid transparent',
-              transition: 'all var(--transition-fast)',
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* Learn is the page itself; Setup opens as a drawer */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          onClick={() => setSetupOpen(true)}
+          className="btn btn-secondary"
+          style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+        >
+          ⚙️ Setup — goal, tasks & resources, history
+        </button>
       </div>
 
       {/* Main Body Layout Grid */}
@@ -1010,7 +998,6 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
         {/* LEFT WORKSPACE PANELS */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {activeTab === 'workspace' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
               {/* Show Curriculum when no concepts yet, otherwise Knowledge Map + Socratic Coach */}
@@ -1121,36 +1108,177 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
               )}
 
             </div>
-          )}
 
-          {/* Notes Tab — Rich Text Editor */}
-          {activeTab === 'notes' && (
-            <div className="glass-panel" style={{ padding: '4px' }}>
-              <RichTextEditor
-                content={notes}
-                onChange={handleSaveNotes}
-                placeholder="Write notes, summaries, key concepts... Format with headings, bullets, bold, and more."
-                minHeight={300}
-              />
+          {/* Confusions & mistakes — inline, no tab switch mid-thought */}
+          <details className="glass-panel" style={{ padding: '4px 16px' }}>
+            <summary style={{ cursor: 'pointer', padding: '12px 0', fontSize: '0.88rem', fontWeight: 700 }}>
+              🧩 Confusions & Mistakes ({confusions.filter((c: any) => !c.resolved).length} open · {mistakes.length} logged)
+            </summary>
+            <div style={{ paddingBottom: '12px' }}>
+            <ConfusionMistakeBank
+              confusions={confusions}
+              mistakes={mistakes}
+              onSaveConfusions={handleSaveConfusions}
+              onSaveMistakes={handleSaveMistakes}
+            />
+            </div>
+          </details>
+
+          {/* Sessions — compact timeline strip */}
+          <details className="glass-panel" style={{ padding: '4px 16px' }}>
+            <summary style={{ cursor: 'pointer', padding: '12px 0', fontSize: '0.88rem', fontWeight: 700 }}>
+              📊 Sessions ({sessionLogs.length})
+            </summary>
+            <div style={{ paddingBottom: '12px' }}>
+            <SessionTimeline sessionLogs={sessionLogs} />
+            </div>
+          </details>
+        </div>
+
+        {/* RIGHT SIDE FOCUS COMPANION */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          
+          {/* Focus Timer Widget */}
+          {(status === 'active' || status === 'paused') && (
+            <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', borderLeft: '3px solid var(--color-primary)' }}>
+              <div className="flex-between">
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary-light)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  ⏱️ Focus Sprint Timer
+                </span>
+                <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                  {timerMode === 'study' ? '25m Sprint' : '5m Break'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                <span style={{ fontSize: '2.5rem', fontWeight: 800, fontFamily: 'monospace', color: '#fff' }}>
+                  {formatTimerTime(secondsRemaining)}
+                </span>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setTimerActive(!timerActive)}
+                    className="btn btn-primary"
+                    style={{ padding: '6px 14px', fontSize: '0.8rem' }}
+                  >
+                    {timerActive ? '⏸ Pause' : '▶ Start'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => resetTimer(timerMode)}
+                    className="btn btn-secondary"
+                    style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                  >
+                    ↺
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => { setTimerElapsedMinutes(Math.round((25 * 60 - secondsRemaining) / 60) || 25); setShowDebrief(true); }}
+                className="btn btn-secondary"
+                style={{ width: '100%', fontSize: '0.75rem', padding: '6px', borderStyle: 'dashed' }}
+              >
+                📝 Log Study Session & Insights
+              </button>
             </div>
           )}
 
-          {/* Sessions Tab — Session Timeline */}
-          {activeTab === 'sessions' && (
-            <SessionTimeline sessionLogs={sessionLogs} />
-          )}
+          {/* Quick Notes Side-Drawer */}
+          <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="flex-between">
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff' }}>📝 Quick Scratchpad & Notes</span>
+              <button
+                onClick={() => handleSaveNotes(notes)}
+                className="btn btn-secondary"
+                style={{ fontSize: '0.7rem', padding: '2px 8px' }}
+                disabled={saving}
+              >
+                💾 Save
+              </button>
+            </div>
+            <textarea
+              className="form-input"
+              rows={6}
+              placeholder="Jot down quick thoughts, formulas, or key takeaways as you study..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              style={{ resize: 'vertical', fontSize: '0.82rem', lineHeight: 1.5, background: 'rgba(0,0,0,0.2)' }}
+            />
+          </div>
 
-          {activeTab === 'contract' && (
+          {/* Compact Study Context & Stage Selection */}
+          <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="flex-between">
+              <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#fff' }}>📌 Topic Milestone Stage</h4>
+              <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '9999px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', fontWeight: 600 }}>
+                {depthTarget || 'Proficiency'}
+              </span>
+            </div>
+            
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" style={{ fontSize: '0.7rem' }}>CURRENT MASTERY STAGE</label>
+              <select
+                className="form-input"
+                value={currentStage}
+                onChange={async (e) => {
+                  const newSt = e.target.value;
+                  setCurrentStage(newSt);
+                  try {
+                    await fetch(`/api/topics/${params.id}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ currentStage: newSt }),
+                    });
+                  } catch (err) {}
+                }}
+                style={{ background: '#121218', fontSize: '0.82rem' }}
+              >
+                {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+            <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+              <p><strong>Category:</strong> {area}</p>
+              <p><strong>Target Effort:</strong> {contract?.estimatedEffort || 0} Hours</p>
+              <p><strong>Last Activity:</strong> {topic?.lastTouchedDate ? new Date(topic.lastTouchedDate).toLocaleDateString() : '—'}</p>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* Setup drawer — contract, materials, history. Touched when activating a topic, rarely after. */}
+      {setupOpen && (
+        <div
+          onClick={() => setSetupOpen(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.55)', display: 'flex', justifyContent: 'flex-end' }}
+        >
+          <aside
+            role="dialog"
+            aria-label="Topic setup"
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: 'min(680px, 100vw)', height: '100%', overflowY: 'auto', background: '#0f0f15', borderLeft: '1px solid var(--border-color)', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '24px' }}
+          >
+            <div className="flex-between">
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 700 }}>⚙️ Setup</h2>
+              <button onClick={() => setSetupOpen(false)} className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 12px' }}>Close ✕</button>
+            </div>
+
+            <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>🎯 Goal & Progress</h3>
             <LearningContract
               contract={contract}
               onSaveContract={handleSaveContract}
               concepts={concepts}
               onDiagnoseConcepts={handleDiagnoseConcepts}
             />
-          )}
+            </section>
 
-          {/* Materials Tab */}
-          {activeTab === 'materials' && (
+            <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>📋 Tasks & Resources ({subtasks.length + resources.length})</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div className="flex-between">
@@ -1288,18 +1416,10 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
               </div>
 
             </div>
-          )}
+            </section>
 
-          {activeTab === 'confusions' && (
-            <ConfusionMistakeBank
-              confusions={confusions}
-              mistakes={mistakes}
-              onSaveConfusions={handleSaveConfusions}
-              onSaveMistakes={handleSaveMistakes}
-            />
-          )}
-
-          {activeTab === 'history' && (
+            <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>📜 History</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               
               {/* Pause History logs */}
@@ -1341,124 +1461,10 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
               </div>
 
             </div>
-          )}
-
+            </section>
+          </aside>
         </div>
-
-        {/* RIGHT SIDE FOCUS COMPANION */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
-          {/* Focus Timer Widget */}
-          {(status === 'active' || status === 'paused') && (
-            <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', borderLeft: '3px solid var(--color-primary)' }}>
-              <div className="flex-between">
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary-light)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  ⏱️ Focus Sprint Timer
-                </span>
-                <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-                  {timerMode === 'study' ? '25m Sprint' : '5m Break'}
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                <span style={{ fontSize: '2.5rem', fontWeight: 800, fontFamily: 'monospace', color: '#fff' }}>
-                  {formatTimerTime(secondsRemaining)}
-                </span>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setTimerActive(!timerActive)}
-                    className="btn btn-primary"
-                    style={{ padding: '6px 14px', fontSize: '0.8rem' }}
-                  >
-                    {timerActive ? '⏸ Pause' : '▶ Start'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => resetTimer(timerMode)}
-                    className="btn btn-secondary"
-                    style={{ padding: '6px 10px', fontSize: '0.8rem' }}
-                  >
-                    ↺
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => { setTimerElapsedMinutes(Math.round((25 * 60 - secondsRemaining) / 60) || 25); setShowDebrief(true); }}
-                className="btn btn-secondary"
-                style={{ width: '100%', fontSize: '0.75rem', padding: '6px', borderStyle: 'dashed' }}
-              >
-                📝 Log Study Session & Insights
-              </button>
-            </div>
-          )}
-
-          {/* Quick Notes Side-Drawer */}
-          <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div className="flex-between">
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff' }}>📝 Quick Scratchpad & Notes</span>
-              <button
-                onClick={() => handleSaveNotes(notes)}
-                className="btn btn-secondary"
-                style={{ fontSize: '0.7rem', padding: '2px 8px' }}
-                disabled={saving}
-              >
-                💾 Save
-              </button>
-            </div>
-            <textarea
-              className="form-input"
-              rows={6}
-              placeholder="Jot down quick thoughts, formulas, or key takeaways as you study..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              style={{ resize: 'vertical', fontSize: '0.82rem', lineHeight: 1.5, background: 'rgba(0,0,0,0.2)' }}
-            />
-          </div>
-
-          {/* Compact Study Context & Stage Selection */}
-          <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div className="flex-between">
-              <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#fff' }}>📌 Topic Milestone Stage</h4>
-              <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '9999px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', fontWeight: 600 }}>
-                {depthTarget || 'Proficiency'}
-              </span>
-            </div>
-            
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '0.7rem' }}>CURRENT MASTERY STAGE</label>
-              <select
-                className="form-input"
-                value={currentStage}
-                onChange={async (e) => {
-                  const newSt = e.target.value;
-                  setCurrentStage(newSt);
-                  try {
-                    await fetch(`/api/topics/${params.id}`, {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ currentStage: newSt }),
-                    });
-                  } catch (err) {}
-                }}
-                style={{ background: '#121218', fontSize: '0.82rem' }}
-              >
-                {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-
-            <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
-              <p><strong>Category:</strong> {area}</p>
-              <p><strong>Target Effort:</strong> {contract?.estimatedEffort || 0} Hours</p>
-              <p><strong>Last Activity:</strong> {topic?.lastTouchedDate ? new Date(topic.lastTouchedDate).toLocaleDateString() : '—'}</p>
-            </div>
-          </div>
-
-        </div>
-
-      </div>
+      )}
 
       {/* Reactivation Modal overlay */}
       {showReactivation && (
