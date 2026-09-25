@@ -5,6 +5,22 @@ import {
   hasAnyAIProviderConfigured,
 } from '@/lib/ai/aiClient';
 import { db } from '@/lib/db';
+import { buildLessonContext, type LessonContext } from '@/lib/lessonContext';
+import { normalizeLesson } from '@/lib/lessonNormalize';
+
+/** Loads the rows buildLessonContext needs for one topic/module. */
+async function loadLessonContext(userId: string, topicId: string, moduleId: string | undefined): Promise<LessonContext | null> {
+  const topic = await db.topic.findFirst({ where: { id: topicId, userId, deletedAt: null }, select: { contract: true } });
+  if (!topic) return null;
+  const [modules, attempts, confusions, mistakes] = await Promise.all([
+    db.curriculumItem.findMany({ where: { topicId, removed: false }, select: { legacyId: true, order: true, title: true, completed: true } }),
+    db.moduleAttempt.findMany({ where: { userId, topicId }, orderBy: { createdAt: 'desc' }, take: 20, select: { moduleId: true, kind: true, verdict: true, details: true } }),
+    db.confusion.findMany({ where: { topicId, removed: false, resolved: false }, orderBy: { createdAt: 'desc' }, take: 5, select: { text: true, resolved: true } }),
+    db.mistake.findMany({ where: { topicId, removed: false }, orderBy: { occurredAt: 'desc' }, take: 5, select: { mistake: true } }),
+  ]);
+  const contract = topic.contract as Record<string, unknown> | null;
+  return buildLessonContext({ modules, moduleId, contractLevel: contract?.currentLevel, attempts, confusions, mistakes });
+}
 
 /**
  * Every cached lesson for a topic, keyed by moduleId.
@@ -78,12 +94,12 @@ export async function POST(request: Request) {
     moduleId,
     regenerate = false,
 
-    // Optional learner context.
-    // These can be supplied now or added to the frontend later.
-    learnerLevel = 'beginner',
-    priorKnowledge = '',
-    knownWeaknesses = [],
-    recentMistakes = [],
+    // Optional learner context. When omitted and topicId is given, it is
+    // derived server-side from real evidence (see loadLessonContext below).
+    learnerLevel: bodyLearnerLevel,
+    priorKnowledge: bodyPriorKnowledge = '',
+    knownWeaknesses: bodyKnownWeaknesses = [],
+    recentMistakes: bodyRecentMistakes = [],
   } = body;
 
   if (!moduleTitle) {
@@ -189,13 +205,28 @@ To study it independently:
    * - what the model must NOT do
    */
 
-  const normalizedWeaknesses = Array.isArray(knownWeaknesses)
-    ? knownWeaknesses.slice(0, 10)
-    : [];
+  /*
+   * Learner context from real evidence: where this module sits in the
+   * course, what's been completed, challenge answers graded partial or
+   * wrong, wrong quiz answers, open confusions, logged mistakes. Explicit
+   * values in the request body take precedence.
+   */
+  const ctx = topicId ? await loadLessonContext(userId, topicId, moduleId).catch((e) => {
+    console.warn('Could not load learner context:', e);
+    return null;
+  }) : null;
 
-  const normalizedMistakes = Array.isArray(recentMistakes)
-    ? recentMistakes.slice(0, 10)
-    : [];
+  const learnerLevel: string = bodyLearnerLevel || ctx?.learnerLevel || 'beginner';
+  const priorKnowledge: string = bodyPriorKnowledge || ctx?.priorKnowledge || '';
+  const coursePosition: string = ctx?.coursePosition || '';
+
+  const normalizedWeaknesses = Array.isArray(bodyKnownWeaknesses) && bodyKnownWeaknesses.length
+    ? bodyKnownWeaknesses.slice(0, 10)
+    : ctx?.knownWeaknesses ?? [];
+
+  const normalizedMistakes = Array.isArray(bodyRecentMistakes) && bodyRecentMistakes.length
+    ? bodyRecentMistakes.slice(0, 10)
+    : ctx?.recentMistakes ?? [];
 
   const systemPrompt = `
 You are an expert teacher and senior practitioner creating one focused learning lesson.
@@ -234,6 +265,15 @@ ${normalizedMistakes.length
       ? normalizedMistakes.map((item: string) => `- ${item}`).join('\n')
       : 'No recent mistakes provided.'
     }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+COURSE POSITION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${coursePosition || 'Standalone lesson — no course position provided.'}
+
+Use this to avoid re-teaching earlier modules (refer to them briefly when
+you build on them) and to avoid teaching the next module early.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PRIMARY OBJECTIVE
@@ -525,6 +565,23 @@ Do not fabricate sources or claim something is "industry standard" unless
 the claim is genuinely justified.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REVIEW CARDS RULE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Write 3 to 5 "reviewCards": the few things from this lesson most worth
+remembering in a month. They are shown later with NO lesson context, as
+spaced-repetition flashcards.
+
+- The prompt asks for recall or reasoning ("Why does X fail when Y?",
+  "What would you use for Z, and why?"), never yes/no or a definition to
+  parrot.
+- The prompt must be answerable on its own — name the concept; don't say
+  "this lesson" or "the example above".
+- The answer is short (1-3 sentences) and complete enough to check yourself
+  against.
+- One idea per card.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT QUALITY TEST
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -647,6 +704,14 @@ Use exactly this structure:
     "idealAnswer": "Clear, complete breakdown of how to solve the challenge correctly."
   },
 
+  "reviewCards": [
+    {
+      "concept": "Short name of the idea",
+      "prompt": "Standalone recall or reasoning question",
+      "answer": "Short, checkable answer"
+    }
+  ],
+
   "estimatedDifficulty": "beginner | intermediate | advanced",
 
   "prerequisites": [
@@ -685,6 +750,9 @@ ${normalizedMistakes.length
         ? normalizedMistakes.join(', ')
         : 'None provided'
       }
+
+Course position:
+${coursePosition || 'Standalone lesson'}
 
 Important:
 Teach "${moduleTitle}" itself.
@@ -743,16 +811,11 @@ Actually teach the concept.
      *
      * We do not blindly trust model output just because JSON.parse succeeded.
      */
-    const isValidLesson =
-      parsed &&
-      typeof parsed === 'object' &&
-      typeof parsed.title === 'string' &&
-      typeof parsed.summary === 'string' &&
-      typeof parsed.explanation === 'string' &&
-      Array.isArray(parsed.keyTakeaways) &&
-      Array.isArray(parsed.quiz);
+    // normalizeLesson drops quiz questions the UI can't render, coerces
+    // list fields, and returns null if the core teaching content is missing.
+    const normalized = normalizeLesson(parsed);
 
-    if (!isValidLesson) {
+    if (!normalized) {
       console.error('AI returned structurally invalid lesson:', parsed);
 
       return NextResponse.json({
@@ -803,19 +866,19 @@ Actually teach the concept.
             topicId,
             moduleId,
             moduleTitle,
-            content: parsed,
+            content: normalized as object,
             provider,
           },
           update: {
             moduleTitle,
-            content: parsed,
+            content: normalized as object,
             provider,
           },
         });
       }
     }
 
-    return NextResponse.json(parsed);
+    return NextResponse.json(normalized);
   } catch (error) {
     console.error('Lesson generation error:', error);
 

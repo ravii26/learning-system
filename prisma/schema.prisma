@@ -80,6 +80,8 @@ model User {
   generatedLessons GeneratedLesson[]
   curriculumItems  CurriculumItem[]
   resourceRows     Resource[]
+  moduleAttempts   ModuleAttempt[]
+  studyTime        StudyTimeEntry[]
 }
 
 model Topic {
@@ -155,6 +157,62 @@ model Topic {
   // which remain as generated mirrors of these rows.
   curriculumItems CurriculumItem[]
   resourceRows    Resource[]
+  moduleAttempts  ModuleAttempt[]
+  studyTime       StudyTimeEntry[]
+}
+
+/// Evidence from the Study Room: one row per checked quiz or graded
+/// challenge. Feeds progress, "where you stand", and the next lesson's
+/// personalization (what you got wrong gets addressed).
+model ModuleAttempt {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  moduleId String // CurriculumItem.legacyId
+  kind     String // quiz | challenge
+
+  score   Float? // 0..1 — quiz: correct/total; challenge: AI verdict mapped to 1 / 0.5 / 0
+  correct Int?
+  total   Int?
+  verdict String? // challenge: correct | partial | incorrect
+  answer  String? // challenge: what you wrote
+  details Json? // quiz: [{question, chosen, correctAnswer, isCorrect}]; challenge: {captured, missed, tip, followUp}
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, topicId, moduleId, createdAt])
+}
+
+/// Time actually spent studying. `auto` spans come from the Study Room's
+/// activity tracker (visible tab + recent input, or a running focus timer);
+/// `away` is time you confirmed you spent on an external link it opened;
+/// `manual` is time you logged yourself (e.g. offline reading). Auto spans
+/// are upserted by clientSessionId, so repeated heartbeats never double-count.
+model StudyTimeEntry {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  moduleId        String? // CurriculumItem.legacyId, when known
+  startedAt       DateTime
+  seconds         Int
+  source          String // auto | away | manual
+  note            String?
+  clientSessionId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, clientSessionId])
+  @@index([userId, startedAt])
+  @@index([userId, topicId, startedAt])
 }
 
 model ActivityLog {
@@ -218,6 +276,15 @@ model Concept {
   // can match a concept across both representations.
   legacyId         String?
   seededFromLegacy Boolean   @default(false)
+
+  // Review-card fields: a concept created from a studied module carries an
+  // explicit question and answer, so Daily Review can show the answer to
+  // check yourself against (src/lib/reviewCards.ts). Null for concepts made
+  // on a concept map, which review by title alone.
+  prompt         String?
+  answer         String?
+  sourceModuleId String? // CurriculumItem.legacyId of the module it came from
+  sourceKind     String? // lesson_card | takeaway | quiz_miss
 
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt

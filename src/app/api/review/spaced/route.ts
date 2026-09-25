@@ -23,7 +23,10 @@ export async function GET() {
         suspended: false,
         masteryLevel: { not: 'Unknown' }, // matches the old `if (c.status === 'Unknown') continue;`
         OR: [{ nextReview: null }, { nextReview: { lte: now } }],
-        topic: { status: { in: ['active', 'maintenance'] }, deletedAt: null },
+        // Retention doesn't depend on whether a topic is currently your
+        // focus: anything you studied comes back for review unless you
+        // dropped the topic.
+        topic: { status: { not: 'dropped' }, deletedAt: null },
       },
       include: { topic: { select: { title: true, area: true } } },
       orderBy: { nextReview: 'asc' },
@@ -38,6 +41,9 @@ export async function GET() {
       topicArea: c.topic.area,
       conceptId: c.id,
       conceptTitle: c.title,
+      // Review-card question/answer (null for concept-map concepts)
+      prompt: c.prompt,
+      answer: c.answer,
       conceptStatus: enumToLabel(c.masteryLevel),
       difficulty: c.difficultyTag || 'Medium',
       importance: c.importance || 'Medium',

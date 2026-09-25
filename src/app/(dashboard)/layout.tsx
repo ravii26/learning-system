@@ -59,7 +59,7 @@ export default async function DashboardLayout({
           </div>
           
           <div style={{ flexGrow: 1, padding: '24px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <NavLinks />
             </nav>
             

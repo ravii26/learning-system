@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { callAIContent, hasAnyAIProviderConfigured } from '@/lib/ai/aiClient';
 import { requireAuth } from '@/lib/apiAuth';
+import { db } from '@/lib/db';
 
 function stringifyField(val: any): string {
   if (typeof val === 'string') return val;
@@ -27,6 +28,7 @@ function generateSmartFallback(conceptTitle: string, topicTitle?: string) {
 export async function POST(request: Request) {
   const auth = requireAuth();
   if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
 
   try {
     const body = await request.json();
@@ -38,45 +40,58 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'topicTitle is required' }, { status: 400 });
       }
 
-      const prompt = `You are a world-class curriculum designer and educator.
-Create a progressive, 5 to 7 module learning syllabus for the subject: "${topicTitle}".
-Each module must be a concrete, capability-building topic (e.g. "Types of Data: Categorical vs Numerical", "Calculating Summary Statistics", "Cleaning Missing Values").
-NEVER use generic placeholder titles like "Module 1: Mental Models" or corporate buzzwords.
+      const { why, level, depthTarget, area } = body as { why?: string; level?: string; depthTarget?: string; area?: string };
 
-Return JSON only in this exact format:
+      const prompt = `Design a study syllabus for one learner.
+
+Subject: "${topicTitle}"
+${area ? `Area: ${area}\n` : ''}Why they are learning it: ${why?.trim() || 'not stated'}
+Current level: ${level || 'beginner'}
+How deep they need to go: ${depthTarget || 'working knowledge — able to use it confidently'}
+
+Rules:
+- 5 to 8 modules, ordered so each builds on the previous ones (foundations → mechanisms → application → integration).
+- Each module is ONE concrete, teachable concept or skill that fits a 20-60 minute session. Split anything bigger.
+- Titles name the actual thing learned (e.g. "Two Pointers on Sorted Arrays", "Reading a Cash-Flow Statement", "Structuring a 2-Minute Answer: Point–Reason–Example").
+  Never generic titles ("Fundamentals", "Core Concepts", "Advanced Topics", "Mental Models", "Best Practices").
+- Fit the stated reason: if they learn it for interviews, bias toward what gets asked and practiced; for a job task, toward what they will actually do.
+- Match the level: skip what a ${level || 'beginner'} already knows; don't jump past what they need.
+- Stop at the stated depth — no modules beyond what they need.
+- "notes": one sentence saying what they will be able to DO after the module (an observable outcome, not "understand X").
+- The last module should apply everything to one realistic task or mini-project.
+
+Return JSON only:
 {
   "modules": [
-    {
-      "title": "Clear Concrete Module Title",
-      "estimatedMinutes": 30,
-      "notes": "Brief 1-sentence description of what the student will learn and practice"
-    }
+    { "title": "Concrete module title", "estimatedMinutes": 40, "notes": "After this you can ..." }
   ]
 }`;
 
       try {
         const result = await callAIContent([
-          { role: 'system', content: 'You create structured practical curricula. Return JSON only.' },
+          { role: 'system', content: 'You design practical, well-sequenced curricula for self-learners. Return JSON only.' },
           { role: 'user', content: prompt },
         ], { jsonMode: true, temperature: 0.3 });
 
         const parsed = JSON.parse(result.content);
-        if (Array.isArray(parsed.modules) && parsed.modules.length > 0) {
-          return NextResponse.json(parsed);
+        const modules = (Array.isArray(parsed.modules) ? parsed.modules : [])
+          .filter((m: any) => m && typeof m.title === 'string' && m.title.trim())
+          .slice(0, 10)
+          .map((m: any) => ({
+            title: m.title.trim(),
+            estimatedMinutes: Math.min(120, Math.max(10, Math.round(Number(m.estimatedMinutes) || 30))),
+            notes: typeof m.notes === 'string' ? m.notes.trim() : '',
+          }));
+        if (modules.length >= 2) {
+          return NextResponse.json({ modules });
         }
+        console.warn('AI curriculum had too few usable modules:', parsed);
       } catch (e) {
-        console.warn('AI curriculum generation failed, using intelligent fallback:', e);
+        console.warn('AI curriculum generation failed:', e instanceof Error ? e.message : e);
       }
 
-      return NextResponse.json({
-        modules: [
-          { title: `${topicTitle} Fundamentals & Core Mental Models`, estimatedMinutes: 25, notes: 'Foundational concepts and key terminology.' },
-          { title: `Core Techniques & Step-by-Step Examples`, estimatedMinutes: 30, notes: 'Essential mechanics with real-world examples.' },
-          { title: `Practical Application & Hands-on Exercises`, estimatedMinutes: 35, notes: 'Hands-on practice solving real problems.' },
-          { title: `Common Mistakes & Edge Cases to Avoid`, estimatedMinutes: 25, notes: 'Debugging and critical thinking.' },
-          { title: `Independent Project & Synthesis`, estimatedMinutes: 45, notes: 'Synthesize everything learned into a complete outcome.' },
-        ],
-      });
+      // Honest failure — no generic filler syllabus saved as if it were real.
+      return NextResponse.json({ modules: [], fallback: true, reason: 'Could not generate a syllabus right now' });
     }
 
     // 2. Generate Structured Concept Tree
@@ -141,48 +156,93 @@ Return JSON only in this exact format:
         return NextResponse.json({ error: 'userRecall and idealAnswer are required' }, { status: 400 });
       }
 
-      if (!hasAnyAIProviderConfigured()) {
-        return NextResponse.json({
-          captured: 'Good effort attempting to explain the concept from memory!',
-          missed: 'Compare your response with the ideal answer below to spot any missing details.',
-          tip: 'Active recall strengthens long-term memory far more than re-reading.',
+      // Never invent feedback: when no real evaluation is possible, say so,
+      // and don't record it as evidence.
+      const unavailable = (reason: string) =>
+        NextResponse.json({
+          fallback: true,
+          reason,
+          verdict: null,
+          captured: '',
+          missed: '',
+          tip: 'AI feedback is unavailable right now — compare your answer with the model solution yourself.',
         });
-      }
 
-      const prompt = `You are an expert, encouraging Socratic tutor evaluating a student's self-recall attempt.
-Concept: "${conceptTitle || 'General Concept'}"
-Topic: "${topicTitle || 'Study Subject'}"
+      if (!hasAnyAIProviderConfigured()) return unavailable('AI provider not configured');
 
-Ideal Answer:
+      const { question, scenario, topicId, moduleId } = body as { question?: string; scenario?: string; topicId?: string; moduleId?: string };
+
+      const prompt = `You are grading one learner's answer to a practice challenge, as a demanding but kind tutor.
+
+Subject: "${topicTitle || 'Study subject'}"
+Concept: "${conceptTitle || 'General concept'}"
+${scenario ? `Scenario given to the learner:\n"${scenario}"\n` : ''}${question ? `Question the learner had to answer:\n"${question}"\n` : ''}
+Reference answer (what a strong answer covers):
 "${idealAnswer}"
 
-Student's Attempted Recall:
+The learner's answer:
 "${userRecall}"
 
-Compare the student's attempt against the ideal answer. Be direct, helpful, and friendly. Avoid academic jargon.
-Respond with JSON only in this exact format:
+How to grade:
+- Judge the reasoning, not the wording. A different but correct approach is correct.
+- "correct": the key idea and reasoning are right; small omissions are fine.
+- "partial": the right direction but a load-bearing step, condition, or trade-off is missing or wrong.
+- "incorrect": the core idea is wrong, missing, or the answer doesn't address the question.
+- Be specific. Quote or paraphrase the exact part of their answer you are reacting to. Never write feedback that could apply to any answer.
+- If they hold a misconception, name it and correct it in one sentence.
+- Do not pad with praise. If the answer is weak, say what is missing.
+
+Return JSON only:
 {
-  "captured": "1-2 sentences highlighting the key ideas the student understood correctly.",
-  "missed": "1-2 sentences highlighting important nuances or facts they missed or got slightly wrong.",
-  "tip": "One clear, memorable takeaway or mnemonic to cement this concept forever."
+  "verdict": "correct" | "partial" | "incorrect",
+  "captured": "What they got right, specifically (1-2 sentences). Empty string if nothing.",
+  "missed": "The most important thing missing or wrong, and the correction (1-2 sentences). Empty string if nothing.",
+  "tip": "One concrete, memorable rule or check they can reuse next time.",
+  "followUp": "One short question that probes exactly the gap you found (or deepens it if the answer was correct)."
 }`;
 
+      let parsed: Record<string, unknown>;
       try {
         const result = await callAIContent([
-          { role: 'system', content: 'You evaluate student learning recall accurately, warmly, and constructively. Return JSON only.' },
+          { role: 'system', content: 'You grade learner answers accurately and specifically. Return JSON only.' },
           { role: 'user', content: prompt },
-        ], { jsonMode: true, temperature: 0.3 });
-
-        const parsed = JSON.parse(result.content);
-        return NextResponse.json(parsed);
+        ], { jsonMode: true, temperature: 0.2 });
+        parsed = JSON.parse(result.content);
       } catch (aiErr) {
-        console.warn('AI call failed for evaluate, returning fallback:', aiErr);
-        return NextResponse.json({
-          captured: 'You captured the main idea in your own words.',
-          missed: 'Check the ideal answer to see if you can add more precision to your explanation.',
-          tip: 'Try teaching this concept out loud to an imaginary beginner.',
-        });
+        console.warn('AI call failed for evaluate:', aiErr instanceof Error ? aiErr.message : aiErr);
+        return unavailable('AI evaluation failed');
       }
+
+      const verdict = ['correct', 'partial', 'incorrect'].includes(String(parsed.verdict)) ? String(parsed.verdict) : null;
+      const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+      const evaluation = {
+        verdict,
+        captured: text(parsed.captured),
+        missed: text(parsed.missed),
+        tip: text(parsed.tip),
+        followUp: text(parsed.followUp),
+      };
+
+      // Record as evidence only for a real verdict on a topic you own.
+      if (verdict && topicId && moduleId) {
+        const owned = await db.topic.findFirst({ where: { id: topicId, userId, deletedAt: null }, select: { id: true } });
+        if (owned) {
+          await db.moduleAttempt.create({
+            data: {
+              userId,
+              topicId,
+              moduleId,
+              kind: 'challenge',
+              verdict,
+              score: verdict === 'correct' ? 1 : verdict === 'partial' ? 0.5 : 0,
+              answer: String(userRecall).slice(0, 5000),
+              details: { captured: evaluation.captured, missed: evaluation.missed, tip: evaluation.tip, followUp: evaluation.followUp },
+            },
+          });
+        }
+      }
+
+      return NextResponse.json(evaluation);
     }
 
     // 3. Default Action: Generate Socratic Lesson Content

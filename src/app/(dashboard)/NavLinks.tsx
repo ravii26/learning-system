@@ -8,15 +8,20 @@ export default function NavLinks() {
 
   const links = [
     { name: 'Home', href: '/', icon: '🏠' },
+    { name: 'Goals', href: '/goals', icon: '🎯' },
     { name: 'Roadmaps', href: '/plan', icon: '🗺️' },
-    { name: 'Notes', href: '/notes', icon: '📝' },
+    { name: 'Explore', href: '/explore', icon: '🧭' },
     { name: 'Daily Review', href: '/review', icon: '🔄' },
+    { name: 'Practice', href: '/practice', icon: '🎙️' },
+    { name: 'Notes', href: '/notes', icon: '📝' },
+    { name: 'Progress', href: '/progress', icon: '📈' },
+    { name: 'Where I Stand', href: '/skills', icon: '🌳' },
   ];
 
   return (
     <>
       {links.map((link) => {
-        const isActive = pathname === link.href;
+        const isActive = link.href === '/' ? pathname === '/' : pathname === link.href || pathname.startsWith(`${link.href}/`);
         return (
           <Link
             key={link.name}
@@ -25,7 +30,7 @@ export default function NavLinks() {
               display: 'flex',
               alignItems: 'center',
               gap: '12px',
-              padding: '12px 16px',
+              padding: '9px 14px',
               borderRadius: 'var(--radius-sm)',
               fontSize: '0.95rem',
               fontWeight: 500,

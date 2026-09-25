@@ -6,7 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/ToastProvider';
 import { pickNextAction, type NextActionPick, type TopicForNextAction } from '@/lib/nextAction';
 import { createCapture } from '@/lib/captureClient';
-import { Button, ButtonLink, Card, CardLabel, EmptyState } from '@/components/ui';
+import { Button, ButtonLink, Card, CardLabel, EmptyState, Sparkline } from '@/components/ui';
+import { formatDuration } from '@/lib/timeSummary';
 import ResurfacedNote from '@/components/ResurfacedNote';
 
 /**
@@ -32,6 +33,14 @@ interface Topic extends TopicForNextAction {
   mode: string;
 }
 
+interface TimeWeek {
+  totalSeconds: number;
+  todaySeconds: number;
+  allTimeSeconds: number;
+  daily: Array<{ date: string; seconds: number }>;
+  byTopic: Array<{ topicId: string; title: string; seconds: number }>;
+}
+
 export default function TodayPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -50,13 +59,17 @@ export default function TodayPage() {
   const [quickStartTitle, setQuickStartTitle] = useState('');
   const [quickStarting, setQuickStarting] = useState(false);
 
+  const [time, setTime] = useState<TimeWeek | null>(null);
+
   const fetchData = useCallback(async () => {
     try {
-      const [topicsRes, spacedRes, inboxRes] = await Promise.all([
+      const [topicsRes, spacedRes, inboxRes, timeRes] = await Promise.all([
         fetch('/api/topics'),
         fetch('/api/review/spaced'),
         fetch('/api/captures?status=inbox'),
+        fetch(`/api/time/summary?days=7&tz=${new Date().getTimezoneOffset()}`),
       ]);
+      if (timeRes.ok) setTime(await timeRes.json());
       if (inboxRes.ok) {
         const inbox = await inboxRes.json();
         setInboxCount(Array.isArray(inbox) ? inbox.length : 0);
@@ -146,23 +159,39 @@ export default function TodayPage() {
     if (!title) return;
     setQuickStarting(true);
     try {
-      const res = await fetch('/api/topics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          area: 'Tech',
-          status: 'active',
-          depthTarget: 'Proficiency',
-          why: `I want to learn ${title}`,
-          nextAction: `Start studying ${title}`,
-          currentStage: 'Fundamentals',
-          mode: 'syllabus',
-        }),
-      });
+      const create = (status: 'active' | 'queued') =>
+        fetch('/api/topics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            area: 'Tech',
+            status,
+            depthTarget: 'Proficiency',
+            why: `I want to learn ${title}`,
+            nextAction: `Start studying ${title}`,
+            currentStage: 'Fundamentals',
+            mode: 'syllabus',
+          }),
+        });
+      let res = await create('active');
+      let queued = false;
+      // Both "Now" slots taken: still create it and open it — just in Next.
+      if (res.status === 400) {
+        const data = await res.clone().json().catch(() => ({}));
+        if (/active limit/i.test(data.error || '')) {
+          res = await create('queued');
+          queued = true;
+        }
+      }
       if (res.ok) {
         const created = await res.json();
-        toast.success(`"${title}" created — generating your study plan...`);
+        toast.success(
+          queued
+            ? `"${title}" added to Next (both Now slots are full) — building its study plan...`
+            : `"${title}" created — generating your study plan...`
+        );
+        setQuickStartTitle('');
         router.push(`/topics/${created.id}?autostart=1`);
       } else {
         const data = await res.json().catch(() => ({}));
@@ -243,6 +272,25 @@ export default function TodayPage() {
         </Card>
       )}
 
+      {topics.length > 0 && (
+        <form onSubmit={handleQuickStart} className="flex items-center gap-2.5">
+          <input
+            type="text"
+            className="form-input flex-1 px-3 py-2 text-[0.85rem]"
+            placeholder="Learn something new — type a subject and get a study plan"
+            value={quickStartTitle}
+            onChange={(e) => setQuickStartTitle(e.target.value)}
+            disabled={quickStarting}
+            aria-label="New subject to learn"
+          />
+          {quickStartTitle.trim() && (
+            <Button type="submit" size="sm" variant="primary" disabled={quickStarting}>
+              {quickStarting ? 'Creating…' : 'Start ▸'}
+            </Button>
+          )}
+        </form>
+      )}
+
       {/* Next 25 minutes — the one choice */}
       <Card accent="primary">
         <CardLabel tone="primary">▸ Next 25 minutes</CardLabel>
@@ -293,6 +341,52 @@ export default function TodayPage() {
           </Card>
         )}
       </div>
+
+      {/* Time actually given — tracked while studying, plus anything logged by hand */}
+      {time && (
+        <Card className="flex flex-col gap-3 px-[18px] py-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <CardLabel>▸ Time you gave this week</CardLabel>
+              <div className="mt-1 flex items-baseline gap-3">
+                <span className="text-xl font-bold">{formatDuration(time.totalSeconds)}</span>
+                <span className="text-[0.8rem] text-fg-secondary">today {formatDuration(time.todaySeconds)}</span>
+                <span className="text-[0.8rem] text-fg-muted">all time {formatDuration(time.allTimeSeconds)}</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-0.5">
+              <Sparkline
+                values={time.daily.map((d) => Math.round(d.seconds / 60))}
+                width={140}
+                height={30}
+                label={`Minutes studied per day, last 7 days: ${time.daily.map((d) => Math.round(d.seconds / 60)).join(', ')}`}
+              />
+              <span className="text-[0.65rem] text-fg-muted">last 7 days</span>
+            </div>
+          </div>
+          {time.byTopic.length > 0 ? (
+            <div className="flex flex-col gap-1">
+              {time.byTopic.slice(0, 4).map((t) => (
+                <Link key={t.topicId} href={`/topics/${t.topicId}`} className="flex items-center gap-2 text-[0.8rem]">
+                  <span className="min-w-0 flex-1 truncate text-fg-secondary">{t.title}</span>
+                  <span className="h-1.5 w-24 overflow-hidden rounded-full bg-white/5">
+                    <span
+                      className="block h-full rounded-full bg-primary"
+                      style={{ width: `${Math.max(4, Math.round((t.seconds / Math.max(1, time.byTopic[0].seconds)) * 100))}%` }}
+                    />
+                  </span>
+                  <span className="w-14 text-right text-fg">{formatDuration(t.seconds)}</span>
+                </Link>
+              ))}
+              <Link href="/progress" className="mt-1 self-start text-[0.75rem] text-primary-light">Full progress ▸</Link>
+            </div>
+          ) : (
+            <p className="text-[0.8rem] text-fg-muted">
+              Nothing yet this week. Open a topic and study — time counts on its own while you&apos;re active, and you can log offline study from the topic&apos;s ⏱ button.
+            </p>
+          )}
+        </Card>
+      )}
 
       {/* Accretion review: one older note shown back to you (renders nothing if none is due) */}
       <ResurfacedNote />

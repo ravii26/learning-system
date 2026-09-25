@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { CourseModule } from './page';
+import { CourseModule, ModuleEvidence } from './page';
 import { renderMarkdown } from '@/lib/markdown';
 import RichTextEditor from './RichTextEditor';
 
@@ -14,7 +14,21 @@ interface ModuleStudyRoomProps {
   onSaveNotes: (html: string) => Promise<void>;
   onToggleCompleted: (id: string) => Promise<void>;
   onAddBookmark?: (resource: { title: string; url: string; type: string; purpose: string }) => Promise<void>;
+  /** Latest quiz score / challenge verdict / review cards for this module. */
+  evidence?: ModuleEvidence;
+  /** Called after something was recorded, so the parent can refetch evidence. */
+  onEvidenceChanged?: () => void;
 }
+
+type Verdict = 'correct' | 'partial' | 'incorrect';
+
+const VERDICT_STYLE: Record<Verdict, { label: string; color: string; bg: string }> = {
+  correct: { label: 'Correct', color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
+  partial: { label: 'Partly there', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
+  incorrect: { label: 'Not yet', color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
+};
+
+const isVerdict = (v: unknown): v is Verdict => v === 'correct' || v === 'partial' || v === 'incorrect';
 
 export default function ModuleStudyRoom({
   topicId,
@@ -25,6 +39,8 @@ export default function ModuleStudyRoom({
   onSaveNotes,
   onToggleCompleted,
   onAddBookmark,
+  evidence,
+  onEvidenceChanged,
 }: ModuleStudyRoomProps) {
   const [activeTab, setActiveTab] = useState<'guide' | 'media' | 'challenge' | 'quiz'>('guide');
   const [lesson, setLesson] = useState<any | null>(null);
@@ -34,12 +50,20 @@ export default function ModuleStudyRoom({
   // Socratic Challenge Interactive State
   const [challengeAnswer, setChallengeAnswer] = useState('');
   const [evaluating, setEvaluating] = useState(false);
-  const [evaluation, setEvaluation] = useState<{ captured?: string; missed?: string; tip?: string } | null>(null);
+  const [evaluation, setEvaluation] = useState<{
+    verdict?: Verdict | null;
+    captured?: string;
+    missed?: string;
+    tip?: string;
+    followUp?: string;
+    fallback?: boolean;
+  } | null>(null);
   const [savedBookmarkTitles, setSavedBookmarkTitles] = useState<Record<string, boolean>>({});
 
   // Quiz State
   const [quizSelections, setQuizSelections] = useState<Record<number, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizResult, setQuizResult] = useState<string | null>(null);
 
   // Fetch or Generate Full Comprehensive Lesson
   const loadLesson = useCallback(async (forceRegenerate = false) => {
@@ -48,6 +72,7 @@ export default function ModuleStudyRoom({
     setChallengeAnswer('');
     setQuizSelections({});
     setQuizSubmitted(false);
+    setQuizResult(null);
 
     try {
       const res = await fetch('/api/generate-lesson', {
@@ -91,6 +116,10 @@ export default function ModuleStudyRoom({
           action: 'evaluate',
           conceptTitle: module.title,
           topicTitle,
+          topicId,
+          moduleId: module.id,
+          question: lesson?.socraticChallenge?.question,
+          scenario: lesson?.socraticChallenge?.scenario,
           userRecall: challengeAnswer,
           idealAnswer: lesson?.socraticChallenge?.idealAnswer || lesson?.keyTakeaways?.join('\n') || 'Accurate understanding of core mechanics.',
         }),
@@ -98,12 +127,42 @@ export default function ModuleStudyRoom({
 
       if (res.ok) {
         const data = await res.json();
-        setEvaluation(data);
+        setEvaluation({ ...data, verdict: isVerdict(data.verdict) ? data.verdict : null });
+        if (isVerdict(data.verdict)) onEvidenceChanged?.();
+      } else {
+        setEvaluation({ fallback: true, tip: 'Could not reach the AI mentor. Compare your answer with the model solution below.' });
       }
     } catch (err) {
       console.error('Evaluation failed:', err);
+      setEvaluation({ fallback: true, tip: 'Could not reach the AI mentor. Compare your answer with the model solution below.' });
     } finally {
       setEvaluating(false);
+    }
+  };
+
+  // Grade locally right away, then save the attempt: the score becomes
+  // evidence and every miss becomes a Daily Review card due tomorrow.
+  const handleCheckQuiz = async () => {
+    setQuizSubmitted(true);
+    const quiz: any[] = Array.isArray(lesson?.quiz) ? lesson.quiz : [];
+    const correct = quiz.filter((q, i) => quizSelections[i] === q.correctIndex).length;
+    setQuizResult(`Score ${correct}/${quiz.length} · saving…`);
+    try {
+      const res = await fetch(`/api/topics/${topicId}/modules/${module.id}/attempts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selections: quizSelections }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const data = await res.json();
+      const added: number = data.cardsAdded ?? 0;
+      setQuizResult(
+        `Score ${data.attempt?.correct ?? correct}/${data.attempt?.total ?? quiz.length} saved` +
+          (added > 0 ? ` · ${added} missed question${added === 1 ? '' : 's'} added to Daily Review` : '')
+      );
+      onEvidenceChanged?.();
+    } catch {
+      setQuizResult(`Score ${correct}/${quiz.length} (not saved, try again later)`);
     }
   };
 
@@ -143,6 +202,24 @@ export default function ModuleStudyRoom({
           <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#fff', marginTop: '2px', letterSpacing: '-0.01em' }}>
             {module.order}. {module.title}
           </h2>
+          {evidence && (evidence.quiz || evidence.challenge || evidence.reviewCards > 0) && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[0.74rem] text-fg-secondary">
+              {evidence.quiz?.total ? (
+                <span>Last quiz <strong className="text-fg">{evidence.quiz.correct}/{evidence.quiz.total}</strong></span>
+              ) : null}
+              {isVerdict(evidence.challenge?.verdict) && (
+                <span>
+                  Challenge{' '}
+                  <strong style={{ color: VERDICT_STYLE[evidence.challenge!.verdict as Verdict].color }}>
+                    {VERDICT_STYLE[evidence.challenge!.verdict as Verdict].label}
+                  </strong>
+                </span>
+              )}
+              {evidence.reviewCards > 0 && (
+                <span>{evidence.reviewCards} card{evidence.reviewCards === 1 ? '' : 's'} in Daily Review</span>
+              )}
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -615,10 +692,30 @@ export default function ModuleStudyRoom({
 
               {/* AI Mentor Feedback Card */}
               {evaluation && (
-                <div className="glass-panel" style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: '14px', borderLeft: '4px solid #10b981' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div
+                  className="glass-panel"
+                  style={{
+                    padding: '22px 24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px',
+                    borderLeft: `4px solid ${evaluation.verdict ? VERDICT_STYLE[evaluation.verdict].color : 'var(--color-text-muted)'}`,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '1.1rem' }}>💡</span>
-                    <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff' }}>AI Mentor Evaluation & Critique</h4>
+                    <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff' }}>
+                      {evaluation.fallback ? 'No AI feedback this time' : 'Mentor feedback'}
+                    </h4>
+                    {evaluation.verdict && (
+                      <span
+                        className="rounded px-2 py-0.5 text-[0.72rem] font-bold"
+                        style={{ color: VERDICT_STYLE[evaluation.verdict].color, background: VERDICT_STYLE[evaluation.verdict].bg }}
+                      >
+                        {VERDICT_STYLE[evaluation.verdict].label}
+                      </span>
+                    )}
+                    {evaluation.verdict && <span className="text-[0.72rem] text-fg-muted">saved to this module&apos;s record</span>}
                   </div>
 
                   {evaluation.captured && (
@@ -638,7 +735,26 @@ export default function ModuleStudyRoom({
                   {evaluation.tip && (
                     <div style={{ fontSize: '0.88rem', color: 'var(--color-primary-light)', display: 'flex', alignItems: 'flex-start', gap: '8px', background: 'rgba(99,102,241,0.1)', padding: '10px 14px', borderRadius: '6px' }}>
                       <span>📌</span>
-                      <span><strong>Golden Takeaway:</strong> {evaluation.tip}</span>
+                      <span><strong>{evaluation.fallback ? 'Note' : 'Remember'}:</strong> {evaluation.tip}</span>
+                    </div>
+                  )}
+
+                  {evaluation.followUp && (
+                    <div className="flex flex-col gap-2 rounded-md border border-line bg-black/20 px-3.5 py-3 text-[0.86rem]">
+                      <span className="text-[0.72rem] font-bold uppercase tracking-wide text-fg-secondary">Go one step further</span>
+                      <span className="text-fg">{evaluation.followUp}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = evaluation.followUp;
+                          setChallengeAnswer('');
+                          setEvaluation(null);
+                          if (lesson) setLesson({ ...lesson, socraticChallenge: { ...lesson.socraticChallenge, question: next } });
+                        }}
+                        className="btn btn-secondary self-start px-3 py-1 text-[0.78rem]"
+                      >
+                        Answer this next
+                      </button>
                     </div>
                   )}
 
@@ -729,15 +845,28 @@ export default function ModuleStudyRoom({
                 );
               })}
 
-              <button
-                type="button"
-                onClick={() => setQuizSubmitted(true)}
-                disabled={quizSubmitted || Object.keys(quizSelections).length < lesson.quiz.length}
-                className="btn btn-primary"
-                style={{ alignSelf: 'flex-start', padding: '8px 20px', fontSize: '0.84rem' }}
-              >
-                {quizSubmitted ? '✓ Quiz Checked' : 'Check Answers'}
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleCheckQuiz}
+                  disabled={quizSubmitted || Object.keys(quizSelections).length < lesson.quiz.length}
+                  className="btn btn-primary"
+                  style={{ padding: '8px 20px', fontSize: '0.84rem' }}
+                >
+                  {quizSubmitted ? '✓ Quiz Checked' : 'Check Answers'}
+                </button>
+                {quizSubmitted && (
+                  <button
+                    type="button"
+                    onClick={() => { setQuizSelections({}); setQuizSubmitted(false); setQuizResult(null); }}
+                    className="btn btn-secondary"
+                    style={{ padding: '8px 14px', fontSize: '0.8rem' }}
+                  >
+                    Retake
+                  </button>
+                )}
+                {quizResult && <span className="text-[0.82rem] text-fg-secondary">{quizResult}</span>}
+              </div>
             </div>
           )}
 

@@ -17,6 +17,8 @@ interface DueConcept {
   lastRecalledAt: string | null;
   reviewIntervalDays: number;
   consecutiveRecalls: number;
+  prompt?: string | null;
+  answer?: string | null;
 }
 
 interface SpacedReviewQueueProps {
@@ -216,7 +218,10 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
 
           {!revealed ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <label className="form-label">EXPLAIN THIS CONCEPT FROM MEMORY</label>
+              <label className="form-label">{testingConcept.prompt ? 'ANSWER FROM MEMORY' : 'EXPLAIN THIS CONCEPT FROM MEMORY'}</label>
+              {testingConcept.prompt && (
+                <p style={{ fontSize: '0.9rem', fontWeight: 600, color: '#fff' }}>{testingConcept.prompt}</p>
+              )}
               <textarea
                 className="form-input"
                 style={{ width: '100%', height: '90px', resize: 'none', background: 'rgba(0,0,0,0.25)', fontFamily: 'monospace', fontSize: '0.8rem' }}
@@ -251,7 +256,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
                 <div>
                   <span className="form-label" style={{ fontSize: '0.7rem', color: 'var(--color-success)' }}>IDEAL MODEL KEYPOINTS</span>
                   <div style={{ fontSize: '0.75rem', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.15)', padding: '8px', borderRadius: '4px', minHeight: '60px' }}>
-                    {getIdealAnswer(testingConcept.conceptTitle)}
+                    {testingConcept.answer || getIdealAnswer(testingConcept.conceptTitle)}
                   </div>
                 </div>
               </div>

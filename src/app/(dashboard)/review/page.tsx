@@ -35,6 +35,9 @@ interface DueConcept {
   conceptStatus: string;
   difficulty: string;
   importance: string;
+  /** Set on cards made from lessons and quiz misses; plain concepts have neither. */
+  prompt?: string | null;
+  answer?: string | null;
 }
 
 interface ReviewDecision {
@@ -360,12 +363,26 @@ export default function ReviewPage() {
 
               <div className="rounded-md border border-line bg-black/20 px-3 py-6 text-center">
                 <CardLabel>Recall from memory first</CardLabel>
-                <h2 className="mt-2 text-xl font-bold text-white">
-                  Can you explain or define: &quot;{dueConcepts[currentConceptIdx].conceptTitle}&quot;?
+                <h2 className="mx-auto mt-2 max-w-[560px] text-xl font-bold text-white">
+                  {dueConcepts[currentConceptIdx].prompt
+                    ? dueConcepts[currentConceptIdx].prompt
+                    : <>Can you explain or define: &quot;{dueConcepts[currentConceptIdx].conceptTitle}&quot;?</>}
                 </h2>
                 {revealedAnswer && (
-                  <div className="mt-4 border-t border-dashed border-line pt-4 text-[0.88rem] text-primary-light">
-                    Status: <strong>{dueConcepts[currentConceptIdx].conceptStatus}</strong> | Difficulty: <strong>{dueConcepts[currentConceptIdx].difficulty}</strong>
+                  <div className="mt-4 border-t border-dashed border-line pt-4 text-[0.88rem]">
+                    {dueConcepts[currentConceptIdx].answer ? (
+                      <div className="mx-auto max-w-[560px] whitespace-pre-wrap text-left leading-relaxed text-fg">
+                        <span className="mb-1 block text-[0.7rem] font-bold uppercase tracking-wide text-success">Answer</span>
+                        {dueConcepts[currentConceptIdx].answer}
+                      </div>
+                    ) : (
+                      <span className="text-fg-muted">
+                        No stored answer for this card — check yourself against your notes, then grade honestly.
+                      </span>
+                    )}
+                    <div className="mt-3 text-[0.75rem] text-fg-muted">
+                      {dueConcepts[currentConceptIdx].conceptTitle} · level {dueConcepts[currentConceptIdx].conceptStatus}
+                    </div>
                   </div>
                 )}
               </div>

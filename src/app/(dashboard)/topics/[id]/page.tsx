@@ -12,6 +12,18 @@ import RichTextEditor from './RichTextEditor';
 import SessionDebriefModal, { SessionLog } from './SessionDebriefModal';
 import CustomDialog, { CustomDialogConfig } from '@/components/CustomDialog';
 import { Drawer } from '@/components/ui';
+import { useToast } from '@/components/ToastProvider';
+import { useStudyTracker } from '@/lib/useStudyTracker';
+import { formatDuration } from '@/lib/timeSummary';
+import TopicTimeDrawer from './TopicTimeDrawer';
+
+/** Latest quiz/challenge result per module — from /api/topics/[id]/attempts. */
+export interface ModuleEvidence {
+  quiz?: { score: number | null; correct: number | null; total: number | null; at: string };
+  challenge?: { verdict: string | null; at: string };
+  attempts: number;
+  reviewCards: number;
+}
 
 export interface CourseModule {
   id: string;
@@ -106,6 +118,38 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
   const [timerActive, setTimerActive] = useState(false);
   const [timerElapsedMinutes, setTimerElapsedMinutes] = useState(25);
   const [showDebrief, setShowDebrief] = useState(false);
+
+  const toast = useToast();
+
+  // Evidence per module (quiz scores, challenge verdicts, review cards)
+  const [evidence, setEvidence] = useState<Record<string, ModuleEvidence>>({});
+  const fetchEvidence = useCallback(async () => {
+    const res = await fetch(`/api/topics/${params.id}/attempts`).catch(() => null);
+    if (res?.ok) setEvidence((await res.json()).modules || {});
+  }, [params.id]);
+  useEffect(() => { fetchEvidence(); }, [fetchEvidence]);
+
+  // Real study time: tracked while you study here (see useStudyTracker)
+  const tracker = useStudyTracker({ topicId: params.id, moduleId: activeModuleId, forceActive: timerActive });
+  const [timeTotals, setTimeTotals] = useState({ todaySeconds: 0, allTimeSeconds: 0 });
+  const [timeDrawerOpen, setTimeDrawerOpen] = useState(false);
+  const fetchTimeTotals = useCallback(async () => {
+    const tz = new Date().getTimezoneOffset();
+    const res = await fetch(`/api/time/summary?topicId=${params.id}&days=1&tz=${tz}`).catch(() => null);
+    if (res?.ok) {
+      const d = await res.json();
+      setTimeTotals({ todaySeconds: d.todaySeconds || 0, allTimeSeconds: d.allTimeSeconds || 0 });
+    }
+  }, [params.id]);
+  useEffect(() => { fetchTimeTotals(); }, [fetchTimeTotals, tracker.flushCount]);
+
+  // Syllabus editing (staged until Save)
+  const [editingSyllabus, setEditingSyllabus] = useState(false);
+  const [draftModules, setDraftModules] = useState<CourseModule[]>([]);
+
+  // Resource editing
+  const [editingResourceIdx, setEditingResourceIdx] = useState<number | null>(null);
+  const [resourceDraft, setResourceDraft] = useState<Resource | null>(null);
 
   // Global Dialog
   const [dialogConfig, setDialogConfig] = useState<CustomDialogConfig>({
@@ -213,6 +257,8 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
   // Toggle Module Completion
   const handleToggleModuleCompleted = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    const target = curriculum.find((m) => m.id === id);
+    const nowCompleting = target ? !target.completed : false;
     const updated = curriculum.map((m) =>
       m.id === id
         ? {
@@ -223,6 +269,44 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
         : m
     );
     await handleSaveCurriculum(updated);
+
+    // Finishing a module turns its lesson into Daily Review cards, so it
+    // comes back before you forget it.
+    if (nowCompleting) {
+      const res = await fetch(`/api/topics/${params.id}/modules/${id}/review-cards`, { method: 'POST' }).catch(() => null);
+      if (res?.ok) {
+        const { added } = await res.json();
+        if (added > 0) toast.success(`${added} review card${added === 1 ? '' : 's'} added to Daily Review — first one comes back in 2 days`);
+        fetchEvidence();
+      }
+    }
+  };
+
+  // Syllabus editing: rename, re-time, reorder, remove — saved together
+  const startEditingSyllabus = () => {
+    setDraftModules(curriculum.map((m) => ({ ...m })));
+    setEditingSyllabus(true);
+  };
+  const moveDraftModule = (index: number, dir: -1 | 1) => {
+    setDraftModules((prev) => {
+      const next = [...prev];
+      const j = index + dir;
+      if (j < 0 || j >= next.length) return prev;
+      [next[index], next[j]] = [next[j], next[index]];
+      return next;
+    });
+  };
+  const saveSyllabusEdits = async () => {
+    const cleaned = draftModules
+      .map((m) => ({ ...m, title: m.title.trim(), estimatedMinutes: Math.min(240, Math.max(5, Math.round(Number(m.estimatedMinutes) || 30))) }))
+      .filter((m) => m.title)
+      .map((m, i) => ({ ...m, order: i + 1 }));
+    await handleSaveCurriculum(cleaned);
+    if (activeModuleId && !cleaned.some((m) => m.id === activeModuleId)) {
+      setActiveModuleId(cleaned[0]?.id ?? null);
+    }
+    setEditingSyllabus(false);
+    toast.success('Syllabus updated');
   };
 
   // Add Single Module
@@ -253,10 +337,19 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
       const res = await fetch('/api/socratic', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'generate-curriculum', topicTitle: title }),
+        body: JSON.stringify({
+          action: 'generate-curriculum',
+          topicTitle: title,
+          why,
+          area,
+          depthTarget: topic?.depthTarget || undefined,
+        }),
       });
       if (res.ok) {
         const data = await res.json();
+        if (data.fallback || !Array.isArray(data.modules) || data.modules.length === 0) {
+          toast.error('Could not generate a syllabus right now — try again, or add modules yourself below.');
+        }
         if (Array.isArray(data.modules) && data.modules.length > 0) {
           const generated: CourseModule[] = data.modules.map((m: any, i: number) => ({
             id: Math.random().toString(36).substring(2, 9),
@@ -353,6 +446,31 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
     }
   };
 
+  const saveResources = async (updated: Resource[]) => {
+    setResources(updated);
+    try {
+      await fetch(`/api/topics/${params.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resources: updated }),
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSaveResourceEdit = async () => {
+    if (editingResourceIdx === null || !resourceDraft || !resourceDraft.title.trim()) return;
+    const updated = resources.map((r, i) => (i === editingResourceIdx ? { ...resourceDraft, title: resourceDraft.title.trim(), url: resourceDraft.url.trim() } : r));
+    setEditingResourceIdx(null);
+    setResourceDraft(null);
+    await saveResources(updated);
+  };
+
+  const handleResourceStatus = async (index: number, status: string) => {
+    await saveResources(resources.map((r, i) => (i === index ? { ...r, status } : r)));
+  };
+
   const handleDeleteResource = async (index: number) => {
     const updated = resources.filter((_, i) => i !== index);
     setResources(updated);
@@ -373,7 +491,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
       isOpen: true,
       type: 'confirm',
       title: 'Delete Topic',
-      message: `Are you sure you want to permanently delete "${title}"? This cannot be undone.`,
+      message: `Are you sure you want to delete "${title}"? It will disappear from your lists and Daily Review; its history is kept and can be restored.`,
       confirmLabel: 'Delete Topic',
       onConfirm: async () => {
         setDialogConfig((p) => ({ ...p, isOpen: false }));
@@ -461,12 +579,30 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
         </div>
 
         {/* Top Right Tool Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          
-          {/* Focus Sprint Timer Card */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+
+          {/* Real study time — tracked while you're active here, plus anything you log */}
+          <button
+            type="button"
+            onClick={() => setTimeDrawerOpen(true)}
+            className="flex items-center gap-2 rounded-lg border border-line bg-black/30 px-3 py-1.5 text-left hover:border-line-hover"
+            title="Time you actually spent on this topic — click to see history, log or correct time"
+          >
+            <span className="text-base">⏱</span>
+            <span className="flex flex-col leading-tight">
+              <span className="text-[0.82rem] font-bold text-fg">
+                {formatDuration(timeTotals.todaySeconds + tracker.unflushedSeconds)} today
+              </span>
+              <span className="text-[0.68rem] text-fg-muted">
+                {formatDuration(timeTotals.allTimeSeconds + tracker.unflushedSeconds)} total
+              </span>
+            </span>
+          </button>
+
+          {/* Focus Sprint Timer Card (pomodoro pacing; while it runs, reading without input still counts) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '5px 12px', borderRadius: '8px' }}>
             <span style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'monospace', color: timerActive ? '#10b981' : '#fff' }}>
-              ⏱ {formatTimer(secondsRemaining)}
+              🍅 {formatTimer(secondsRemaining)}
             </span>
             <button
               type="button"
@@ -527,6 +663,29 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
         </div>
       </div>
 
+      {/* Came back from an external link (video, book, docs): count that time? */}
+      {tracker.awayPrompt && (
+        <div className="glass-panel flex flex-wrap items-center justify-between gap-3 border-l-4 border-l-warning px-4 py-3">
+          <span className="text-[0.86rem]">
+            You were away <strong>{tracker.awayPrompt.minutes} min</strong>
+            {tracker.awayPrompt.label ? <> on <em>{tracker.awayPrompt.label}</em></> : null}. Was that study time for this topic?
+          </span>
+          <span className="flex gap-2">
+            <button
+              type="button"
+              className="btn btn-primary px-3 py-1 text-[0.78rem]"
+              onClick={async () => {
+                const p = tracker.awayPrompt!;
+                if (await tracker.confirmAway(p.minutes, p.label)) toast.success(`Added ${p.minutes} min`);
+              }}
+            >
+              Yes, add {tracker.awayPrompt.minutes} min
+            </button>
+            <button type="button" className="btn btn-secondary px-3 py-1 text-[0.78rem]" onClick={tracker.dismissAway}>No</button>
+          </span>
+        </div>
+      )}
+
       {/* ── 2-PANE STUDY ROOM GRID ───────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 340px) 1fr', gap: '24px', alignItems: 'start' }}>
         
@@ -543,7 +702,17 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                   {completedCount} of {curriculum.length} completed ({progressPct}%)
                 </span>
               </div>
-              <span style={{ fontSize: '1.1rem' }}>📚</span>
+              {curriculum.length > 0 && !editingSyllabus && (
+                <button type="button" onClick={startEditingSyllabus} className="btn btn-secondary px-2.5 py-1 text-[0.72rem]" title="Rename, re-time, reorder or remove modules">
+                  ✎ Edit
+                </button>
+              )}
+              {editingSyllabus && (
+                <span className="flex gap-1.5">
+                  <button type="button" onClick={saveSyllabusEdits} className="btn btn-primary px-2.5 py-1 text-[0.72rem]">Save</button>
+                  <button type="button" onClick={() => setEditingSyllabus(false)} className="btn btn-secondary px-2.5 py-1 text-[0.72rem]">Cancel</button>
+                </span>
+              )}
             </div>
 
             {/* Progress Bar */}
@@ -560,7 +729,37 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
             </div>
 
             {/* Modules List */}
-            {curriculum.length > 0 ? (
+            {editingSyllabus ? (
+              <div className="flex max-h-[520px] flex-col gap-2 overflow-y-auto pr-1">
+                {draftModules.map((mod, idx) => (
+                  <div key={mod.id} className="flex flex-col gap-1.5 rounded-lg border border-line bg-white/[0.02] p-2">
+                    <input
+                      className="form-input px-2 py-1.5 text-[0.82rem]"
+                      value={mod.title}
+                      onChange={(e) => setDraftModules((prev) => prev.map((m, i) => (i === idx ? { ...m, title: e.target.value } : m)))}
+                      aria-label={`Module ${idx + 1} title`}
+                    />
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min={5}
+                        max={240}
+                        className="form-input w-20 px-2 py-1 text-[0.75rem]"
+                        value={mod.estimatedMinutes}
+                        onChange={(e) => setDraftModules((prev) => prev.map((m, i) => (i === idx ? { ...m, estimatedMinutes: Number(e.target.value) } : m)))}
+                        aria-label={`Module ${idx + 1} minutes`}
+                      />
+                      <span className="text-[0.7rem] text-fg-muted">min</span>
+                      <span className="flex-1" />
+                      <button type="button" disabled={idx === 0} onClick={() => moveDraftModule(idx, -1)} className="bg-transparent px-1.5 text-fg-secondary disabled:opacity-30" title="Move up">↑</button>
+                      <button type="button" disabled={idx === draftModules.length - 1} onClick={() => moveDraftModule(idx, 1)} className="bg-transparent px-1.5 text-fg-secondary disabled:opacity-30" title="Move down">↓</button>
+                      <button type="button" onClick={() => setDraftModules((prev) => prev.filter((_, i) => i !== idx))} className="bg-transparent px-1.5 text-danger" title="Remove module">✕</button>
+                    </div>
+                  </div>
+                ))}
+                {draftModules.length === 0 && <p className="text-[0.78rem] text-fg-muted">All modules removed — Save to confirm, or Cancel.</p>}
+              </div>
+            ) : curriculum.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '520px', overflowY: 'auto', paddingRight: '4px' }}>
                 {curriculum.map((mod) => {
                   const isSelected = mod.id === activeModuleId;
@@ -620,6 +819,14 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                           </div>
                           <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
                             ~{mod.estimatedMinutes} mins
+                            {evidence[mod.id]?.quiz && (
+                              <span className="ml-1.5 text-fg-secondary">· quiz {evidence[mod.id].quiz!.correct}/{evidence[mod.id].quiz!.total}</span>
+                            )}
+                            {evidence[mod.id]?.challenge?.verdict && (
+                              <span className={`ml-1.5 ${evidence[mod.id].challenge!.verdict === 'correct' ? 'text-success' : evidence[mod.id].challenge!.verdict === 'partial' ? 'text-warning' : 'text-danger'}`}>
+                                · challenge {evidence[mod.id].challenge!.verdict}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -650,7 +857,8 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
               </div>
             )}
 
-            {/* Quick Add Module Form */}
+            {/* Quick Add Module Form (hidden while editing, so a staged edit can't drop it) */}
+            {!editingSyllabus && (
             <form onSubmit={handleAddModule} style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
               <input
                 type="text"
@@ -664,6 +872,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                 Add
               </button>
             </form>
+            )}
 
           </div>
         </div>
@@ -677,6 +886,8 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
               topicTitle={title}
               topicArea={area}
               module={activeModule}
+              evidence={evidence[activeModule.id]}
+              onEvidenceChanged={fetchEvidence}
               notes={notes}
               onSaveNotes={handleSaveNotes}
               onToggleCompleted={handleToggleModuleCompleted}
@@ -779,10 +990,9 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                 <input
                   type="url"
                   className="form-input"
-                  placeholder="https://..."
+                  placeholder="https://... (optional for books)"
                   value={newResUrl}
                   onChange={(e) => setNewResUrl(e.target.value)}
-                  required
                 />
                 <select
                   className="form-input"
@@ -811,33 +1021,53 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {resources.map((res, i) => (
-              <div
-                key={res.id || i}
-                className="glass-card"
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(0,0,0,0.2)' }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(99,102,241,0.15)', color: 'var(--color-primary-light)', fontWeight: 700 }}>
-                      {res.type}
-                    </span>
-                    <a href={res.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-primary-light)' }}>
-                      {res.title} ↗
-                    </a>
+            {resources.map((res, i) =>
+              editingResourceIdx === i && resourceDraft ? (
+                <div key={res.id || i} className="flex flex-col gap-2 rounded-md border border-primary bg-black/20 p-3">
+                  <input className="form-input text-[0.85rem]" value={resourceDraft.title} onChange={(e) => setResourceDraft({ ...resourceDraft, title: e.target.value })} placeholder="Title" aria-label="Resource title" />
+                  <div className="grid grid-cols-[2fr_1fr] gap-2">
+                    <input className="form-input text-[0.82rem]" value={resourceDraft.url} onChange={(e) => setResourceDraft({ ...resourceDraft, url: e.target.value })} placeholder="https://... (optional)" aria-label="Resource link" />
+                    <select className="form-input bg-[#121218] text-[0.82rem]" value={resourceDraft.type} onChange={(e) => setResourceDraft({ ...resourceDraft, type: e.target.value })} aria-label="Resource type">
+                      {['ARTICLE', 'VIDEO', 'BOOK', 'COURSE', 'PAPER', 'TOOL', 'WEBSITE', 'OTHER'].map((t) => <option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</option>)}
+                    </select>
                   </div>
-                  {res.purpose && <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{res.purpose}</p>}
+                  <input className="form-input text-[0.82rem]" value={resourceDraft.purpose} onChange={(e) => setResourceDraft({ ...resourceDraft, purpose: e.target.value })} placeholder="Why is it useful?" aria-label="Why it's useful" />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={handleSaveResourceEdit} disabled={!resourceDraft.title.trim()} className="btn btn-primary px-3 py-1 text-[0.78rem]">Save</button>
+                    <button type="button" onClick={() => { setEditingResourceIdx(null); setResourceDraft(null); }} className="btn btn-secondary px-3 py-1 text-[0.78rem]">Cancel</button>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteResource(i)}
-                  style={{ color: 'var(--color-danger)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '4px' }}
-                  title="Remove bookmark"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
+              ) : (
+                <div key={res.id || i} className="flex items-start justify-between gap-3 rounded-md border border-line bg-black/20 px-3.5 py-2.5">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="rounded bg-[rgba(99,102,241,0.15)] px-1.5 py-px text-[0.65rem] font-bold text-primary-light">{res.type}</span>
+                      {res.url ? (
+                        <a href={res.url} target="_blank" rel="noreferrer" className="text-[0.88rem] font-semibold text-primary-light">{res.title} ↗</a>
+                      ) : (
+                        <span className="text-[0.88rem] font-semibold text-fg">{res.title}</span>
+                      )}
+                    </div>
+                    {res.purpose && <p className="mt-0.5 text-[0.75rem] text-fg-secondary">{res.purpose}</p>}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <select
+                      value={res.status || 'NOT_STARTED'}
+                      onChange={(e) => handleResourceStatus(i, e.target.value)}
+                      className="form-input w-auto bg-[#121218] px-1.5 py-1 text-[0.7rem]"
+                      aria-label={`Status of ${res.title}`}
+                    >
+                      <option value="NOT_STARTED">To do</option>
+                      <option value="IN_PROGRESS">In progress</option>
+                      <option value="COMPLETED">Done</option>
+                      <option value="PAUSED">Paused</option>
+                    </select>
+                    <button type="button" onClick={() => { setEditingResourceIdx(i); setResourceDraft({ ...res }); }} className="bg-transparent px-1.5 text-[0.75rem] text-primary-light" title="Edit">✎</button>
+                    <button type="button" onClick={() => handleDeleteResource(i)} className="bg-transparent px-1.5 text-danger" title="Remove">✕</button>
+                  </div>
+                </div>
+              )
+            )}
             {resources.length === 0 && !showAddRes && (
               <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '16px' }}>
                 No resources saved yet.
@@ -919,7 +1149,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           <div>
             <h4 style={{ fontSize: '0.85rem', color: 'var(--color-danger)', fontWeight: 600, marginBottom: '6px' }}>Danger Zone</h4>
             <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginBottom: '10px' }}>
-              Permanently delete this topic and all its associated modules, notes, and records.
+              Delete this topic. It disappears from your lists; its modules, notes, review cards and time history are kept and can be restored.
             </p>
             <button
               type="button"
@@ -943,6 +1173,14 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           onClose={() => setShowDebrief(false)}
         />
       )}
+
+      <TopicTimeDrawer
+        open={timeDrawerOpen}
+        onClose={() => setTimeDrawerOpen(false)}
+        topicId={params.id}
+        modules={curriculum.map((m) => ({ id: m.id, title: m.title }))}
+        onChanged={fetchTimeTotals}
+      />
 
       {/* Custom Confirmation / Alert Dialog */}
       <CustomDialog {...dialogConfig} />
