@@ -65,7 +65,7 @@ export default async function DashboardLayout({
             
             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-success)', display: 'inline-block', boxShadow: '0 0 6px var(--color-success)', flexShrink: 0 }} />
-              <span>Single User · 2 Active Slots</span>
+              <span>Personal Learning Workspace</span>
             </div>
           </div>
         </aside>
@@ -82,16 +82,16 @@ export default async function DashboardLayout({
                     display: 'flex', 
                     alignItems: 'center', 
                     gap: '6px', 
-                    background: activeCount >= 2 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(99, 102, 241, 0.1)', 
-                    border: activeCount >= 2 ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(99, 102, 241, 0.2)',
+                    background: 'rgba(99, 102, 241, 0.1)', 
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
                     padding: '4px 12px', 
                     borderRadius: '9999px',
                     fontWeight: 600,
                     fontSize: '0.85rem',
-                    color: activeCount >= 2 ? 'var(--color-danger)' : 'var(--color-primary-light)'
+                    color: 'var(--color-primary-light)'
                   }}
                 >
-                  {activeCount}/2 topics active
+                  {activeCount} {activeCount === 1 ? 'topic' : 'topics'} in progress
                 </div>
               </div>
 

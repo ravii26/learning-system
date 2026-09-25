@@ -626,6 +626,27 @@ Use exactly this structure:
     }
   ],
 
+  "recommendedResources": [
+    {
+      "title": "Specific Video Title or Book Chapter (e.g. StatQuest / CrashCourse / Book Chapter)",
+      "type": "video",
+      "searchQuery": "YouTube or Google search query to find this exact material",
+      "whyRecommended": "1 clear sentence explaining why this video or book is the best resource for visual or deep understanding."
+    },
+    {
+      "title": "Book or Documentation Reference",
+      "type": "book",
+      "searchQuery": "Recommended book title and chapter",
+      "whyRecommended": "Authoritative textbook or reference chapter for deep mastery."
+    }
+  ],
+
+  "socraticChallenge": {
+    "scenario": "A concrete real-world dilemma or dataset scenario where this concept applies.",
+    "question": "A sharp question asking the student to diagnose, choose, or explain how to handle the scenario.",
+    "idealAnswer": "Clear, complete breakdown of how to solve the challenge correctly."
+  },
+
   "estimatedDifficulty": "beginner | intermediate | advanced",
 
   "prerequisites": [

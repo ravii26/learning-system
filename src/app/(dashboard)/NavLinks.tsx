@@ -8,13 +8,9 @@ export default function NavLinks() {
 
   const links = [
     { name: 'Home', href: '/', icon: '🏠' },
-    { name: 'My Topics', href: '/plan', icon: '📋' },
-    { name: 'Progress', href: '/skills', icon: '📊' },
-    { name: 'Goals', href: '/goals', icon: '🎯' },
-    { name: 'Notes', href: '/notes', icon: '📓' },
-    { name: 'Practice', href: '/practice', icon: '🎙️' },
-    { name: 'Review', href: '/review', icon: '🔄' },
-    { name: 'Explore', href: '/explore', icon: '🔍' },
+    { name: 'Roadmaps', href: '/plan', icon: '🗺️' },
+    { name: 'Notes', href: '/notes', icon: '📝' },
+    { name: 'Daily Review', href: '/review', icon: '🔄' },
   ];
 
   return (

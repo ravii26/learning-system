@@ -3,31 +3,28 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { renderMarkdown } from '@/lib/markdown';
 
-// Modular Imports
-import LearningContract from './LearningContract';
-import KnowledgeMap, { Concept } from './KnowledgeMap';
+// Modular Components
 import SocraticCoach from './SocraticCoach';
+import ModuleStudyRoom from './ModuleStudyRoom';
 import ConfusionMistakeBank from './ConfusionMistakeBank';
-import ReactivationModal from './ReactivationModal';
+import RichTextEditor from './RichTextEditor';
 import SessionDebriefModal, { SessionLog } from './SessionDebriefModal';
-import SessionTimeline from './SessionTimeline';
-import CurriculumView, { CourseModule } from './CurriculumView';
 import CustomDialog, { CustomDialogConfig } from '@/components/CustomDialog';
-import { Drawer, Sparkline, StatPill } from '@/components/ui';
-import { computeAccretionStats } from '@/lib/accretionStats';
+import { Drawer } from '@/components/ui';
 
-interface ActivityLog {
+export interface CourseModule {
   id: string;
-  fieldChanged: string;
-  oldValue: string | null;
-  newValue: string | null;
-  timestamp: string;
+  order: number;
+  title: string;
+  estimatedMinutes: number;
+  completed: boolean;
+  completedAt: string | null;
+  notes: string;
 }
 
 interface Resource {
-  id?: string; // assigned by src/lib/resourceSync.ts; older entries may lack one
+  id?: string;
   title: string;
   type: string;
   url: string;
@@ -36,11 +33,12 @@ interface Resource {
   notes: string;
 }
 
-interface Subtask {
+interface ActivityLog {
   id: string;
-  title: string;
-  completed: boolean;
-  createdAt: string;
+  fieldChanged: string;
+  oldValue: string | null;
+  newValue: string | null;
+  timestamp: string;
 }
 
 interface Topic {
@@ -60,530 +58,197 @@ interface Topic {
   lastTouchedDate: string;
   createdAt: string;
   resources: Resource[];
-  subtasks: Subtask[];
   activityLogs: ActivityLog[];
-  contract: any;
-  knowledgeMap: any;
   confusions: any[];
   mistakes: any[];
-  pauseHistory: any[];
-  activeSlotType: string | null;
   sessionLogs: SessionLog[];
-  topicMode: 'self_directed' | 'course' | 'project';
   curriculum: CourseModule[];
 }
 
-const STAGES = ['Define', 'Map', 'Fundamentals', 'Core Knowledge', 'Application', 'Advanced', 'Proof'];
-
-const LEARNING_MODES = [
-  { key: 'syllabus', label: '📚 Syllabus', hint: 'A body of material with a finish line — DSA, React, a course.' },
-  { key: 'practice', label: '🎙️ Practice', hint: 'A skill built by reps — speaking, writing. Tracked as a trend.' },
-  { key: 'accretion', label: '🌱 Ongoing', hint: 'Topics you learn bit by bit over time — investing, news, current affairs. Grows as notes.' },
-  { key: 'reference', label: '📖 Reference', hint: 'Look it up when needed. No progress tracked.' },
-] as const;
-const DEPTHS = ['Awareness', 'Working Knowledge', 'Proficiency', 'Deep', 'Mastery'];
-const AREAS = ['Tech', 'Business', 'Finance', 'Creative', 'Personal', 'Other'];
-const STATUSES = ['inbox', 'queued', 'active', 'paused', 'maintenance', 'reference', 'dropped'];
-
-export default function TopicDetailPage({ params }: { params: { id: string } }) {
+export default function TopicStudyRoomPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+
   const [topic, setTopic] = useState<Topic | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Learn is the page; Setup (contract, materials, history) is a drawer opened on demand.
-  const [setupOpen, setSetupOpen] = useState(false);
-  const closeSetup = useCallback(() => setSetupOpen(false), []);
-
-  // Edit fields
+  // Topic Metadata
   const [title, setTitle] = useState('');
-  const [area, setArea] = useState('');
+  const [area, setArea] = useState('Tech');
   const [why, setWhy] = useState('');
-  const [depthTarget, setDepthTarget] = useState('');
-  const [status, setStatus] = useState('');
-  const [progressPct, setProgressPct] = useState(0);
-  const [currentStage, setCurrentStage] = useState('');
-  const [lastCompleted, setLastCompleted] = useState('');
-  const [nextAction, setNextAction] = useState('');
-  const [proofOfLearning, setProofOfLearning] = useState('');
   const [notes, setNotes] = useState('');
-
-  // Advanced State variables
-  const [contract, setContract] = useState<any>({ outcome: '', estimatedEffort: 0, successCriterion: '', currentLevel: 'Beginner', prerequisites: [] });
-  const [concepts, setConcepts] = useState<any[]>([]);
+  const [curriculum, setCurriculum] = useState<CourseModule[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
   const [confusions, setConfusions] = useState<any[]>([]);
   const [mistakes, setMistakes] = useState<any[]>([]);
-  const [pauseHistory, setPauseHistory] = useState<any[]>([]);
-  const [activeSlotType, setActiveSlotType] = useState<string | null>(null);
-
-  // Session Log state
   const [sessionLogs, setSessionLogs] = useState<SessionLog[]>([]);
-  const [showDebrief, setShowDebrief] = useState(false);
-  const [timerElapsedMinutes, setTimerElapsedMinutes] = useState(25);
 
-  // How this topic is learned (Topic.mode) — drives what Learn shows and how
-  // progress is measured. Distinct from topicMode below (the legacy
-  // curriculum-vs-concept-map view toggle).
-  const [learningMode, setLearningMode] = useState<'syllabus' | 'practice' | 'accretion' | 'reference'>('syllabus');
-  const [linkedNotes, setLinkedNotes] = useState<Array<{ id: string; title: string; createdAt: string; updatedAt: string; tags: string[]; _count?: { outgoing: number } }>>([]);
-  const linkedNoteStats = React.useMemo(() => computeAccretionStats(linkedNotes), [linkedNotes]);
+  // Active Selected Module
+  const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
+  const [newModuleTitle, setNewModuleTitle] = useState('');
+  const [generatingModules, setGeneratingModules] = useState(false);
 
-  useEffect(() => {
-    if (learningMode !== 'accretion') return;
-    fetch(`/api/notes?topicId=${params.id}`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((rows) => setLinkedNotes(Array.isArray(rows) ? rows : []))
-      .catch(() => setLinkedNotes([]));
-  }, [learningMode, params.id]);
+  // Side Drawers
+  const [confusionsDrawerOpen, setConfusionsDrawerOpen] = useState(false);
+  const [resourcesDrawerOpen, setResourcesDrawerOpen] = useState(false);
+  const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
 
-  // Why / depth / next action — the three fields activation requires. The
-  // hero card sends users here to set them; Setup previously had no editor.
-  const [focusSaving, setFocusSaving] = useState(false);
-  const handleSaveFocus = async (activate: boolean) => {
-    setFocusSaving(true);
-    try {
-      const res = await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ why, depthTarget, nextAction, ...(activate ? { status: 'active' } : {}) }),
-      });
-      if (res.ok) {
-        await fetchTopic();
-        if (activate) setSetupOpen(false);
-      } else {
-        const data = await res.json().catch(() => ({}));
-        setDialogConfig({ isOpen: true, type: 'error', title: activate ? 'Could not activate' : 'Could not save', message: data.error || 'Save failed', onConfirm: () => setDialogConfig((p) => ({ ...p, isOpen: false })) });
-      }
-    } catch {
-      setDialogConfig({ isOpen: true, type: 'error', title: 'Connection Error', message: 'Could not reach the server', onConfirm: () => setDialogConfig((p) => ({ ...p, isOpen: false })) });
-    } finally {
-      setFocusSaving(false);
-    }
-  };
-
-  const handleChangeLearningMode = async (next: typeof learningMode) => {
-    const prev = learningMode;
-    setLearningMode(next);
-    const res = await fetch(`/api/topics/${params.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: next }),
-    }).catch(() => null);
-    if (!res || !res.ok) setLearningMode(prev);
-  };
-
-  // Course Mode state
-  const [topicMode, setTopicMode] = useState<'self_directed' | 'course'>('self_directed');
-  const [curriculum, setCurriculum] = useState<CourseModule[]>([]);
-
-  // Selected concept for active Socratic Coach tutoring
-  const [selectedConcept, setSelectedConcept] = useState<any | null>(null);
-  const [explanationsRead, setExplanationsRead] = useState(0);
-
-  // Reactivation Modal State
-  const [showReactivation, setShowReactivation] = useState(false);
-
-  // Materials Sub-State
-  const [resources, setResources] = useState<Resource[]>([]);
+  // Resources state inside drawer
   const [newResTitle, setNewResTitle] = useState('');
-  const [newResType, setNewResType] = useState('BOOK');
+  const [newResType, setNewResType] = useState('ARTICLE');
   const [newResUrl, setNewResUrl] = useState('');
   const [newResPurpose, setNewResPurpose] = useState('');
-  const [newResNotes, setNewResNotes] = useState('');
   const [showAddRes, setShowAddRes] = useState(false);
 
-  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
-  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  // Focus Timer
+  const [secondsRemaining, setSecondsRemaining] = useState(25 * 60);
+  const [timerActive, setTimerActive] = useState(false);
+  const [timerElapsedMinutes, setTimerElapsedMinutes] = useState(25);
+  const [showDebrief, setShowDebrief] = useState(false);
 
-  // Notes Markdown Mode
-  const [notesMode, setNotesMode] = useState<'write' | 'preview'>('write');
-  const [scrapingLink, setScrapingLink] = useState(false);
+  // Global Dialog
+  const [dialogConfig, setDialogConfig] = useState<CustomDialogConfig>({
+    isOpen: false,
+    title: '',
+    message: '',
+  });
 
+  // Fetch Topic Data
   const fetchTopic = useCallback(async () => {
     try {
       const res = await fetch(`/api/topics/${params.id}`);
       if (res.ok) {
         const data = await res.json();
         setTopic(data);
-
-        // Populate inputs
         setTitle(data.title);
-        setArea(data.area);
+        setArea(data.area || 'Tech');
         setWhy(data.why || '');
-        setDepthTarget(data.depthTarget || 'Proficiency');
-        setStatus(data.status);
-        setProgressPct(data.progressPct);
-        setCurrentStage(data.currentStage);
-        setLastCompleted(data.lastCompleted || '');
-        setNextAction(data.nextAction || '');
-        setProofOfLearning(data.proofOfLearning || '');
         setNotes(data.notes || '');
-
-        // Populate advanced JSONs
-        setContract(data.contract || { outcome: '', estimatedEffort: 0, successCriterion: '', currentLevel: 'Beginner', prerequisites: [] });
-        const mapData = data.knowledgeMap || { concepts: [] };
-        setConcepts(mapData.concepts || []);
+        setResources(data.resources || []);
         setConfusions(data.confusions || []);
         setMistakes(data.mistakes || []);
-        setPauseHistory(data.pauseHistory || []);
-        setActiveSlotType(data.activeSlotType || null);
-        setSessionLogs(Array.isArray(data.sessionLogs) ? data.sessionLogs : []);
-        setTopicMode(data.topicMode || 'self_directed');
-        setLearningMode(data.mode || 'syllabus');
-        setCurriculum(Array.isArray(data.curriculum) ? data.curriculum : []);
+        setSessionLogs(data.sessionLogs || []);
 
-        // Parse resources & subtasks JSON
-        setResources(Array.isArray(data.resources) ? data.resources : []);
-        setSubtasks(Array.isArray(data.subtasks) ? data.subtasks : []);
+        const sortedCurriculum = Array.isArray(data.curriculum)
+          ? [...data.curriculum].sort((a: CourseModule, b: CourseModule) => a.order - b.order)
+          : [];
+        setCurriculum(sortedCurriculum);
+
+        // Default active module to first incomplete or first module
+        if (!activeModuleId && sortedCurriculum.length > 0) {
+          const firstIncomplete = sortedCurriculum.find((m: CourseModule) => !m.completed);
+          setActiveModuleId(firstIncomplete ? firstIncomplete.id : sortedCurriculum[0].id);
+        }
       } else {
         setError('Topic not found');
       }
-    } catch (e) {
-      setError('Failed to fetch topic details');
+    } catch {
+      setError('Failed to load topic');
     } finally {
       setLoading(false);
     }
-  }, [params.id]);
+  }, [params.id, activeModuleId]);
 
   useEffect(() => {
     fetchTopic();
   }, [fetchTopic]);
 
-  // Handle main topic form save
-  const handleSave = async (e?: React.FormEvent, statusOverride?: string) => {
-    if (e) e.preventDefault();
-    setError(null);
-    setSaving(true);
-
-    const targetStatus = statusOverride || status;
-
-    // Enforce guards
-    if (targetStatus === 'active') {
-      if (!why.trim()) {
-        setError('Why you are learning is required for active topics.');
-        setSaving(false);
-        return;
-      }
-      if (!depthTarget) {
-        setError('Depth target is required for active topics.');
-        setSaving(false);
-        return;
-      }
-      if (!nextAction.trim()) {
-        setError('A concrete verb-first Next Action is required for active topics.');
-        setSaving(false);
-        return;
-      }
+  // Auto-generate syllabus if ?autostart=1 passed from quick-start
+  const autoStartedRef = React.useRef(false);
+  useEffect(() => {
+    if (loading || !topic || autoStartedRef.current) return;
+    if (searchParams.get('autostart') === '1' && curriculum.length === 0) {
+      autoStartedRef.current = true;
+      handleGenerateCurriculum();
     }
+  }, [loading, topic, curriculum.length, searchParams]);
 
-    if (targetStatus === 'paused' && !nextAction.trim()) {
-      setError('A concrete Next Action is required to pause a topic.');
-      setSaving(false);
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          area,
-          why: why.trim() || null,
-          depthTarget,
-          status: targetStatus,
-          progressPct: Number(progressPct),
-          currentStage,
-          lastCompleted: lastCompleted.trim() || null,
-          nextAction: nextAction.trim() || null,
-          proofOfLearning: proofOfLearning.trim() || null,
-          notes: notes.trim() || null,
-          resources,
-          subtasks,
-          // contract / knowledgeMap / confusions / mistakes / pauseHistory are
-          // deliberately NOT sent here. Each has its own save handler, and the
-          // copies in this component's state go stale the moment the Socratic
-          // coach or the spaced-review queue writes to them. Including them in
-          // this form save overwrote live review scheduling with whatever was
-          // loaded at mount.
-        }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setTopic(data);
-        setStatus(data.status);
-        await fetchTopic();
-        router.refresh();
-      } else {
-        setError(data.error || 'Failed to update topic');
-      }
-    } catch (err) {
-      setError('Failed to connect to server');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const [dialogConfig, setDialogConfig] = useState<CustomDialogConfig>({ isOpen: false, message: '' });
-
-  const handlePause = () => {
-    setDialogConfig({
-      isOpen: true,
-      type: 'prompt',
-      title: 'Pause Topic',
-      message: 'Why are you pausing this topic? (e.g. Switched focus, taking a break)',
-      promptValue: 'Switched focus to another priority.',
-      confirmLabel: 'Pause Topic',
-      onConfirm: async (reason) => {
-        setDialogConfig(prev => ({ ...prev, isOpen: false }));
-        const newPauseLog = {
-          id: Math.random().toString(36).substring(2, 9),
-          pausedAt: new Date().toISOString(),
-          resumedAt: null,
-          reason: (reason || '').trim() || 'Switched focus to another priority.',
-          completedConcepts: concepts.filter(c => c.status !== 'Unknown' && c.status !== 'Exposed').map(c => c.title),
-          currentConcept: selectedConcept?.title || 'None',
-          openQuestion: confusions.filter(c => !c.resolved)[0]?.text || 'None',
-          reactivationScore: null,
-        };
-
-        const updatedPauseHistory = [...pauseHistory, newPauseLog];
-        setPauseHistory(updatedPauseHistory);
-
-        setError(null);
-        try {
-          const res = await fetch(`/api/topics/${params.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              status: 'paused',
-              pauseHistory: updatedPauseHistory,
-            }),
-          });
-
-          if (res.ok) {
-            await fetchTopic();
-            router.refresh();
-          } else {
-            const data = await res.json();
-            setDialogConfig({ isOpen: true, type: 'error', title: 'Pause Error', message: data.error || 'Failed to pause topic' });
+  // Focus Timer Tick
+  useEffect(() => {
+    let interval: any = null;
+    if (timerActive) {
+      interval = setInterval(() => {
+        setSecondsRemaining((prev) => {
+          if (prev <= 1) {
+            setTimerActive(false);
+            setTimerElapsedMinutes(25);
+            setTimeout(() => setShowDebrief(true), 300);
+            return 0;
           }
-        } catch (e) {
-          setDialogConfig({ isOpen: true, type: 'error', title: 'Connection Error', message: 'Connection error pausing topic' });
-        }
-      },
-      onCancel: () => setDialogConfig(prev => ({ ...prev, isOpen: false })),
-    });
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [timerActive]);
+
+  const resetTimer = () => {
+    setTimerActive(false);
+    setSecondsRemaining(25 * 60);
   };
 
-  const handleResume = async () => {
-    // Check if slots capacity reached
-    try {
-      const statsRes = await fetch('/api/stats');
-      if (statsRes.ok) {
-        const stats = await statsRes.json();
-        const activeCount = stats.counts.active;
-        if (topic?.status !== 'active' && activeCount >= 2) {
-          setDialogConfig({
-            isOpen: true,
-            type: 'warning',
-            title: 'Active Capacity Reached',
-            message: 'You already have 2 active topics. Please pause or drop an active topic first before resuming this one.',
-            onConfirm: () => setDialogConfig(prev => ({ ...prev, isOpen: false })),
-          });
-          return;
-        }
-      }
-
-      setError(null);
-      const res = await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'active' }),
-      });
-
-      if (res.ok) {
-        await fetchTopic();
-        router.refresh();
-      } else {
-        const data = await res.json();
-        setDialogConfig({ isOpen: true, type: 'error', title: 'Resume Error', message: data.error || 'Failed to resume topic' });
-      }
-    } catch (e) {
-      setDialogConfig({ isOpen: true, type: 'error', title: 'Connection Error', message: 'Error connecting to database' });
-    }
+  const formatTimer = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const r = secs % 60;
+    return `${mins.toString().padStart(2, '0')}:${r.toString().padStart(2, '0')}`;
   };
 
-  // Reactivation success handler
-  const handleConfirmReactivation = async (forgottenIds: string[], reactivationNotes: string) => {
-    // Each forgotten concept is logged as an FSRS "Again" review with the
-    // explicit forgotten flag (drops it to Exposed, reschedules it soon).
-    // Concept rows own mastery/FSRS state, so sending a modified
-    // knowledgeMap here (the old approach) was silently ignored.
-    for (const conceptId of forgottenIds) {
-      await fetch('/api/review/spaced', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topicId: params.id, conceptId, grade: 'Again', forgotten: true }),
-      });
-    }
-
-    // Update pause logs
-    const updatedPauseHistory = pauseHistory.map((ph, idx) => {
-      if (idx === pauseHistory.length - 1) {
-        return {
-          ...ph,
-          resumedAt: new Date().toISOString(),
-          reactivationScore: `Flagged ${forgottenIds.length} forgotten`,
-        };
-      }
-      return ph;
-    });
-
-    try {
-      const res = await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'active',
-          pauseHistory: updatedPauseHistory,
-          nextAction: nextAction || 'Continue study map concepts',
-        }),
-      });
-
-      if (res.ok) {
-        await fetchTopic();
-        router.refresh();
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to resume topic');
-      }
-    } catch (e) {
-      alert('Error connecting to database');
-    }
-  };
-
-  // Sub-saving callbacks
-  const handleSaveContract = async (updatedContract: any) => {
-    setContract(updatedContract);
+  // Save Curriculum to Backend
+  const handleSaveCurriculum = async (updated: CourseModule[]) => {
+    setCurriculum(updated);
     try {
       await fetch(`/api/topics/${params.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contract: updatedContract }),
+        body: JSON.stringify({ curriculum: updated }),
       });
-      await fetchTopic();
     } catch (e) {
-      console.error(e);
+      console.error('Failed to save curriculum:', e);
     }
   };
 
-  const handleSaveConcepts = async (updatedConcepts: any[]) => {
-    setConcepts(updatedConcepts);
-    try {
-      await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ knowledgeMap: { concepts: updatedConcepts } }),
-      });
-      await fetchTopic();
-    } catch (e) {
-      console.error(e);
-    }
+  // Toggle Module Completion
+  const handleToggleModuleCompleted = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const updated = curriculum.map((m) =>
+      m.id === id
+        ? {
+            ...m,
+            completed: !m.completed,
+            completedAt: !m.completed ? new Date().toISOString() : null,
+          }
+        : m
+    );
+    await handleSaveCurriculum(updated);
   };
 
-  const handleDiagnoseConcepts = async (diagnosticLevels: Record<string, string>) => {
-    const updated = concepts.map((c) => {
-      if (c.id in diagnosticLevels) {
-        return {
-          ...c,
-          status: diagnosticLevels[c.id],
-        };
-      }
-      return c;
-    });
+  // Add Single Module
+  const handleAddModule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newModuleTitle.trim()) return;
 
-    setConcepts(updated);
-    try {
-      await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ knowledgeMap: { concepts: updated } }),
-      });
-      await fetchTopic();
-    } catch (e) {
-      console.error(e);
-    }
+    const newMod: CourseModule = {
+      id: Math.random().toString(36).substring(2, 9),
+      order: curriculum.length + 1,
+      title: newModuleTitle.trim(),
+      estimatedMinutes: 30,
+      completed: false,
+      completedAt: null,
+      notes: '',
+    };
+
+    const updated = [...curriculum, newMod];
+    setNewModuleTitle('');
+    if (!activeModuleId) setActiveModuleId(newMod.id);
+    await handleSaveCurriculum(updated);
   };
 
-  const handleSaveConfusions = async (updatedConfusions: any[]) => {
-    setConfusions(updatedConfusions);
-    try {
-      await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confusions: updatedConfusions }),
-      });
-      await fetchTopic();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleSaveMistakes = async (updatedMistakes: any[]) => {
-    setMistakes(updatedMistakes);
-    try {
-      await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mistakes: updatedMistakes }),
-      });
-      await fetchTopic();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  // Session Log handlers
-  const handleSaveSessionLog = async (log: SessionLog) => {
-    const updated = [...sessionLogs, log];
-    setSessionLogs(updated);
-    const updates: Record<string, unknown> = { sessionLogs: updated };
-    if (log.nextAction.trim()) updates.nextAction = log.nextAction.trim();
-    try {
-      await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
-      if (log.nextAction.trim()) setNextAction(log.nextAction.trim());
-      await fetchTopic();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const [generatingStudyPlan, setGeneratingStudyPlan] = useState(false);
-
-  const handleSaveCurriculum = async (modules: CourseModule[]) => {
-    setCurriculum(modules);
-    try {
-      await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ curriculum: modules }),
-      });
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleGenerateStudyPlan = async () => {
-    setGeneratingStudyPlan(true);
+  // AI Curriculum Generator
+  const handleGenerateCurriculum = async () => {
+    setGeneratingModules(true);
     try {
       const res = await fetch('/api/socratic', {
         method: 'POST',
@@ -603,76 +268,45 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
             notes: m.notes || '',
           }));
           await handleSaveCurriculum(generated);
-          setTopicMode('course');
-
-          // Auto-set nextAction to the first module if currently empty or generic
-          const currentNext = nextAction?.trim() || '';
-          if (!currentNext || currentNext.startsWith('Start studying') || currentNext.startsWith('I want to learn')) {
-            const firstTitle = `Module 1: ${generated[0].title}`;
-            setNextAction(firstTitle);
-            fetch(`/api/topics/${params.id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ nextAction: firstTitle }),
-            }).catch(console.error);
+          if (generated.length > 0) {
+            setActiveModuleId(generated[0].id);
           }
         }
       }
     } catch (e) {
-      console.error('Failed to generate study plan:', e);
+      console.error('Failed to generate curriculum:', e);
     } finally {
-      setGeneratingStudyPlan(false);
+      setGeneratingModules(false);
     }
   };
 
-  // Auto-generate study plan if requested via ?autostart=1 from quick-start
-  const autoStartedRef = React.useRef(false);
-  useEffect(() => {
-    if (loading || !topic || autoStartedRef.current) return;
-    if (searchParams.get('autostart') === '1' && curriculum.length === 0 && concepts.length === 0) {
-      autoStartedRef.current = true;
-      handleGenerateStudyPlan();
-    }
-  }, [loading, topic, curriculum.length, concepts.length, searchParams]);
-
-  const handleStartKnowledgeMap = async () => {
-    setGeneratingStudyPlan(true);
+  const handleSaveConfusions = async (updated: any[]) => {
+    setConfusions(updated);
     try {
-      const res = await fetch('/api/socratic', {
-        method: 'POST',
+      await fetch(`/api/topics/${params.id}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'generate-concepts', topicTitle: title }),
+        body: JSON.stringify({ confusions: updated }),
       });
-      let generatedConcepts: Concept[] = [];
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.concepts) && data.concepts.length > 0) {
-          generatedConcepts = data.concepts.map((c: any) => ({
-            id: Math.random().toString(36).substring(2, 9),
-            title: c.title || 'Core Concept',
-            parentId: null,
-            status: 'Unknown',
-            difficulty: c.difficulty || 'Medium',
-            importance: c.importance || 'High',
-          }));
-        }
-      }
-      if (generatedConcepts.length === 0) {
-        generatedConcepts = [
-          { id: Math.random().toString(36).substring(2, 9), title: `${title} Fundamentals`, parentId: null, status: 'Unknown', difficulty: 'Low', importance: 'High' },
-          { id: Math.random().toString(36).substring(2, 9), title: `Core Mechanics of ${title}`, parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
-          { id: Math.random().toString(36).substring(2, 9), title: `Practical Application & Synthesis`, parentId: null, status: 'Unknown', difficulty: 'Medium', importance: 'High' },
-        ];
-      }
-      await handleSaveConcepts(generatedConcepts);
-      setTopicMode('self_directed');
     } catch (e) {
-      console.error('Failed to generate concepts:', e);
-    } finally {
-      setGeneratingStudyPlan(false);
+      console.error(e);
     }
   };
 
+  const handleSaveMistakes = async (updated: any[]) => {
+    setMistakes(updated);
+    try {
+      await fetch(`/api/topics/${params.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mistakes: updated }),
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Auto-Save Notes
   const handleSaveNotes = async (html: string) => {
     setNotes(html);
     try {
@@ -682,32 +316,11 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
         body: JSON.stringify({ notes: html }),
       });
     } catch (e) {
-      console.error(e);
+      console.error('Failed to auto-save notes:', e);
     }
   };
 
-  const handleSaveSocraticProgress = async (conceptId: string, success: boolean, mistakeText?: string, whyMade?: string, howToAvoid?: string) => {
-    try {
-      await fetch('/api/review/spaced', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topicId: params.id,
-          conceptId,
-          success,
-          mistakeText,
-          whyMade,
-          howToAvoid,
-        }),
-      });
-      await fetchTopic();
-      setSelectedConcept(null); // Return to map
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  // Materials: Add Resource
+  // Resource Handlers
   const handleAddResource = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newResTitle.trim()) return;
@@ -719,35 +332,15 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
       url: newResUrl.trim(),
       purpose: newResPurpose.trim(),
       status: 'NOT_STARTED',
-      notes: newResNotes.trim(),
+      notes: '',
     };
 
-    const updatedRes = [...resources, newRes];
-    setResources(updatedRes);
+    const updated = [...resources, newRes];
+    setResources(updated);
     setNewResTitle('');
     setNewResUrl('');
     setNewResPurpose('');
-    setNewResNotes('');
     setShowAddRes(false);
-
-    try {
-      await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resources: updatedRes }),
-      });
-      await fetchTopic();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleToggleResourceStatus = async (index: number) => {
-    const cycle = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'PAUSED'];
-    const updated = [...resources];
-    const idx = cycle.indexOf(updated[index].status);
-    updated[index].status = cycle[(idx + 1) % cycle.length];
-    setResources(updated);
 
     try {
       await fetch(`/api/topics/${params.id}`, {
@@ -755,157 +348,35 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resources: updated }),
       });
-      await fetchTopic();
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  const handleDeleteResource = (index: number) => {
-    setDialogConfig({
-      isOpen: true,
-      type: 'confirm',
-      title: 'Remove Bookmark',
-      message: 'Are you sure you want to remove this bookmark resource?',
-      confirmLabel: 'Remove',
-      onConfirm: async () => {
-        setDialogConfig(prev => ({ ...prev, isOpen: false }));
-        const updated = resources.filter((_, i) => i !== index);
-        setResources(updated);
-
-        try {
-          await fetch(`/api/topics/${params.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ resources: updated }),
-          });
-          await fetchTopic();
-        } catch (e) {
-          console.error(e);
-        }
-      },
-      onCancel: () => setDialogConfig(prev => ({ ...prev, isOpen: false })),
-    });
-  };
-
-  // Materials: Subtasks Checklist
-  const updateSubtasksAndProgress = async (updatedSubtasks: Subtask[]) => {
-    setSubtasks(updatedSubtasks);
-    let newProgress = progressPct;
-    if (updatedSubtasks.length > 0) {
-      const completed = updatedSubtasks.filter(t => t.completed).length;
-      newProgress = Math.round((completed / updatedSubtasks.length) * 100);
-      setProgressPct(newProgress);
-    }
-
+  const handleDeleteResource = async (index: number) => {
+    const updated = resources.filter((_, i) => i !== index);
+    setResources(updated);
     try {
       await fetch(`/api/topics/${params.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          subtasks: updatedSubtasks,
-          progressPct: newProgress,
-        }),
+        body: JSON.stringify({ resources: updated }),
       });
-      await fetchTopic();
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  const handleAddSubtask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newSubtaskTitle.trim()) return;
-
-    const newSub: Subtask = {
-      id: Math.random().toString(36).substring(2, 9),
-      title: newSubtaskTitle.trim(),
-      completed: false,
-      createdAt: new Date().toISOString(),
-    };
-    setNewSubtaskTitle('');
-    await updateSubtasksAndProgress([...subtasks, newSub]);
-  };
-
-  const handleToggleSubtask = async (id: string) => {
-    const updated = subtasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t);
-    await updateSubtasksAndProgress(updated);
-  };
-
-  const handleDeleteSubtask = async (id: string) => {
-    await updateSubtasksAndProgress(subtasks.filter(t => t.id !== id));
-  };
-
-  // Timer Focus
-  const [secondsRemaining, setSecondsRemaining] = useState(25 * 60);
-  const [timerActive, setTimerActive] = useState(false);
-  const [timerMode, setTimerMode] = useState<'study' | 'shortBreak' | 'longBreak'>('study');
-
-  useEffect(() => {
-    let interval: any = null;
-    if (timerActive) {
-      interval = setInterval(() => {
-        setSecondsRemaining((prev) => {
-          if (prev <= 1) {
-            setTimerActive(false);
-            // Calculate elapsed minutes from the original timer preset
-            const presetSecs = timerMode === 'study' ? 25 * 60 : timerMode === 'shortBreak' ? 5 * 60 : 15 * 60;
-            setTimerElapsedMinutes(Math.round((presetSecs - 0) / 60));
-            setTimeout(() => setShowDebrief(true), 300);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (interval) clearInterval(interval);
-    }
-    return () => { if (interval) clearInterval(interval); };
-  }, [timerActive, timerMode]);
-
-  const resetTimer = (mode: 'study' | 'shortBreak' | 'longBreak') => {
-    setTimerActive(false);
-    setTimerMode(mode);
-    setSecondsRemaining(mode === 'study' ? 25 * 60 : mode === 'shortBreak' ? 5 * 60 : 15 * 60);
-  };
-
-  const formatTimerTime = (secs: number) => {
-    const mins = Math.floor(secs / 60);
-    const r = secs % 60;
-    return `${mins.toString().padStart(2, '0')}:${r.toString().padStart(2, '0')}`;
-  };
-
-  const handleScrapeLink = async () => {
-    if (!newResUrl.trim()) return;
-    setScrapingLink(true);
-    try {
-      const res = await fetch('/api/scrape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: newResUrl.trim() }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.title) setNewResTitle(data.title);
-        if (data.description) setNewResPurpose(data.description);
-        if (data.type) setNewResType(data.type);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setScrapingLink(false);
-    }
-  };
-
+  // Delete Topic
   const handleDeleteTopic = () => {
     setDialogConfig({
       isOpen: true,
       type: 'confirm',
       title: 'Delete Topic',
-      message: `Are you sure you want to permanently delete "${title}"? This action cannot be undone.`,
+      message: `Are you sure you want to permanently delete "${title}"? This cannot be undone.`,
       confirmLabel: 'Delete Topic',
       onConfirm: async () => {
-        setDialogConfig(prev => ({ ...prev, isOpen: false }));
+        setDialogConfig((p) => ({ ...p, isOpen: false }));
         try {
           await fetch(`/api/topics/${params.id}`, { method: 'DELETE' });
           router.push('/');
@@ -914,756 +385,567 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
           console.error(e);
         }
       },
-      onCancel: () => setDialogConfig(prev => ({ ...prev, isOpen: false })),
+      onCancel: () => setDialogConfig((p) => ({ ...p, isOpen: false })),
     });
   };
 
-  const handleLaunchSocraticSession = async () => {
-    if (selectedConcept) {
-      setSelectedConcept(null);
-      return;
-    }
-    setSetupOpen(false);
-    if (concepts.length > 0) {
-      setSelectedConcept(concepts[0]);
-    } else {
-      const defaultConcept = {
-        id: Math.random().toString(36).substring(2, 9),
-        title: `${title} Fundamentals & Core Principles`,
-        status: 'Exposed',
-        parentId: null,
-        difficulty: 'Medium',
-        importance: 'High',
-      };
-      const updatedConcepts = [defaultConcept];
-      setConcepts(updatedConcepts);
-      setSelectedConcept(defaultConcept);
-      try {
-        await fetch(`/api/topics/${params.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ knowledgeMap: { concepts: updatedConcepts } }),
-        });
-      } catch (e) {
-        console.error(e);
-      }
+  // Save Session Log from Debrief Modal
+  const handleSaveSessionLog = async (log: SessionLog) => {
+    const updated = [...sessionLogs, log];
+    setSessionLogs(updated);
+    try {
+      await fetch(`/api/topics/${params.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionLogs: updated }),
+      });
+    } catch (e) {
+      console.error(e);
     }
   };
 
   if (loading) {
-    return <div className="flex-center" style={{ minHeight: '60vh' }}>Loading Study Workspace...</div>;
-  }
-
-  if (error && !topic) {
     return (
       <div className="flex-center" style={{ minHeight: '60vh', flexDirection: 'column', gap: '16px' }}>
-        <p style={{ color: 'var(--color-danger)' }}>⚠️ {error}</p>
-        <Link href="/" className="btn btn-secondary">Back to Dashboard</Link>
+        <div style={{ width: '40px', height: '40px', border: '3px solid rgba(99,102,241,0.2)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Opening Study Room...</p>
       </div>
     );
   }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+  if (error || !topic) {
+    return (
+      <div className="flex-center" style={{ minHeight: '60vh', flexDirection: 'column', gap: '16px' }}>
+        <p style={{ color: 'var(--color-danger)' }}>⚠️ {error || 'Topic not found'}</p>
+        <Link href="/" className="btn btn-secondary">← Back to Dashboard</Link>
+      </div>
+    );
+  }
 
-      {/* Header bar */}
-      <div className="flex-between" style={{ flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <Link href="/" style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+  const completedCount = curriculum.filter((m) => m.completed).length;
+  const progressPct = curriculum.length > 0 ? Math.round((completedCount / curriculum.length) * 100) : 0;
+  const activeModule = curriculum.find((m) => m.id === activeModuleId) || curriculum[0] || null;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1440px', margin: '0 auto', width: '100%' }}>
+      
+      {/* ── TOP BAR: Navigation, Title & Header Actions ──────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Link
+            href="/"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: 'var(--color-text-secondary)',
+              fontSize: '0.85rem',
+              fontWeight: 500,
+              padding: '6px 10px',
+              borderRadius: '6px',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid var(--border-color)',
+            }}
+          >
             ← Back
           </Link>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>{title}</h2>
-          {activeSlotType && (
-            <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '9999px', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--color-primary-light)', fontWeight: 600, textTransform: 'uppercase' }}>
-              ⚡ {activeSlotType} focus slot
-            </span>
-          )}
-          <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-muted)', border: '1px solid var(--border-color)' }}>
-            🏷️ {area}
-          </span>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>{title}</h1>
+              <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(99,102,241,0.15)', color: 'var(--color-primary-light)', fontWeight: 600 }}>
+                {area}
+              </span>
+            </div>
+            {why && <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{why}</p>}
+          </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        {/* Top Right Tool Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          
+          {/* Focus Sprint Timer Card */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '5px 12px', borderRadius: '8px' }}>
+            <span style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'monospace', color: timerActive ? '#10b981' : '#fff' }}>
+              ⏱ {formatTimer(secondsRemaining)}
+            </span>
+            <button
+              type="button"
+              onClick={() => setTimerActive(!timerActive)}
+              style={{
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                padding: '3px 8px',
+                borderRadius: '4px',
+                background: timerActive ? 'rgba(239,68,68,0.2)' : 'var(--color-primary)',
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              {timerActive ? 'Pause' : 'Start'}
+            </button>
+            <button
+              type="button"
+              onClick={resetTimer}
+              style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}
+              title="Reset 25m Timer"
+            >
+              ↺
+            </button>
+          </div>
+
+          {/* Drawer Quick Actions */}
           <button
-            onClick={() => setSetupOpen(true)}
+            type="button"
+            onClick={() => setConfusionsDrawerOpen(true)}
             className="btn btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            title="Topic settings, why statement, target depth, tasks, resources"
+            style={{ fontSize: '0.78rem', padding: '6px 12px' }}
+            title="Log confusions or mistakes to review later"
           >
-            ⚙️ Setup
+            ❓ Mistakes ({confusions.length + mistakes.length})
           </button>
 
-          {topic?.status === 'active' ? (
-            <button onClick={handlePause} className="btn btn-secondary" style={{ color: 'var(--color-warning)' }}>
-              ⏸️ Pause
-            </button>
-          ) : topic?.status === 'paused' ? (
-            <button onClick={handleResume} className="btn btn-primary">
-              ▶️ Resume
-            </button>
-          ) : (
-            <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', background: 'rgba(255,255,255,0.03)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-              Status: <strong className={`status-${topic?.status}`}>{topic?.status}</strong>
-            </span>
-          )}
+          <button
+            type="button"
+            onClick={() => setResourcesDrawerOpen(true)}
+            className="btn btn-secondary"
+            style={{ fontSize: '0.78rem', padding: '6px 12px' }}
+            title="View bookmarks and saved references"
+          >
+            📁 Resources ({resources.length})
+          </button>
 
-          <button onClick={handleDeleteTopic} className="btn btn-secondary" style={{ color: 'var(--color-danger)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-            🗑️ Delete
+          <button
+            type="button"
+            onClick={() => setSettingsDrawerOpen(true)}
+            className="btn btn-secondary"
+            style={{ fontSize: '0.78rem', padding: '6px 10px' }}
+            title="Topic settings and deletion"
+          >
+            ⚙️
           </button>
         </div>
       </div>
 
-      {/* Current Focus Hero Card */}
-      {(() => {
-        const activeModule = curriculum.find(m => !m.completed) || curriculum[0];
-        const displayNextAction = nextAction && nextAction.trim()
-          ? nextAction
-          : activeModule
-            ? `Module ${activeModule.order}: ${activeModule.title}`
-            : null;
-
-        return (
-          <div className="glass-panel" style={{ padding: '18px 22px', borderLeft: '4px solid var(--color-primary)', background: 'rgba(99, 102, 241, 0.05)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px' }}>
-              <div style={{ flex: 1 }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-primary-light)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  🎯 Your Next Action
-                </span>
-                {displayNextAction ? (
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginTop: '2px', color: '#fff' }}>
-                    {displayNextAction}
-                  </h3>
-                ) : (
-                  <div style={{ marginTop: '4px' }}>
-                    <p style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)' }}>
-                      Ready to learn? Generate your curriculum modules below to begin.
-                    </p>
-                    <button
-                      onClick={handleGenerateStudyPlan}
-                      disabled={generatingStudyPlan}
-                      className="btn btn-primary"
-                      style={{ marginTop: '8px', fontSize: '0.78rem', padding: '6px 14px' }}
-                    >
-                      {generatingStudyPlan ? '✨ Generating Modules...' : '🤖 Generate AI Course Modules'}
-                    </button>
-                  </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
-                <button
-                  onClick={() => {
-                    setSetupOpen(false);
-                    if (concepts.length > 0) {
-                      setSelectedConcept(concepts[0]);
-                    } else if (curriculum.length > 0) {
-                      const mod = curriculum.find(m => !m.completed) || curriculum[0];
-                      setSelectedConcept({ id: mod.id, title: mod.title });
-                    } else {
-                      handleGenerateStudyPlan();
-                    }
-                  }}
-                  className="btn btn-primary"
-                  style={{ fontSize: '0.78rem', padding: '6px 14px', borderRadius: 'var(--radius-sm)' }}
-                >
-                  🧠 Practice with AI Coach
-                </button>
-                <button
-                  onClick={() => setSetupOpen(true)}
-                  className="btn btn-secondary"
-                  style={{ fontSize: '0.78rem', padding: '6px 12px', borderRadius: 'var(--radius-sm)' }}
-                >
-                  📋 Tasks ({subtasks.filter(s => s.completed).length}/{subtasks.length})
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Main Body Layout Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '32px', alignItems: 'start' }}>
-
-        {/* LEFT WORKSPACE PANELS */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-          {learningMode === 'practice' && (
-            <div className="glass-panel" style={{ padding: '20px', borderLeft: '4px solid var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+      {/* ── 2-PANE STUDY ROOM GRID ───────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 340px) 1fr', gap: '24px', alignItems: 'start' }}>
+        
+        {/* ── LEFT PANE: Syllabus & Curriculum Navigator ─────────────── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          <div className="glass-panel" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            
+            {/* Syllabus Header with Progress */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>🎙️ Practice topic</div>
-                <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-                  Progress here is a trend across reps, not a checklist. Log today&apos;s rep and see your curve on the Practice page.
-                </p>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>Course Syllabus</h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  {completedCount} of {curriculum.length} completed ({progressPct}%)
+                </span>
               </div>
-              <Link href="/practice" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>Log a rep ▸</Link>
+              <span style={{ fontSize: '1.1rem' }}>📚</span>
             </div>
-          )}
 
-          {learningMode === 'accretion' && (
-            <div className="glass-panel" style={{ padding: '20px', borderLeft: '4px solid #10b981', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div className="flex-between" style={{ gap: '12px' }}>
-                <div>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>🌱 Ongoing topic — {linkedNotes.length} note{linkedNotes.length === 1 ? '' : 's'}</div>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-                    No syllabus and no finish line. Capture what you come across, then turn the keepers into linked notes.
-                  </p>
-                </div>
-                <Link href={`/notes/new?topicId=${params.id}`} className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>+ Note</Link>
-              </div>
-              {linkedNotes.length > 0 && (
-                <div className="flex flex-wrap items-center gap-3">
-                  <Sparkline values={linkedNoteStats.weekly} color="#10b981" label={`Notes added per week for this topic, last 8 weeks: ${linkedNoteStats.weekly.join(', ')}`} />
-                  <StatPill value={`+${linkedNoteStats.addedThisWeek}`} label="this week" tone="success" />
-                  <StatPill value={linkedNoteStats.linkCount} label={linkedNoteStats.linkCount === 1 ? 'link' : 'links'} />
-                </div>
-              )}
-              {linkedNotes.length > 0 ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {linkedNotes.map((n) => (
-                    <Link key={n.id} href={`/notes/${n.id}`} style={{ fontSize: '0.78rem', padding: '3px 10px', borderRadius: '9999px', background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>
-                      {n.title}
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-                  No notes yet. Capture a link or thought from Today or <Link href="/notes" style={{ color: 'var(--color-primary-light)' }}>Notes</Link>, or start one above.
-                </p>
-              )}
-            </div>
-          )}
-
-          {learningMode === 'reference' && concepts.length === 0 && curriculum.length === 0 && (
-            <div className="glass-panel" style={{ padding: '16px 20px', fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
-              📖 Reference topic — nothing to complete. Keep resources in Setup and your scratchpad on the right.
-            </div>
-          )}
-
-          {(learningMode === 'syllabus' || concepts.length > 0 || curriculum.length > 0) && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-              {/* Show Curriculum when no concepts yet, otherwise Knowledge Map + Socratic Coach */}
-              {concepts.length === 0 && curriculum.length === 0 ? (
-                /* Truly empty — no curriculum, no concepts yet */
-                <div className="glass-panel" style={{ padding: '36px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', textAlign: 'center' }}>
-                  <span style={{ fontSize: '2.8rem' }}>🚀</span>
-                  <div>
-                    <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#fff', marginBottom: '6px' }}>Ready to learn {title}?</h3>
-                    <p style={{ fontSize: '0.86rem', color: 'var(--color-text-secondary)', maxWidth: '420px', lineHeight: 1.5 }}>
-                      Get started in seconds. Let AI generate structured study modules for this topic, or build a visual concept map.
-                    </p>
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                    <button
-                      onClick={handleGenerateStudyPlan}
-                      disabled={generatingStudyPlan}
-                      className="btn btn-primary"
-                      style={{ fontSize: '0.86rem', padding: '10px 20px' }}
-                    >
-                      {generatingStudyPlan ? '✨ Generating Modules with AI...' : '🤖 Generate AI Course Modules'}
-                    </button>
-                    <button
-                      onClick={handleStartKnowledgeMap}
-                      disabled={generatingStudyPlan}
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.86rem', padding: '10px 18px' }}
-                    >
-                      🗺️ Build Visual Concept Map
-                    </button>
-                  </div>
-                </div>
-              ) : curriculum.length > 0 && !selectedConcept ? (
-                /* Curriculum exists — show it as the default study view */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {concepts.length > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                      <button
-                        onClick={() => setTopicMode(topicMode === 'course' ? 'self_directed' : 'course')}
-                        className="btn btn-secondary"
-                        style={{ fontSize: '0.75rem', padding: '4px 12px' }}
-                      >
-                        {topicMode === 'course' ? '🗺️ Switch to Knowledge Map' : '📚 Switch to Curriculum'}
-                      </button>
-                    </div>
-                  )}
-                  {topicMode === 'course' || concepts.length === 0 ? (
-                    <CurriculumView
-                      curriculum={curriculum}
-                      topicTitle={title}
-                      topicId={params.id}
-                      onPracticeModule={(mod) => setSelectedConcept({ id: mod.id, title: mod.title })}
-                      onSaveCurriculum={handleSaveCurriculum}
-                      onImportToSubtasks={async (titles) => {
-                        const existingTitles = new Set(subtasks.map(s => s.title.toLowerCase()));
-                        const newSubs: Subtask[] = titles
-                          .filter(t => !existingTitles.has(t.toLowerCase()))
-                          .map(title => ({
-                            id: Math.random().toString(36).substring(2, 9),
-                            title,
-                            completed: false,
-                            createdAt: new Date().toISOString(),
-                          }));
-                        if (newSubs.length > 0) {
-                          await updateSubtasksAndProgress([...subtasks, ...newSubs]);
-                        }
-                      }}
-                    />
-                  ) : (
-                    <KnowledgeMap
-                      concepts={concepts}
-                      topicTitle={title}
-                      onSaveConcepts={handleSaveConcepts}
-                      onSelectConcept={(c) => setSelectedConcept(c)}
-                      selectedConceptId={selectedConcept?.id}
-                    />
-                  )}
-                </div>
-              ) : selectedConcept ? (
-                /* A concept is selected — show Socratic Coach */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <button
-                    onClick={() => setSelectedConcept(null)}
-                    className="btn btn-secondary"
-                    style={{ alignSelf: 'flex-start', fontSize: '0.75rem', padding: '6px 12px' }}
-                  >
-                    ← Back to Study Plan
-                  </button>
-                  <SocraticCoach
-                    concept={selectedConcept}
-                    topicId={params.id}
-                    topicTitle={title}
-                    onSaveProgress={handleSaveSocraticProgress}
-                    explanationsRead={explanationsRead}
-                    onIncrementExplanationsRead={() => setExplanationsRead(prev => prev + 1)}
-                    onResetExplanationsRead={() => setExplanationsRead(0)}
-                  />
-                </div>
-              ) : (
-                /* Concepts exist but no concept selected — show Knowledge Map */
-                <KnowledgeMap
-                  concepts={concepts}
-                  topicTitle={title}
-                  onSaveConcepts={handleSaveConcepts}
-                  onSelectConcept={(c) => setSelectedConcept(c)}
-                  selectedConceptId={selectedConcept?.id}
-                />
-              )}
-
-            </div>
-          )}
-
-          {/* Confusions & mistakes — inline, no tab switch mid-thought */}
-          <details className="glass-panel" style={{ padding: '4px 16px' }}>
-            <summary style={{ cursor: 'pointer', padding: '12px 0', fontSize: '0.88rem', fontWeight: 700 }}>
-              🧩 Confusions & Mistakes ({confusions.filter((c: any) => !c.resolved).length} open · {mistakes.length} logged)
-            </summary>
-            <div style={{ paddingBottom: '12px' }}>
-              <ConfusionMistakeBank
-                confusions={confusions}
-                mistakes={mistakes}
-                onSaveConfusions={handleSaveConfusions}
-                onSaveMistakes={handleSaveMistakes}
+            {/* Progress Bar */}
+            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '9999px', overflow: 'hidden' }}>
+              <div
+                style={{
+                  width: `${progressPct}%`,
+                  height: '100%',
+                  background: 'linear-gradient(90deg, var(--color-primary), #10b981)',
+                  borderRadius: '9999px',
+                  transition: 'width 0.3s ease',
+                }}
               />
             </div>
-          </details>
 
-          {/* Sessions — compact timeline strip */}
-          <details className="glass-panel" style={{ padding: '4px 16px' }}>
-            <summary style={{ cursor: 'pointer', padding: '12px 0', fontSize: '0.88rem', fontWeight: 700 }}>
-              📊 Sessions ({sessionLogs.length})
-            </summary>
-            <div style={{ paddingBottom: '12px' }}>
-              <SessionTimeline sessionLogs={sessionLogs} />
-            </div>
-          </details>
+            {/* Modules List */}
+            {curriculum.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '520px', overflowY: 'auto', paddingRight: '4px' }}>
+                {curriculum.map((mod) => {
+                  const isSelected = mod.id === activeModuleId;
+                  return (
+                    <div
+                      key={mod.id}
+                      onClick={() => setActiveModuleId(mod.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '10px',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        background: isSelected ? 'rgba(99, 102, 241, 0.16)' : 'rgba(255,255,255,0.02)',
+                        border: isSelected ? '1px solid var(--color-primary-light)' : '1px solid rgba(255,255,255,0.06)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleModuleCompleted(mod.id, e)}
+                          style={{
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            border: mod.completed ? 'none' : '2px solid rgba(255,255,255,0.3)',
+                            background: mod.completed ? '#10b981' : 'transparent',
+                            color: '#fff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.65rem',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                          }}
+                          title={mod.completed ? 'Mark uncompleted' : 'Mark completed'}
+                        >
+                          {mod.completed && '✓'}
+                        </button>
+
+                        <div style={{ overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              fontSize: '0.84rem',
+                              fontWeight: isSelected ? 700 : 500,
+                              color: mod.completed ? 'var(--color-text-muted)' : isSelected ? '#fff' : 'var(--color-text-primary)',
+                              textDecoration: mod.completed ? 'line-through' : 'none',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {mod.order}. {mod.title}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                            ~{mod.estimatedMinutes} mins
+                          </div>
+                        </div>
+                      </div>
+
+                      {isSelected && (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--color-primary-light)', fontWeight: 700 }}>
+                          ▶
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ padding: '24px 12px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+                <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
+                  No curriculum modules yet. Generate a progressive study syllabus with AI:
+                </p>
+                <button
+                  type="button"
+                  onClick={handleGenerateCurriculum}
+                  disabled={generatingModules}
+                  className="btn btn-primary"
+                  style={{ width: '100%', fontSize: '0.82rem', padding: '8px 14px' }}
+                >
+                  {generatingModules ? '✨ Generating Modules...' : '✨ Generate AI Syllabus'}
+                </button>
+              </div>
+            )}
+
+            {/* Quick Add Module Form */}
+            <form onSubmit={handleAddModule} style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="+ Add custom module..."
+                value={newModuleTitle}
+                onChange={(e) => setNewModuleTitle(e.target.value)}
+                style={{ fontSize: '0.8rem', padding: '6px 10px', flex: 1 }}
+              />
+              <button type="submit" className="btn btn-secondary" style={{ fontSize: '0.75rem', padding: '6px 10px' }}>
+                Add
+              </button>
+            </form>
+
+          </div>
         </div>
 
-        {/* RIGHT SIDE FOCUS COMPANION */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-          {/* Focus Timer Widget */}
-          {(status === 'active' || status === 'paused') && (
-            <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', borderLeft: '3px solid var(--color-primary)' }}>
-              <div className="flex-between">
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary-light)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  ⏱️ Focus Sprint Timer
-                </span>
-                <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-                  {timerMode === 'study' ? '25m Sprint' : '5m Break'}
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                <span style={{ fontSize: '2.5rem', fontWeight: 800, fontFamily: 'monospace', color: '#fff' }}>
-                  {formatTimerTime(secondsRemaining)}
-                </span>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setTimerActive(!timerActive)}
-                    className="btn btn-primary"
-                    style={{ padding: '6px 14px', fontSize: '0.8rem' }}
-                  >
-                    {timerActive ? '⏸ Pause' : '▶ Start'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => resetTimer(timerMode)}
-                    className="btn btn-secondary"
-                    style={{ padding: '6px 10px', fontSize: '0.8rem' }}
-                  >
-                    ↺
-                  </button>
-                </div>
-              </div>
-
+        {/* ── RIGHT PANE: Active Lesson & Interactive Study Space ────── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          {activeModule ? (
+            <ModuleStudyRoom
+              topicId={params.id}
+              topicTitle={title}
+              topicArea={area}
+              module={activeModule}
+              notes={notes}
+              onSaveNotes={handleSaveNotes}
+              onToggleCompleted={handleToggleModuleCompleted}
+              onAddBookmark={async (res) => {
+                const newRes: Resource = {
+                  id: `r${Math.random().toString(36).substring(2, 9)}`,
+                  title: res.title,
+                  type: res.type,
+                  url: res.url,
+                  purpose: res.purpose,
+                  status: 'NOT_STARTED',
+                  notes: '',
+                };
+                const updated = [...resources, newRes];
+                setResources(updated);
+                try {
+                  await fetch(`/api/topics/${params.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ resources: updated }),
+                  });
+                } catch (e) {
+                  console.error(e);
+                }
+              }}
+            />
+          ) : (
+            <div className="glass-panel" style={{ padding: '48px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+              <span style={{ fontSize: '3rem' }}>🎯</span>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: '#fff' }}>Welcome to {title}</h2>
+              <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', maxWidth: '480px', lineHeight: 1.6 }}>
+                Generate your personalized course syllabus to start interactive Socratic tutoring and taking structured notes.
+              </p>
               <button
                 type="button"
-                onClick={() => { setTimerElapsedMinutes(Math.round((25 * 60 - secondsRemaining) / 60) || 25); setShowDebrief(true); }}
-                className="btn btn-secondary"
-                style={{ width: '100%', fontSize: '0.75rem', padding: '6px', borderStyle: 'dashed' }}
+                onClick={handleGenerateCurriculum}
+                disabled={generatingModules}
+                className="btn btn-primary"
+                style={{ padding: '10px 24px', fontSize: '0.92rem' }}
               >
-                📝 Log Study Session & Insights
+                {generatingModules ? '✨ Generating Syllabus...' : '✨ Generate AI Course Modules'}
               </button>
             </div>
           )}
 
-          {/* Quick Notes Side-Drawer */}
-          <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div className="flex-between">
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff' }}>📝 Quick Scratchpad & Notes</span>
-              <button
-                onClick={() => handleSaveNotes(notes)}
-                className="btn btn-secondary"
-                style={{ fontSize: '0.7rem', padding: '2px 8px' }}
-                disabled={saving}
-              >
-                💾 Save
+        </div>
+      </div>
+
+      {/* ── SLIDE-OVER DRAWER: Confusions & Mistakes ─────────────────── */}
+      <Drawer
+        open={confusionsDrawerOpen}
+        onClose={() => setConfusionsDrawerOpen(false)}
+        title="❓ Mistakes & Confusions Bank"
+        label="Mistakes and Confusions Bank"
+      >
+        <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
+          Tracking what confused you and why ensures you don't repeat the same errors.
+        </div>
+        <ConfusionMistakeBank
+          confusions={confusions}
+          mistakes={mistakes}
+          onSaveConfusions={handleSaveConfusions}
+          onSaveMistakes={handleSaveMistakes}
+        />
+      </Drawer>
+
+      {/* ── SLIDE-OVER DRAWER: Bookmarks & Resources ─────────────────── */}
+      <Drawer
+        open={resourcesDrawerOpen}
+        onClose={() => setResourcesDrawerOpen(false)}
+        title="📁 Saved Resources & Links"
+        label="Resources and Bookmarks"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+              Keep helpful articles, documentation, or tutorial videos handy.
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowAddRes(!showAddRes)}
+              className="btn btn-primary"
+              style={{ fontSize: '0.78rem', padding: '4px 10px' }}
+            >
+              {showAddRes ? 'Cancel' : '+ Add Link'}
+            </button>
+          </div>
+
+          {showAddRes && (
+            <form onSubmit={handleAddResource} className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Resource title (e.g. Official Documentation)..."
+                value={newResTitle}
+                onChange={(e) => setNewResTitle(e.target.value)}
+                required
+              />
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                <input
+                  type="url"
+                  className="form-input"
+                  placeholder="https://..."
+                  value={newResUrl}
+                  onChange={(e) => setNewResUrl(e.target.value)}
+                  required
+                />
+                <select
+                  className="form-input"
+                  value={newResType}
+                  onChange={(e) => setNewResType(e.target.value)}
+                  style={{ background: '#121218' }}
+                >
+                  <option value="ARTICLE">Article</option>
+                  <option value="VIDEO">Video</option>
+                  <option value="BOOK">Book</option>
+                  <option value="TOOL">Tool</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Why is this resource useful? (Optional)"
+                value={newResPurpose}
+                onChange={(e) => setNewResPurpose(e.target.value)}
+              />
+              <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start', padding: '6px 14px', fontSize: '0.8rem' }}>
+                Save Bookmark
               </button>
-            </div>
-            <textarea
+            </form>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {resources.map((res, i) => (
+              <div
+                key={res.id || i}
+                className="glass-card"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(0,0,0,0.2)' }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(99,102,241,0.15)', color: 'var(--color-primary-light)', fontWeight: 700 }}>
+                      {res.type}
+                    </span>
+                    <a href={res.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-primary-light)' }}>
+                      {res.title} ↗
+                    </a>
+                  </div>
+                  {res.purpose && <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{res.purpose}</p>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteResource(i)}
+                  style={{ color: 'var(--color-danger)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '4px' }}
+                  title="Remove bookmark"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            {resources.length === 0 && !showAddRes && (
+              <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '16px' }}>
+                No resources saved yet.
+              </p>
+            )}
+          </div>
+        </div>
+      </Drawer>
+
+      {/* ── SLIDE-OVER DRAWER: Topic Settings ────────────────────────── */}
+      <Drawer
+        open={settingsDrawerOpen}
+        onClose={() => setSettingsDrawerOpen(false)}
+        title="⚙️ Topic Settings"
+        label="Topic Settings"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>Topic Title</label>
+            <input
+              type="text"
               className="form-input"
-              rows={6}
-              placeholder="Jot down quick thoughts, formulas, or key takeaways as you study..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              style={{ resize: 'vertical', fontSize: '0.82rem', lineHeight: 1.5, background: 'rgba(0,0,0,0.2)' }}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
             />
           </div>
 
-          {/* Compact Study Context & Stage Selection */}
-          <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div className="flex-between">
-              <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#fff' }}>📌 Topic Milestone Stage</h4>
-              <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '9999px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', fontWeight: 600 }}>
-                {depthTarget || 'Proficiency'}
-              </span>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '0.7rem' }}>CURRENT MASTERY STAGE</label>
-              <select
-                className="form-input"
-                value={currentStage}
-                onChange={async (e) => {
-                  const newSt = e.target.value;
-                  setCurrentStage(newSt);
-                  try {
-                    await fetch(`/api/topics/${params.id}`, {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ currentStage: newSt }),
-                    });
-                  } catch (err) { }
-                }}
-                style={{ background: '#121218', fontSize: '0.82rem' }}
-              >
-                {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-
-            <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
-              <p><strong>Category:</strong> {area}</p>
-              <p><strong>Target Effort:</strong> {contract?.estimatedEffort || 0} Hours</p>
-              <p><strong>Last Activity:</strong> {topic?.lastTouchedDate ? new Date(topic.lastTouchedDate).toLocaleDateString() : '—'}</p>
-            </div>
+          <div>
+            <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>Subject Area</label>
+            <select
+              className="form-input"
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+              style={{ background: '#121218' }}
+            >
+              <option value="Tech">Tech</option>
+              <option value="Business">Business</option>
+              <option value="Finance">Finance</option>
+              <option value="Creative">Creative</option>
+              <option value="Personal">Personal</option>
+              <option value="Other">Other</option>
+            </select>
           </div>
 
-        </div>
-
-      </div>
-
-      {/* Setup drawer — contract, materials, history. Touched when activating a topic, rarely after. */}
-      <Drawer open={setupOpen} onClose={closeSetup} title="⚙️ Setup" label="Topic setup">
-
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>🎯 Focus</h3>
-          <label className="form-label" style={{ fontSize: '0.72rem', marginBottom: 0 }}>WHY ARE YOU LEARNING THIS?</label>
-          <input type="text" className="form-input" value={why} onChange={(e) => setWhy(e.target.value)} placeholder="e.g. Needed for the backend interview in June" />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px' }}>
-            <div>
-              <label className="form-label" style={{ fontSize: '0.72rem' }}>HOW DEEP</label>
-              <select className="form-input" value={depthTarget} onChange={(e) => setDepthTarget(e.target.value)} style={{ background: '#121218' }}>
-                {['Awareness', 'Working Knowledge', 'Proficiency', 'Deep', 'Mastery'].map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="form-label" style={{ fontSize: '0.72rem' }}>NEXT ACTION (CONCRETE, VERB-FIRST)</label>
-              <input type="text" className="form-input" value={nextAction} onChange={(e) => setNextAction(e.target.value)} placeholder="e.g. Solve 2 sliding-window mediums" />
-            </div>
+          <div>
+            <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>Why Are You Learning This?</label>
+            <textarea
+              className="form-input"
+              style={{ height: '80px', resize: 'vertical' }}
+              value={why}
+              onChange={(e) => setWhy(e.target.value)}
+              placeholder="e.g. Master statistics to pass my job interview and build ML models..."
+            />
           </div>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button onClick={() => handleSaveFocus(false)} disabled={focusSaving} className="btn btn-secondary" style={{ fontSize: '0.8rem' }}>
-              {focusSaving ? 'Saving…' : 'Save'}
+
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await fetch(`/api/topics/${params.id}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ title, area, why }),
+                });
+                setSettingsDrawerOpen(false);
+                fetchTopic();
+              } catch (e) {
+                console.error(e);
+              }
+            }}
+            className="btn btn-primary"
+            style={{ padding: '8px 16px', fontSize: '0.82rem', alignSelf: 'flex-start' }}
+          >
+            Save Settings
+          </button>
+
+          <hr style={{ borderColor: 'rgba(255,255,255,0.06)', margin: '12px 0' }} />
+
+          <div>
+            <h4 style={{ fontSize: '0.85rem', color: 'var(--color-danger)', fontWeight: 600, marginBottom: '6px' }}>Danger Zone</h4>
+            <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginBottom: '10px' }}>
+              Permanently delete this topic and all its associated modules, notes, and records.
+            </p>
+            <button
+              type="button"
+              onClick={handleDeleteTopic}
+              className="btn btn-secondary"
+              style={{ color: 'var(--color-danger)', borderColor: 'rgba(239,68,68,0.3)', fontSize: '0.8rem', padding: '6px 14px' }}
+            >
+              🗑️ Delete Topic
             </button>
-            {status !== 'active' && (
-              <button onClick={() => handleSaveFocus(true)} disabled={focusSaving || !why.trim() || !nextAction.trim()} className="btn btn-primary" style={{ fontSize: '0.8rem' }}>
-                Save & make active (uses 1 of 2 slots)
-              </button>
-            )}
           </div>
-        </section>
-
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>🧭 How you learn this</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
-            {LEARNING_MODES.map((m) => (
-              <button
-                key={m.key}
-                onClick={() => handleChangeLearningMode(m.key)}
-                aria-pressed={learningMode === m.key}
-                style={{
-                  textAlign: 'left', padding: '10px 12px', borderRadius: 'var(--radius-sm)',
-                  border: learningMode === m.key ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
-                  background: learningMode === m.key ? 'rgba(99,102,241,0.12)' : 'transparent',
-                }}
-              >
-                <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{m.label}</div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{m.hint}</div>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>🎯 Goal & Progress</h3>
-          <LearningContract
-            contract={contract}
-            onSaveContract={handleSaveContract}
-            concepts={concepts}
-            onDiagnoseConcepts={handleDiagnoseConcepts}
-          />
-        </section>
-
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>📋 Tasks & Resources ({subtasks.length + resources.length})</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="flex-between">
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>📚 Bookmarks & Learning Materials</h3>
-                <button onClick={() => setShowAddRes(!showAddRes)} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.78rem' }}>
-                  {showAddRes ? 'Cancel' : '➕ Add Material'}
-                </button>
-              </div>
-
-              {showAddRes && (
-                <form onSubmit={handleAddResource} style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="url"
-                      className="form-input"
-                      placeholder="Paste URL (e.g. https://docs.example.com)..."
-                      value={newResUrl}
-                      onChange={(e) => setNewResUrl(e.target.value)}
-                      style={{ flex: 1 }}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleScrapeLink}
-                      disabled={scrapingLink || !newResUrl.trim()}
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
-                    >
-                      {scrapingLink ? 'Fetching...' : '🔍 Auto-Fetch Info'}
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="Resource Title..."
-                      value={newResTitle}
-                      onChange={(e) => setNewResTitle(e.target.value)}
-                      required
-                    />
-                    <select
-                      className="form-input"
-                      value={newResType}
-                      onChange={(e) => setNewResType(e.target.value)}
-                      style={{ background: '#121218' }}
-                    >
-                      <option value="ARTICLE">Article / Doc</option>
-                      <option value="VIDEO">Video / Course</option>
-                      <option value="BOOK">Book / Chapter</option>
-                      <option value="PAPER">Paper / Spec</option>
-                      <option value="TOOL">Tool / Sandbox</option>
-                      <option value="OTHER">Other</option>
-                    </select>
-                  </div>
-
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Why is this material relevant?"
-                    value={newResPurpose}
-                    onChange={(e) => setNewResPurpose(e.target.value)}
-                  />
-
-                  <button type="submit" className="btn btn-primary">Save Bookmark</button>
-                </form>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {resources.map((res, i) => (
-                  <div key={i} className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,0,0,0.15)' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--color-primary-light)', fontWeight: 700 }}>
-                          {res.type}
-                        </span>
-                        <a href={res.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-primary-light)' }}>
-                          {res.title} ↗
-                        </a>
-                      </div>
-                      {res.purpose && <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{res.purpose}</p>}
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <button
-                        onClick={() => handleToggleResourceStatus(i)}
-                        style={{
-                          fontSize: '0.7rem',
-                          padding: '4px 8px',
-                          borderRadius: '9999px',
-                          background: res.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.15)' : res.status === 'IN_PROGRESS' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.05)',
-                          color: res.status === 'COMPLETED' ? '#10b981' : res.status === 'IN_PROGRESS' ? '#f59e0b' : 'var(--color-text-muted)',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {res.status}
-                      </button>
-                      <button onClick={() => handleDeleteResource(i)} style={{ color: 'var(--color-danger)', fontSize: '1rem' }}>×</button>
-                    </div>
-                  </div>
-                ))}
-                {resources.length === 0 && !showAddRes && (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '12px 0' }}>
-                    No bookmarks saved yet. Click "+ Add Material" above to bookmark documentation or guides.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Subtask checklist */}
-            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>📋 Milestones & Practical Exercises</h3>
-
-              <form onSubmit={handleAddSubtask} style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Add practice exercise or milestone..."
-                  value={newSubtaskTitle}
-                  onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                />
-                <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px' }}>➕ Add</button>
-              </form>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {subtasks.map((task) => (
-                  <div key={task.id} className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(0,0,0,0.15)', opacity: task.completed ? 0.6 : 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <input type="checkbox" checked={task.completed} onChange={() => handleToggleSubtask(task.id)} style={{ width: '15px', height: '15px' }} />
-                      <span style={{ fontSize: '0.85rem', textDecoration: task.completed ? 'line-through' : 'none' }}>{task.title}</span>
-                    </div>
-                    <button onClick={() => handleDeleteSubtask(task.id)} style={{ color: 'var(--color-danger)', fontSize: '1rem' }}>×</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
-        </section>
-
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <h3 style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>📜 History</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-            {/* Pause History logs */}
-            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>⏸️ Pause & Reactivation Logs</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {pauseHistory.map((ph, idx) => (
-                  <div key={ph.id || idx} className="glass-card" style={{ padding: '14px', background: 'rgba(0,0,0,0.15)', fontSize: '0.82rem' }}>
-                    <p style={{ color: 'var(--color-warning)', fontWeight: 600, fontSize: '0.75rem' }}>PAUSE SESSION</p>
-                    <p><strong>Paused on:</strong> {new Date(ph.pausedAt).toLocaleString()}</p>
-                    {ph.resumedAt && <p><strong>Resumed on:</strong> {new Date(ph.resumedAt).toLocaleString()}</p>}
-                    <p><strong>Reason:</strong> {ph.reason}</p>
-                    {ph.currentConcept && <p><strong>Stopped on concept:</strong> {ph.currentConcept}</p>}
-                    {ph.reactivationScore && <p><strong>Reactivation:</strong> {ph.reactivationScore}</p>}
-                  </div>
-                ))}
-                {pauseHistory.length === 0 && (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textAlign: 'center' }}>No pause history recorded.</p>
-                )}
-              </div>
-            </div>
-
-            {/* Activity log timeline */}
-            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>📜 Activity Timeline</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {(topic?.activityLogs ?? []).map((log) => (
-                  <div key={log.id} style={{ fontSize: '0.8rem', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                    <div className="flex-between" style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '2px' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--color-primary-light)' }}>{log.fieldChanged.toUpperCase()}</span>
-                      <span>{new Date(log.timestamp).toLocaleString()}</span>
-                    </div>
-                    <p style={{ color: 'var(--color-text-primary)' }}>
-                      {log.oldValue === null ? `Initialized as "${log.newValue}"` : `Changed from "${log.oldValue}" to "${log.newValue}"`}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
-        </section>
+        </div>
       </Drawer>
 
-      {/* Reactivation Modal overlay */}
-      {showReactivation && (
-        <ReactivationModal
-          topicTitle={title}
-          concepts={concepts}
-          onConfirmResume={handleConfirmReactivation}
-          onClose={() => setShowReactivation(false)}
-        />
-      )}
-
-      {/* Global Custom Dialog Modal (Replaces browser alert, confirm, prompt) */}
-      <CustomDialog {...dialogConfig} />
-
-      {/* Session Debrief Modal overlay */}
+      {/* Session Debrief Modal */}
       {showDebrief && (
         <SessionDebriefModal
           topicTitle={title}
-          currentNextAction={nextAction}
+          currentNextAction={activeModule ? `Module ${activeModule.order}: ${activeModule.title}` : title}
           timerDurationMinutes={timerElapsedMinutes}
           onSave={handleSaveSessionLog}
           onClose={() => setShowDebrief(false)}
         />
       )}
+
+      {/* Custom Confirmation / Alert Dialog */}
+      <CustomDialog {...dialogConfig} />
 
     </div>
   );

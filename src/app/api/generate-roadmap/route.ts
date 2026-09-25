@@ -249,47 +249,35 @@ function buildFallbackTopics(
   return topics;
 }
 
-/**
- * Sanitizes and validates AI-generated topics.
- *
- * Models can return valid JSON with invalid values.
- * JSON.parse() alone is not enough.
- */
-function validateTopics(
-  topics: unknown
-): topics is GeneratedTopic[] {
-  if (!Array.isArray(topics)) {
-    return false;
+function sanitizeTopics(raw: unknown): GeneratedTopic[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const valid: GeneratedTopic[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const title = String(item.title || '').trim();
+    if (!title || title.length < 3) continue;
+    const why = String(item.why || `Build foundational capability in ${title}.`).trim();
+    const nextAction = String(item.nextAction || `Review the core concepts of ${title} and complete the first exercise.`).trim();
+    const rawHours = typeof item.estimatedHours === 'number' ? item.estimatedHours : parseInt(String(item.estimatedHours || '10'), 10);
+    const estimatedHours = isNaN(rawHours) ? 10 : Math.max(2, Math.min(100, rawHours));
+    const curriculum = Array.isArray(item.curriculum) && item.curriculum.length > 0
+      ? item.curriculum.map((c: any) => typeof c === 'object' && c?.title ? String(c.title) : String(c))
+      : [`Core Principles of ${title}`, `Practical Examples of ${title}`, `Hands-on Practice with ${title}`];
+
+    valid.push({
+      title,
+      area: String(item.area || 'Tech'),
+      why,
+      depthTarget: item.depthTarget || 'Working Knowledge',
+      estimatedHours,
+      nextAction,
+      mode: (item.mode === 'self_directed' || item.mode === 'project' || item.mode === 'course') ? item.mode : 'course',
+      curriculum,
+      outcome: typeof item.outcome === 'string' ? item.outcome : `Able to understand and apply ${title} independently.`,
+      completionCriteria: Array.isArray(item.completionCriteria) ? item.completionCriteria.map((c: any) => String(c)) : [`Demonstrate understanding of ${title}`],
+    });
   }
-
-  if (topics.length < 4 || topics.length > 10) {
-    return false;
-  }
-
-  return topics.every((topic) => {
-    if (!topic || typeof topic !== 'object') {
-      return false;
-    }
-
-    const item = topic as Partial<GeneratedTopic>;
-
-    return (
-      typeof item.title === 'string' &&
-      item.title.trim().length > 5 &&
-      typeof item.area === 'string' &&
-      typeof item.why === 'string' &&
-      item.why.trim().length > 10 &&
-      typeof item.depthTarget === 'string' &&
-      typeof item.estimatedHours === 'number' &&
-      item.estimatedHours >= 2 &&
-      item.estimatedHours <= 100 &&
-      typeof item.nextAction === 'string' &&
-      item.nextAction.trim().length > 10 &&
-      (item.mode === 'course' || item.mode === 'self_directed' || item.mode === 'project' || typeof item.mode === 'string') &&
-      Array.isArray(item.curriculum) &&
-      item.curriculum.length >= 2
-    );
-  });
+  return valid.length >= 3 ? valid : null;
 }
 
 export async function POST(request: Request) {
@@ -1012,7 +1000,8 @@ The learner should be able to look at the roadmap and know:
      *
      * Valid JSON is not necessarily a valid roadmap.
      */
-    if (!validateTopics(parsed.topics)) {
+    const sanitizedTopics = sanitizeTopics(parsed.topics);
+    if (!sanitizedTopics) {
       console.error(
         'AI returned structurally invalid roadmap:',
         parsed
@@ -1042,6 +1031,8 @@ The learner should be able to look at the roadmap and know:
         reason: 'AI roadmap failed validation',
       } satisfies RoadmapResponse);
     }
+
+    parsed.topics = sanitizedTopics;
 
     /*
      * Recalculate total hours ourselves.

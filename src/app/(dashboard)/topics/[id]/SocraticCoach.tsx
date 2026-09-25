@@ -3,22 +3,24 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '@/components/ToastProvider';
 
-interface Concept {
+export interface Concept {
   id: string;
   title: string;
-  status: string;
-  parentId: string | null;
-  difficulty: 'Low' | 'Medium' | 'High';
-  importance: 'Low' | 'Medium' | 'High';
+  status?: string;
+  parentId?: string | null;
+  difficulty?: 'Low' | 'Medium' | 'High' | string;
+  importance?: 'Low' | 'Medium' | 'High' | string;
 }
 
-interface SocraticCoachProps {
+export interface SocraticCoachProps {
   concept: Concept;
-  topicId: string;
-  onSaveProgress: (conceptId: string, success: boolean, mistakeText?: string, whyMade?: string, howToAvoid?: string) => Promise<void>;
-  explanationsRead: number;
-  onIncrementExplanationsRead: () => void;
-  onResetExplanationsRead: () => void;
+  topicId?: string;
+  topicTitle?: string;
+  onSaveProgress?: (conceptId: string, success: boolean, mistakeText?: string, whyMade?: string, howToAvoid?: string) => Promise<void>;
+  explanationsRead?: number;
+  onIncrementExplanationsRead?: () => void;
+  onResetExplanationsRead?: () => void;
+  onCompleteStage?: () => Promise<void>;
 }
 
 export default function SocraticCoach({
@@ -26,10 +28,11 @@ export default function SocraticCoach({
   topicId,
   topicTitle,
   onSaveProgress,
-  explanationsRead,
-  onIncrementExplanationsRead,
-  onResetExplanationsRead,
-}: SocraticCoachProps & { topicTitle?: string }) {
+  explanationsRead = 0,
+  onIncrementExplanationsRead = () => {},
+  onResetExplanationsRead = () => {},
+  onCompleteStage,
+}: SocraticCoachProps) {
   const toast = useToast();
   // Tutor Stages: 'explain' | 'demonstrate' | 'connect' | 'question' | 'retrieve' | 'apply' | 'correct'
   const [stage, setStage] = useState<'explain' | 'demonstrate' | 'connect' | 'question' | 'retrieve' | 'apply' | 'correct'>('explain');
@@ -200,13 +203,18 @@ export default function SocraticCoach({
     setSubmitting(true);
     try {
       const isSuccess = selfAssessment === 'correct' || selfAssessment === 'partial';
-      await onSaveProgress(
-        concept.id,
-        isSuccess,
-        selfAssessment === 'wrong' || mistakeText ? mistakeText || `Incorrect understanding of ${concept.title}` : undefined,
-        whyMade,
-        howToAvoid
-      );
+      if (onSaveProgress) {
+        await onSaveProgress(
+          concept.id,
+          isSuccess,
+          selfAssessment === 'wrong' || mistakeText ? mistakeText || `Incorrect understanding of ${concept.title}` : undefined,
+          whyMade,
+          howToAvoid
+        );
+      }
+      if (onCompleteStage) {
+        await onCompleteStage();
+      }
       
       setStage('explain');
       setRetrievalInput('');

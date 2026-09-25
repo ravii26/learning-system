@@ -32,7 +32,54 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { action = 'generate', conceptTitle, topicTitle, userRecall, idealAnswer } = body;
 
-    // 1. Generate Structured Concept Tree
+    // 1. Generate Structured Course Curriculum
+    if (action === 'generate-curriculum') {
+      if (!topicTitle) {
+        return NextResponse.json({ error: 'topicTitle is required' }, { status: 400 });
+      }
+
+      const prompt = `You are a world-class curriculum designer and educator.
+Create a progressive, 5 to 7 module learning syllabus for the subject: "${topicTitle}".
+Each module must be a concrete, capability-building topic (e.g. "Types of Data: Categorical vs Numerical", "Calculating Summary Statistics", "Cleaning Missing Values").
+NEVER use generic placeholder titles like "Module 1: Mental Models" or corporate buzzwords.
+
+Return JSON only in this exact format:
+{
+  "modules": [
+    {
+      "title": "Clear Concrete Module Title",
+      "estimatedMinutes": 30,
+      "notes": "Brief 1-sentence description of what the student will learn and practice"
+    }
+  ]
+}`;
+
+      try {
+        const result = await callAIContent([
+          { role: 'system', content: 'You create structured practical curricula. Return JSON only.' },
+          { role: 'user', content: prompt },
+        ], { jsonMode: true, temperature: 0.3 });
+
+        const parsed = JSON.parse(result.content);
+        if (Array.isArray(parsed.modules) && parsed.modules.length > 0) {
+          return NextResponse.json(parsed);
+        }
+      } catch (e) {
+        console.warn('AI curriculum generation failed, using intelligent fallback:', e);
+      }
+
+      return NextResponse.json({
+        modules: [
+          { title: `${topicTitle} Fundamentals & Core Mental Models`, estimatedMinutes: 25, notes: 'Foundational concepts and key terminology.' },
+          { title: `Core Techniques & Step-by-Step Examples`, estimatedMinutes: 30, notes: 'Essential mechanics with real-world examples.' },
+          { title: `Practical Application & Hands-on Exercises`, estimatedMinutes: 35, notes: 'Hands-on practice solving real problems.' },
+          { title: `Common Mistakes & Edge Cases to Avoid`, estimatedMinutes: 25, notes: 'Debugging and critical thinking.' },
+          { title: `Independent Project & Synthesis`, estimatedMinutes: 45, notes: 'Synthesize everything learned into a complete outcome.' },
+        ],
+      });
+    }
+
+    // 2. Generate Structured Concept Tree
     if (action === 'generate-concepts') {
       if (!topicTitle) {
         return NextResponse.json({ error: 'topicTitle is required' }, { status: 400 });
