@@ -41,8 +41,8 @@ export async function recomputeGoalReadiness(db: DbClient, userId: string, goalI
 
   const result = computeGoalReadiness(topics);
 
-  await db.goal.update({
-    where: { id: goalId },
+  await db.goal.updateMany({
+    where: { id: goalId, userId },
     data: {
       readinessMet: result.met,
       readinessTotal: result.total,

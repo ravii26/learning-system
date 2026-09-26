@@ -1,3 +1,4 @@
+import { findUnownedRef, unownedRefError } from '@/lib/ownership';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
@@ -55,6 +56,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     if (body.topicId !== undefined) data.topicId = body.topicId;
     if (body.conceptId !== undefined) data.conceptId = body.conceptId;
     if (body.skillId !== undefined) data.skillId = body.skillId;
+    const badRef = await findUnownedRef(db, userId, { topicId: body.topicId, conceptId: body.conceptId, skillId: body.skillId });
+    if (badRef) return NextResponse.json({ error: unownedRefError(badRef) }, { status: 400 });
 
     const updated = await db.note.update({ where: { id: params.id }, data });
 

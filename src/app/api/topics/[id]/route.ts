@@ -1,3 +1,4 @@
+import { findUnownedRef, unownedRefError } from '@/lib/ownership';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
@@ -224,6 +225,8 @@ export async function PUT(
     // A key absent from the body must leave its column untouched.
     // Area changed without an explicit skill: follow the new area's root,
     // unless the topic was deliberately linked to a finer-grained skill.
+    const badRef = await findUnownedRef(db, userId, { skillId: body.skillId });
+    if (badRef) return NextResponse.json({ error: unownedRefError(badRef) }, { status: 400 });
     if (body.area !== undefined && body.area !== existing.area && body.skillId === undefined) {
       const current = existing.skillId
         ? await db.skill.findFirst({ where: { id: existing.skillId, userId }, select: { kind: true } })

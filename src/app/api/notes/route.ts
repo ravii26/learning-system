@@ -1,3 +1,4 @@
+import { findUnownedRef, unownedRefError } from '@/lib/ownership';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
@@ -53,9 +54,8 @@ export async function POST(request: Request) {
     if (!title || !title.trim()) {
       return NextResponse.json({ error: 'title is required' }, { status: 400 });
     }
-    if (topicId && !(await db.topic.findFirst({ where: { id: topicId, userId, deletedAt: null }, select: { id: true } }))) {
-      return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
-    }
+    const badRef = await findUnownedRef(db, userId, { topicId, conceptId, skillId });
+    if (badRef) return NextResponse.json({ error: unownedRefError(badRef) }, { status: 400 });
 
     const note = await db.note.create({
       data: {

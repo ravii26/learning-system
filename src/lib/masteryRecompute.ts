@@ -70,8 +70,9 @@ export async function recomputeSkillMastery(db: DbClient, userId: string, skillI
     ...artifacts.map((a) => a.occurredAt),
   ].reduce((latest: Date | null, d) => (latest === null || d > latest ? d : latest), null);
 
-  await db.skill.update({
-    where: { id: skillId },
+  // updateMany + userId: never write another user's skill, whatever id came in.
+  await db.skill.updateMany({
+    where: { id: skillId, userId },
     data: {
       masteryScore: result.score,
       masteryLevel: result.level,
