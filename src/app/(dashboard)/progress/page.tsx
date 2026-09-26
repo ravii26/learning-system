@@ -106,7 +106,7 @@ export default function ProgressPage() {
       {time && (
         <Card className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <CardLabel>▸ Last 30 days</CardLabel>
+            <CardLabel>Last 30 days</CardLabel>
             <div className="mt-1 flex flex-wrap items-baseline gap-3">
               <span className="text-2xl font-bold">{formatDuration(time.totalSeconds)}</span>
               <span className="text-[0.82rem] text-fg-secondary">on {activeDays} day{activeDays === 1 ? '' : 's'}</span>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Button, Field, Input, Select } from '@/components/ui';
+import { Button, Field, Icon, Input, Select } from '@/components/ui';
 import { useToast } from '@/components/ToastProvider';
 import { COLD_TARGET, OUTCOME_LABEL, PROBLEM_OUTCOMES, type ProblemOutcome } from '@/lib/problems';
 
@@ -92,9 +92,9 @@ export default function ProblemLog({ topicId, moduleId, onChanged }: { topicId: 
   const toGo = Math.max(0, COLD_TARGET - counts.cold);
 
   return (
-    <section aria-labelledby="problems-h" className="glass-panel flex flex-col gap-3.5 px-6 py-5">
+    <section aria-labelledby="problems-h" className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-3">
-        <h3 id="problems-h" className="m-0 text-base font-bold text-fg">Problems solved</h3>
+        <h3 id="problems-h" className="m-0 text-[0.95rem] font-semibold text-fg">Problems solved</h3>
         {!open && (
           <Button size="sm" onClick={() => setOpen(true)}>
             Log a problem
@@ -102,7 +102,7 @@ export default function ProblemLog({ topicId, moduleId, onChanged }: { topicId: 
         )}
       </div>
 
-      <div className="flex flex-wrap items-baseline gap-5 text-[0.85rem] text-fg-muted">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[0.85rem] text-fg-muted">
         {PROBLEM_OUTCOMES.map((o) => (
           <span key={o}>
             <strong className="text-lg text-fg">{counts[o]}</strong> {OUTCOME_LABEL[o].toLowerCase()}
@@ -114,8 +114,8 @@ export default function ProblemLog({ topicId, moduleId, onChanged }: { topicId: 
       </div>
 
       {open && (
-        <form onSubmit={submit} className="flex flex-col gap-3 rounded-md border border-line bg-sunk p-4">
-          <div className="grid grid-cols-[2fr_1fr] gap-2.5">
+        <form onSubmit={submit} className="flex flex-col gap-3 rounded-xl bg-sunk p-4">
+          <div className="flex flex-col gap-2.5">
             <Field label="Problem" htmlFor="pl-title">
               <Input id="pl-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Minimum window substring" autoFocus />
             </Field>
@@ -136,14 +136,14 @@ export default function ProblemLog({ topicId, moduleId, onChanged }: { topicId: 
                   type="button"
                   aria-pressed={outcome === o}
                   onClick={() => setOutcome(o)}
-                  className={`min-h-[40px] rounded-md border px-3.5 text-[0.85rem] font-semibold ${outcome === o ? 'border-fg bg-fill-3 text-fg' : 'border-line bg-transparent text-fg-secondary'}`}
+                  className={`min-h-[40px] rounded-lg border px-3 text-[0.85rem] font-semibold ${outcome === o ? 'border-ink bg-surface text-fg' : 'border-line bg-transparent text-fg-secondary'}`}
                 >
                   {OUTCOME_LABEL[o]}
                 </button>
               ))}
             </div>
           </fieldset>
-          <div className="grid grid-cols-[2fr_1fr] gap-2.5">
+          <div className="flex flex-col gap-2.5">
             <Field label="Link (optional)" htmlFor="pl-url">
               <Input id="pl-url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="leetcode.com/problems/…" />
             </Field>
@@ -184,8 +184,8 @@ export default function ProblemLog({ topicId, moduleId, onChanged }: { topicId: 
                   {` · ${new Date(p.attemptedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}
                 </span>
               </div>
-              <button type="button" onClick={() => remove(p.id)} aria-label={`Delete ${p.title}`} className="min-h-[36px] bg-transparent px-2 text-fg-muted">
-                ✕
+              <button type="button" onClick={() => remove(p.id)} aria-label={`Delete ${p.title}`} className="flex h-9 w-9 items-center justify-center rounded-md bg-transparent text-fg-muted hover:bg-fill-2 hover:text-fg">
+                <Icon name="close" size={14} />
               </button>
             </li>
           ))}

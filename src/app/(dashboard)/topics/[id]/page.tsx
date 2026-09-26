@@ -11,7 +11,7 @@ import ConfusionMistakeBank from './ConfusionMistakeBank';
 import RichTextEditor from './RichTextEditor';
 import SessionDebriefModal, { SessionLog } from './SessionDebriefModal';
 import CustomDialog, { CustomDialogConfig } from '@/components/CustomDialog';
-import { Drawer, KnowledgeMark } from '@/components/ui';
+import { Drawer, Icon, KNOWLEDGE_LABEL, KnowledgeStrip, knowledgeSummary } from '@/components/ui';
 import type { Knowledge } from '@/lib/moduleState';
 import { useToast } from '@/components/ToastProvider';
 import { useStudyTracker } from '@/lib/useStudyTracker';
@@ -530,156 +530,86 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
 
   if (loading) {
     return (
-      <div className="flex-center" style={{ minHeight: '60vh', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ width: '40px', height: '40px', border: '3px solid var(--fill-4)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Opening Study Room...</p>
+      <div className="mx-auto grid w-full max-w-[1400px] gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="flex flex-col gap-3">{[40, 40, 40, 40, 40].map((h, i) => <div key={i} className="skeleton rounded-md" style={{ height: h }} />)}</div>
+        <div className="flex flex-col gap-5">{[48, 120, 360].map((h) => <div key={h} className="skeleton rounded-md" style={{ height: h }} />)}</div>
       </div>
     );
   }
 
   if (error || !topic) {
     return (
-      <div className="flex-center" style={{ minHeight: '60vh', flexDirection: 'column', gap: '16px' }}>
-        <p style={{ color: 'var(--color-danger)' }}>⚠️ {error || 'Topic not found'}</p>
-        <Link href="/" className="btn btn-secondary">← Back to Dashboard</Link>
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
+        <p className="m-0 text-[1rem] text-fg-secondary">{error || 'This topic doesn’t exist, or it was deleted.'}</p>
+        <Link href="/plan" className="btn btn-secondary">Back to Learn</Link>
       </div>
     );
   }
 
   const completedCount = curriculum.filter((m) => m.completed).length;
-  const progressPct = curriculum.length > 0 ? Math.round((completedCount / curriculum.length) * 100) : 0;
   const activeModule = curriculum.find((m) => m.id === activeModuleId) || curriculum[0] || null;
+  const moduleStates: Knowledge[] = curriculum.map((m) => evidence[m.id]?.state ?? 'unseen');
+  const chip = 'flex h-10 items-center gap-2 rounded-[10px] border border-line bg-surface px-3 text-[0.875rem] hover:border-line-hover';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1440px', margin: '0 auto', width: '100%' }}>
-      
-      {/* ── TOP BAR: Navigation, Title & Header Actions ──────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid var(--fill-3)', paddingBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Link
-            href="/"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              color: 'var(--color-text-secondary)',
-              fontSize: '0.85rem',
-              fontWeight: 500,
-              padding: '6px 10px',
-              borderRadius: '6px',
-              background: 'var(--fill-2)',
-              border: '1px solid var(--border-color)',
-            }}
-          >
-            ← Back
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-7">
+      <header className="flex flex-col gap-5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Link href="/plan" className="flex items-center gap-1.5 text-[0.9rem] text-fg-secondary no-underline hover:text-fg hover:no-underline">
+            <Icon name="arrowLeft" size={16} /> Learn
           </Link>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>{title}</h1>
-              <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', background: 'var(--fill-3)', color: 'var(--color-primary-light)', fontWeight: 600 }}>
-                {area}
-              </span>
-            </div>
-            {why && <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{why}</p>}
-          </div>
-        </div>
-
-        {/* Top Right Tool Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <span className="flex-1" />
 
           {/* Real study time — tracked while you're active here, plus anything you log */}
-          <button
-            type="button"
-            onClick={() => setTimeDrawerOpen(true)}
-            className="flex items-center gap-2 rounded-lg border border-line bg-sunk px-3 py-1.5 text-left hover:border-line-hover"
-            title="Time you actually spent on this topic — click to see history, log or correct time"
-          >
-            <span className="text-base">⏱</span>
-            <span className="flex flex-col leading-tight">
-              <span className="text-[0.82rem] font-bold text-fg">
-                {formatDuration(timeTotals.todaySeconds + tracker.unflushedSeconds)} today
-              </span>
-              <span className="text-[0.68rem] text-fg-muted">
-                {formatDuration(timeTotals.allTimeSeconds + tracker.unflushedSeconds)} total
-              </span>
-            </span>
+          <button type="button" onClick={() => setTimeDrawerOpen(true)} className={chip} title="Time you spent on this topic — see history, log or correct it">
+            <Icon name="clock" size={16} className="text-fg-muted" />
+            <span className="font-semibold text-fg">{formatDuration(timeTotals.todaySeconds + tracker.unflushedSeconds)}</span>
+            <span className="text-fg-muted">today · {formatDuration(timeTotals.allTimeSeconds + tracker.unflushedSeconds)} total</span>
           </button>
 
-          {/* Focus Sprint Timer Card (pomodoro pacing; while it runs, reading without input still counts) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-sunk)', border: '1px solid var(--fill-3)', padding: '5px 12px', borderRadius: '8px' }}>
-            <span style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'monospace', color: timerActive ? 'var(--color-success)' : 'var(--color-text-primary)' }}>
-              🍅 {formatTimer(secondsRemaining)}
-            </span>
-            <button
-              type="button"
-              onClick={() => setTimerActive(!timerActive)}
-              style={{
-                fontSize: '0.72rem',
-                fontWeight: 600,
-                padding: '3px 8px',
-                borderRadius: '4px',
-                background: timerActive ? 'var(--danger-line)' : 'var(--color-primary)',
-                color: 'var(--color-text-primary)',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
+          {/* Focus timer (while it runs, reading without touching anything still counts) */}
+          <div className={`${chip} pr-1.5`}>
+            <span className={`h-2 w-2 rounded-full ${timerActive ? 'bg-ink' : 'bg-[var(--border-strong)]'}`} aria-hidden="true" />
+            <span className="font-mono font-medium tabular-nums">{formatTimer(secondsRemaining)}</span>
+            <button type="button" onClick={() => setTimerActive(!timerActive)} className="h-7 rounded-md px-2 text-[0.8rem] font-semibold text-fg hover:bg-fill-2">
               {timerActive ? 'Pause' : 'Start'}
             </button>
-            <button
-              type="button"
-              onClick={resetTimer}
-              style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}
-              title="Reset 25m Timer"
-            >
-              ↺
+            <button type="button" onClick={resetTimer} aria-label="Reset the 25-minute timer" className="flex h-7 w-7 items-center justify-center rounded-md text-fg-muted hover:bg-fill-2">
+              <Icon name="review" size={14} />
             </button>
           </div>
 
-          {/* Drawer Quick Actions */}
-          <button
-            type="button"
-            onClick={() => setConfusionsDrawerOpen(true)}
-            className="btn btn-secondary"
-            style={{ fontSize: '0.78rem', padding: '6px 12px' }}
-            title="Log confusions or mistakes to review later"
-          >
-            ❓ Mistakes ({confusions.length + mistakes.length})
+          <button type="button" onClick={() => setConfusionsDrawerOpen(true)} className={chip} title="Open questions and mistakes to look at again">
+            Questions &amp; mistakes <span className="text-fg-muted">{confusions.length + mistakes.length}</span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => setResourcesDrawerOpen(true)}
-            className="btn btn-secondary"
-            style={{ fontSize: '0.78rem', padding: '6px 12px' }}
-            title="View bookmarks and saved references"
-          >
-            📁 Resources ({resources.length})
+          <button type="button" onClick={() => setResourcesDrawerOpen(true)} className={chip} title="Books, videos and links for this topic">
+            Sources <span className="text-fg-muted">{resources.length}</span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => setSettingsDrawerOpen(true)}
-            className="btn btn-secondary"
-            style={{ fontSize: '0.78rem', padding: '6px 10px' }}
-            title="Topic settings and deletion"
-          >
-            ⚙️
+          <button type="button" onClick={() => setSettingsDrawerOpen(true)} className={`${chip} w-10 justify-center px-0`} aria-label="Topic settings">
+            <Icon name="edit" size={16} />
           </button>
         </div>
-      </div>
+
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-baseline gap-3">
+            <h1 className="m-0 font-serif text-[2.4rem] font-normal leading-[1.1] tracking-[-0.015em]">{title}</h1>
+            <span className="badge">{area}</span>
+          </div>
+          {why && <p className="m-0 max-w-[760px] text-[1rem] text-fg-secondary">{why}</p>}
+        </div>
+      </header>
 
       {/* Came back from an external link (video, book, docs): count that time? */}
       {tracker.awayPrompt && (
-        <div className="glass-panel flex flex-wrap items-center justify-between gap-3 border-l-4 border-l-warning px-4 py-3">
-          <span className="text-[0.86rem]">
+        <div role="status" className="glass-panel flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+          <span className="text-[0.95rem]">
             You were away <strong>{tracker.awayPrompt.minutes} min</strong>
-            {tracker.awayPrompt.label ? <> on <em>{tracker.awayPrompt.label}</em></> : null}. Was that study time for this topic?
+            {tracker.awayPrompt.label ? <> on <em>{tracker.awayPrompt.label}</em></> : null}. Count it as study time for this topic?
           </span>
           <span className="flex gap-2">
             <button
               type="button"
-              className="btn btn-primary px-3 py-1 text-[0.78rem]"
+              className="btn btn-primary h-10 py-0"
               onClick={async () => {
                 const p = tracker.awayPrompt!;
                 if (await tracker.confirmAway(p.minutes, p.label)) toast.success(`Added ${p.minutes} min`);
@@ -687,226 +617,156 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
             >
               Yes, add {tracker.awayPrompt.minutes} min
             </button>
-            <button type="button" className="btn btn-secondary px-3 py-1 text-[0.78rem]" onClick={tracker.dismissAway}>No</button>
+            <button type="button" className="btn btn-secondary h-10 py-0" onClick={tracker.dismissAway}>No</button>
           </span>
         </div>
       )}
 
-      {/* ── 2-PANE STUDY ROOM GRID ───────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 340px) 1fr', gap: '24px', alignItems: 'start' }}>
-        
-        {/* ── LEFT PANE: Syllabus & Curriculum Navigator ─────────────── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          
-          <div className="glass-panel" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            
-            {/* Syllabus Header with Progress */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>Course Syllabus</h3>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                  {completedCount} of {curriculum.length} completed ({progressPct}%)
-                </span>
-              </div>
+      <div className="grid items-start gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <nav aria-label="Modules" className="flex flex-col gap-4 lg:sticky lg:top-6">
+          <div className="flex flex-col gap-3 px-1">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[0.95rem] font-semibold">
+                {curriculum.length > 0 ? `${curriculum.length} modules` : 'Roadmap'}
+              </span>
               {curriculum.length > 0 && !editingSyllabus && (
-                <span className="flex gap-1.5">
+                <span className="flex gap-1">
                   {completedCount > 0 && completedCount < curriculum.length && (
-                    <button type="button" onClick={() => setPlacementOpen(true)} className="btn btn-secondary px-2.5 py-1 text-[0.72rem]" title="Quiz yourself on the modules you haven't finished and skip the ones you already know">
+                    <button type="button" onClick={() => setPlacementOpen(true)} className="h-8 rounded-md px-2 text-[0.8rem] font-medium text-fg-secondary hover:bg-fill-2 hover:text-fg" title="Quiz yourself on the modules you haven't finished and skip what you already know">
                       Placement check
                     </button>
                   )}
-                  <button type="button" onClick={startEditingSyllabus} className="btn btn-secondary px-2.5 py-1 text-[0.72rem]" title="Rename, re-time, reorder or remove modules">
-                    ✎ Edit
+                  <button type="button" onClick={startEditingSyllabus} className="h-8 rounded-md px-2 text-[0.8rem] font-medium text-fg-secondary hover:bg-fill-2 hover:text-fg" title="Rename, re-time, reorder or remove modules">
+                    Edit
                   </button>
                 </span>
               )}
               {editingSyllabus && (
                 <span className="flex gap-1.5">
-                  <button type="button" onClick={saveSyllabusEdits} className="btn btn-primary px-2.5 py-1 text-[0.72rem]">Save</button>
-                  <button type="button" onClick={() => setEditingSyllabus(false)} className="btn btn-secondary px-2.5 py-1 text-[0.72rem]">Cancel</button>
+                  <button type="button" onClick={saveSyllabusEdits} className="btn btn-primary h-8 px-3 py-0 text-[0.8rem]">Save</button>
+                  <button type="button" onClick={() => setEditingSyllabus(false)} className="btn btn-secondary h-8 px-3 py-0 text-[0.8rem]">Cancel</button>
                 </span>
               )}
             </div>
+            {curriculum.length > 0 && !editingSyllabus && <KnowledgeStrip states={moduleStates} size="sm" />}
+            {curriculum.length > 0 && !editingSyllabus && (
+              <span className="text-[0.82rem] text-fg-muted">{knowledgeSummary(moduleStates)}</span>
+            )}
+          </div>
 
-            {/* Progress Bar */}
-            <div style={{ width: '100%', height: '6px', background: 'var(--fill-3)', borderRadius: '9999px', overflow: 'hidden' }}>
-              <div
-                style={{
-                  width: `${progressPct}%`,
-                  height: '100%',
-                  background: 'var(--ink)',
-                  borderRadius: '9999px',
-                  transition: 'width 0.3s ease',
-                }}
-              />
-            </div>
-
-            {/* Modules List */}
-            {editingSyllabus ? (
-              <div className="flex max-h-[520px] flex-col gap-2 overflow-y-auto pr-1">
-                {draftModules.map((mod, idx) => (
-                  <div key={mod.id} className="flex flex-col gap-1.5 rounded-lg border border-line bg-fill-1 p-2">
+          {editingSyllabus ? (
+            <div className="flex max-h-[560px] flex-col gap-2 overflow-y-auto pr-1">
+              {draftModules.map((mod, idx) => (
+                <div key={mod.id} className="flex flex-col gap-1.5 rounded-lg border border-line bg-surface p-2">
+                  <input
+                    className="form-input px-2 py-1.5 text-[0.875rem]"
+                    value={mod.title}
+                    onChange={(e) => setDraftModules((prev) => prev.map((m, i) => (i === idx ? { ...m, title: e.target.value } : m)))}
+                    aria-label={`Module ${idx + 1} title`}
+                  />
+                  <div className="flex items-center gap-1.5">
                     <input
-                      className="form-input px-2 py-1.5 text-[0.82rem]"
-                      value={mod.title}
-                      onChange={(e) => setDraftModules((prev) => prev.map((m, i) => (i === idx ? { ...m, title: e.target.value } : m)))}
-                      aria-label={`Module ${idx + 1} title`}
+                      type="number"
+                      min={5}
+                      max={240}
+                      className="form-input w-20 px-2 py-1 text-[0.8rem]"
+                      value={mod.estimatedMinutes}
+                      onChange={(e) => setDraftModules((prev) => prev.map((m, i) => (i === idx ? { ...m, estimatedMinutes: Number(e.target.value) } : m)))}
+                      aria-label={`Module ${idx + 1} minutes`}
                     />
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        min={5}
-                        max={240}
-                        className="form-input w-20 px-2 py-1 text-[0.75rem]"
-                        value={mod.estimatedMinutes}
-                        onChange={(e) => setDraftModules((prev) => prev.map((m, i) => (i === idx ? { ...m, estimatedMinutes: Number(e.target.value) } : m)))}
-                        aria-label={`Module ${idx + 1} minutes`}
-                      />
-                      <span className="text-[0.7rem] text-fg-muted">min</span>
-                      <span className="flex-1" />
-                      <button type="button" disabled={idx === 0} onClick={() => moveDraftModule(idx, -1)} className="bg-transparent px-1.5 text-fg-secondary disabled:opacity-30" title="Move up">↑</button>
-                      <button type="button" disabled={idx === draftModules.length - 1} onClick={() => moveDraftModule(idx, 1)} className="bg-transparent px-1.5 text-fg-secondary disabled:opacity-30" title="Move down">↓</button>
-                      <button type="button" onClick={() => setDraftModules((prev) => prev.filter((_, i) => i !== idx))} className="bg-transparent px-1.5 text-danger" title="Remove module">✕</button>
-                    </div>
+                    <span className="text-[0.75rem] text-fg-muted">min</span>
+                    <span className="flex-1" />
+                    <button type="button" disabled={idx === 0} onClick={() => moveDraftModule(idx, -1)} className="h-8 w-8 rounded-md text-fg-secondary hover:bg-fill-2 disabled:opacity-30" aria-label="Move up">↑</button>
+                    <button type="button" disabled={idx === draftModules.length - 1} onClick={() => moveDraftModule(idx, 1)} className="h-8 w-8 rounded-md text-fg-secondary hover:bg-fill-2 disabled:opacity-30" aria-label="Move down">↓</button>
+                    <button type="button" onClick={() => setDraftModules((prev) => prev.filter((_, i) => i !== idx))} className="flex h-8 w-8 items-center justify-center rounded-md text-danger hover:bg-fill-2" aria-label="Remove module">
+                      <Icon name="close" size={14} />
+                    </button>
                   </div>
-                ))}
-                {draftModules.length === 0 && <p className="text-[0.78rem] text-fg-muted">All modules removed — Save to confirm, or Cancel.</p>}
-              </div>
-            ) : curriculum.length > 0 ? (
-              <>
+                </div>
+              ))}
+              {draftModules.length === 0 && <p className="text-[0.82rem] text-fg-muted">All modules removed — Save to confirm, or Cancel.</p>}
+            </div>
+          ) : curriculum.length > 0 ? (
+            <>
               {completedCount === 0 && curriculum.length >= 2 && (
-                <div className="flex flex-col gap-2 rounded-md border border-line bg-fill-1 px-3.5 py-3">
-                  <span className="text-[0.85rem] font-semibold text-fg">Already know some of this?</span>
-                  <span className="text-[0.78rem] text-fg-secondary">A few minutes of questions. Modules you get fully right start as known, so you don’t relearn them.</span>
-                  <button type="button" onClick={() => setPlacementOpen(true)} className="btn btn-secondary self-start px-3 py-1 text-[0.78rem]">
+                <div className="flex flex-col gap-2 rounded-xl bg-sunk px-4 py-3.5">
+                  <span className="text-[0.9rem] font-semibold">Already know some of this?</span>
+                  <span className="text-[0.82rem] text-fg-secondary">A few minutes of questions. Modules you get fully right start as known.</span>
+                  <button type="button" onClick={() => setPlacementOpen(true)} className="btn btn-secondary h-9 self-start px-3 py-0 text-[0.82rem]">
                     Take the placement check
                   </button>
                 </div>
               )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '520px', overflowY: 'auto', paddingRight: '4px' }}>
+              <ol className="m-0 flex max-h-[62vh] list-none flex-col gap-0.5 overflow-y-auto p-0 pr-1">
                 {curriculum.map((mod) => {
-                  const isSelected = mod.id === activeModuleId;
+                  const isSelected = mod.id === activeModule?.id;
+                  const ev = evidence[mod.id];
+                  const state: Knowledge = ev?.state ?? 'unseen';
                   return (
-                    <div
-                      key={mod.id}
-                      onClick={() => setActiveModuleId(mod.id)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '10px',
-                        padding: '10px 12px',
-                        borderRadius: '8px',
-                        background: isSelected ? 'var(--fill-3)' : 'var(--fill-1)',
-                        border: isSelected ? '1px solid var(--color-primary-light)' : '1px solid var(--fill-3)',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-                        <button
-                          type="button"
-                          onClick={(e) => handleToggleModuleCompleted(mod.id, e)}
-                          style={{
-                            width: '20px',
-                            height: '20px',
-                            borderRadius: '50%',
-                            border: mod.completed ? 'none' : '2px solid var(--fill-4)',
-                            background: mod.completed ? 'var(--color-success)' : 'transparent',
-                            color: 'var(--color-text-primary)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.65rem',
-                            cursor: 'pointer',
-                            flexShrink: 0,
-                          }}
-                          title={mod.completed ? 'Mark uncompleted' : 'Mark completed'}
-                        >
-                          {mod.completed && '✓'}
-                        </button>
-
-                        <div style={{ overflow: 'hidden' }}>
-                          <div
-                            style={{
-                              fontSize: '0.84rem',
-                              fontWeight: isSelected ? 700 : 500,
-                              color: mod.completed ? 'var(--color-text-muted)' : isSelected ? 'var(--color-text-primary)' : 'var(--color-text-primary)',
-                              textDecoration: mod.completed ? 'line-through' : 'none',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}
-                          >
-                            {mod.order}. {mod.title}
-                          </div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                            {evidence[mod.id]?.state && (
-                              <KnowledgeMark state={evidence[mod.id].state!} reason={evidence[mod.id].reason} showLabel className="mr-1.5" />
-                            )}
-                            ~{mod.estimatedMinutes} mins
-                            {evidence[mod.id]?.quiz && (
-                              <span className="ml-1.5 text-fg-secondary">· quiz {evidence[mod.id].quiz!.correct}/{evidence[mod.id].quiz!.total}</span>
-                            )}
-                            {evidence[mod.id]?.challenge?.verdict && (
-                              <span className={`ml-1.5 ${evidence[mod.id].challenge!.verdict === 'correct' ? 'text-success' : evidence[mod.id].challenge!.verdict === 'partial' ? 'text-warning' : 'text-danger'}`}>
-                                · challenge {evidence[mod.id].challenge!.verdict}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {isSelected && (
-                        <span style={{ fontSize: '0.7rem', color: 'var(--color-primary-light)', fontWeight: 700 }}>
-                          ▶
+                    <li key={mod.id} className={`flex items-center gap-1 rounded-[10px] ${isSelected ? 'bg-sunk' : 'hover:bg-fill-2'}`}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveModuleId(mod.id)}
+                        aria-current={isSelected ? 'step' : undefined}
+                        title={ev?.reason ? `${KNOWLEDGE_LABEL[state]}: ${ev.reason}` : KNOWLEDGE_LABEL[state]}
+                        className="flex min-h-[44px] min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`h-3 w-3 shrink-0 rounded-[3px] ${state === 'solid' ? 'bg-k-solid' : state === 'learning' ? 'bg-k-learning' : state === 'fading' ? 'bg-k-fading' : 'shadow-[inset_0_0_0_1.5px_var(--k-unseen)]'}`}
+                        />
+                        <span className="flex min-w-0 flex-col">
+                          <span className={`truncate text-[0.9rem] ${isSelected ? 'font-semibold text-fg' : state === 'unseen' ? 'text-fg-muted' : 'text-fg-secondary'}`}>
+                            {mod.title}
+                          </span>
+                          {isSelected && (
+                            <span className="text-[0.75rem] text-fg-muted">
+                              {KNOWLEDGE_LABEL[state]} · {mod.estimatedMinutes} min
+                              {ev?.quiz?.total ? ` · quiz ${ev.quiz.correct}/${ev.quiz.total}` : ''}
+                            </span>
+                          )}
                         </span>
-                      )}
-                    </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleModuleCompleted(mod.id, e)}
+                        aria-pressed={mod.completed}
+                        aria-label={mod.completed ? `Mark “${mod.title}” not finished` : `Mark “${mod.title}” finished`}
+                        className={`mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${mod.completed ? 'border-ink bg-ink text-on-ink' : 'border-line text-transparent hover:border-line-hover hover:text-fg-muted'}`}
+                      >
+                        <Icon name="check" size={14} strokeWidth={2.4} />
+                      </button>
+                    </li>
                   );
                 })}
-              </div>
-              </>
-            ) : (
-              <div style={{ padding: '24px 12px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
-                <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
-                  No curriculum modules yet. Generate a progressive study syllabus with AI:
-                </p>
-                <button
-                  type="button"
-                  onClick={handleGenerateCurriculum}
-                  disabled={generatingModules}
-                  className="btn btn-primary"
-                  style={{ width: '100%', fontSize: '0.82rem', padding: '8px 14px' }}
-                >
-                  {generatingModules ? '✨ Generating Modules...' : '✨ Generate AI Syllabus'}
-                </button>
-              </div>
-            )}
+              </ol>
+            </>
+          ) : (
+            <div className="flex flex-col gap-3 rounded-xl bg-sunk p-4">
+              <p className="m-0 text-[0.9rem] text-fg-secondary">No roadmap yet. Build one — you can trim it after.</p>
+              <button type="button" onClick={handleGenerateCurriculum} disabled={generatingModules} className="btn btn-primary">
+                {generatingModules ? 'Building…' : 'Build a roadmap'}
+              </button>
+            </div>
+          )}
 
-            {/* Quick Add Module Form (hidden while editing, so a staged edit can't drop it) */}
-            {!editingSyllabus && (
-            <form onSubmit={handleAddModule} style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+          {!editingSyllabus && (
+            <form onSubmit={handleAddModule} className="flex gap-2">
+              <label htmlFor="add-module" className="sr-only">Add a module</label>
               <input
+                id="add-module"
                 type="text"
-                className="form-input"
-                placeholder="+ Add custom module..."
+                className="form-input h-10 flex-1 py-0 text-[0.875rem]"
+                placeholder="Add a module"
                 value={newModuleTitle}
                 onChange={(e) => setNewModuleTitle(e.target.value)}
-                style={{ fontSize: '0.8rem', padding: '6px 10px', flex: 1 }}
               />
-              <button type="submit" className="btn btn-secondary" style={{ fontSize: '0.75rem', padding: '6px 10px' }}>
-                Add
-              </button>
+              <button type="submit" className="btn btn-secondary h-10 px-3 py-0 text-[0.85rem]">Add</button>
             </form>
-            )}
+          )}
+        </nav>
 
-          </div>
-        </div>
-
-        {/* ── RIGHT PANE: Active Lesson & Interactive Study Space ────── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
+        <div className="flex min-w-0 flex-col gap-6">
           {activeModule ? (
             <ModuleStudyRoom
               topicId={params.id}
@@ -945,24 +805,16 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
               }}
             />
           ) : (
-            <div className="glass-panel" style={{ padding: '48px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-              <span style={{ fontSize: '3rem' }}>🎯</span>
-              <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>Welcome to {title}</h2>
-              <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', maxWidth: '480px', lineHeight: 1.6 }}>
-                Generate your personalized course syllabus to start interactive Socratic tutoring and taking structured notes.
+            <section className="flex flex-col items-start gap-4 py-10">
+              <h2 className="m-0 font-serif text-[2rem] font-normal">Where do you want to get to?</h2>
+              <p className="m-0 max-w-[520px] text-[1rem] leading-relaxed text-fg-secondary">
+                Build a roadmap for {title}: a short list of modules in the order to learn them. Trim what you don’t need, and skip what you already know with the placement check.
               </p>
-              <button
-                type="button"
-                onClick={handleGenerateCurriculum}
-                disabled={generatingModules}
-                className="btn btn-primary"
-                style={{ padding: '10px 24px', fontSize: '0.92rem' }}
-              >
-                {generatingModules ? '✨ Generating Syllabus...' : '✨ Generate AI Course Modules'}
+              <button type="button" onClick={handleGenerateCurriculum} disabled={generatingModules} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
+                {generatingModules ? 'Building your roadmap…' : 'Build a roadmap'}
               </button>
-            </div>
+            </section>
           )}
-
         </div>
       </div>
 

@@ -4,15 +4,21 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useStudyTimer } from '@/lib/useStudyTimer';
-import { Button, ButtonLink, Card, CardLabel, EmptyState } from '@/components/ui';
+import { Button, ButtonLink } from '@/components/ui';
 import ResurfacedNote from '@/components/ResurfacedNote';
 
 const SPRINT_GRADES = [
-  { grade: 'Again', key: '1', label: '❌ Again', hint: 'Forgot it', cls: 'border-danger bg-[var(--danger-tint)] text-danger' },
-  { grade: 'Hard', key: '2', label: '😓 Hard', hint: 'Got it, with effort', cls: 'border-warning bg-[var(--warning-tint)] text-warning' },
-  { grade: 'Good', key: '3', label: '✅ Good', hint: 'Recalled fine', cls: 'border-success bg-[var(--success-tint)] text-success' },
-  { grade: 'Easy', key: '4', label: '⚡ Easy', hint: 'Instant', cls: 'border-primary bg-[var(--fill-2)] text-primary-light' },
+  { grade: 'Again', key: '1', label: 'Forgot', hint: 'comes back soon' },
+  { grade: 'Hard', key: '2', label: 'Hard', hint: 'sooner than usual' },
+  { grade: 'Good', key: '3', label: 'Got it', hint: 'on schedule' },
+  { grade: 'Easy', key: '4', label: 'Easy', hint: 'later than usual' },
 ] as const;
+
+const daysAgo = (iso: string | null | undefined) => {
+  if (!iso) return null;
+  const d = Math.round((Date.now() - new Date(iso).getTime()) / 86400000);
+  return d <= 0 ? 'today' : d === 1 ? '1 day ago' : `${d} days ago`;
+};
 
 interface Topic {
   id: string;
@@ -41,6 +47,8 @@ interface DueConcept {
   moduleTitle?: string | null;
   /** Your own notes on the module this card came from, as plain text. */
   moduleNote?: string | null;
+  /** Set once you've recalled it before — a due card like this is slipping. */
+  lastRecalledAt?: string | null;
 }
 
 interface ReviewDecision {
@@ -60,6 +68,9 @@ export default function ReviewPage() {
   const [dueConcepts, setDueConcepts] = useState<DueConcept[]>([]);
   const [currentConceptIdx, setCurrentConceptIdx] = useState(0);
   const [revealedAnswer, setRevealedAnswer] = useState(false);
+  // One natural stopping point: once the slipping cards are done.
+  const [pauseAfterSlipping, setPauseAfterSlipping] = useState(false);
+  const [slippingDismissed, setSlippingDismissed] = useState(false);
 
   // Focus mode tab: 'spaced_sprint' | 'weekly_audit' | 'pomodoro'
   const [activeTab, setActiveTab] = useState<'spaced_sprint' | 'weekly_audit' | 'pomodoro'>('spaced_sprint');
@@ -100,7 +111,11 @@ export default function ReviewPage() {
 
       if (spacedRes.ok) {
         const spacedData = await spacedRes.json();
-        setDueConcepts(spacedData.dueConcepts || []);
+        const list: DueConcept[] = spacedData.dueConcepts || [];
+        // Slipping cards (recalled before, now overdue) first: they're the
+        // ones you'd otherwise lose. The API's most-overdue order is kept
+        // within each group.
+        setDueConcepts([...list.filter((c) => c.lastRecalledAt), ...list.filter((c) => !c.lastRecalledAt)]);
       }
     } catch (e) {
       console.error(e);
@@ -131,7 +146,9 @@ export default function ReviewPage() {
       });
 
       setRevealedAnswer(false);
+      const slippingCount = dueConcepts.filter((c) => c.lastRecalledAt).length;
       if (currentConceptIdx + 1 < dueConcepts.length) {
+        if (!slippingDismissed && slippingCount > 0 && currentConceptIdx + 1 === slippingCount) setPauseAfterSlipping(true);
         setCurrentConceptIdx(prev => prev + 1);
       } else {
         await fetchData();
@@ -145,7 +162,7 @@ export default function ReviewPage() {
   // Keyboard: Space reveals, 1-4 grades — only on the sprint tab, and never
   // while typing in a field.
   useEffect(() => {
-    if (activeTab !== 'spaced_sprint' || dueConcepts.length === 0) return;
+    if (activeTab !== 'spaced_sprint' || dueConcepts.length === 0 || pauseAfterSlipping) return;
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
@@ -163,7 +180,7 @@ export default function ReviewPage() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, revealedAnswer, dueConcepts.length, currentConceptIdx]);
+  }, [activeTab, revealedAnswer, dueConcepts.length, currentConceptIdx, pauseAfterSlipping]);
 
   const startReview = () => {
     if (activePaused.length === 0) {
@@ -232,8 +249,9 @@ export default function ReviewPage() {
 
   const submitPromotion = () => {
     if (!promotingTopic) return;
+    setReviewError(null);
     if (!why.trim() || !nextAction.trim()) {
-      alert('Why and Next Action are required to activate this topic.');
+      setReviewError('Add why it matters now and a next step first.');
       return;
     }
 
@@ -301,162 +319,194 @@ export default function ReviewPage() {
       setStep('completed');
     } catch (e) {
       console.error(e);
-      alert('An error occurred during submission.');
+      setReviewError('Couldn’t save the check-in. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
   if (loading) {
-    return <div className="flex-center" style={{ minHeight: '60vh' }}>Processing Workspace...</div>;
+    return (
+      <div className="mx-auto flex max-w-[760px] flex-col gap-6">
+        {[60, 44, 320].map((h) => <div key={h} className="skeleton rounded-md" style={{ height: h }} />)}
+      </div>
+    );
   }
 
+  const card = dueConcepts[currentConceptIdx];
+  const slippingTotal = dueConcepts.filter((c) => c.lastRecalledAt).length;
+  const remainingAfterSlipping = dueConcepts.length - slippingTotal;
+  const TABS: Array<{ key: typeof activeTab; label: string }> = [
+    { key: 'spaced_sprint', label: `Cards${dueConcepts.length ? ` · ${dueConcepts.length}` : ''}` },
+    { key: 'weekly_audit', label: 'Weekly check-in' },
+    { key: 'pomodoro', label: `Focus timer${isActive ? ` · ${formattedTime}` : ''}` },
+  ];
+
   return (
-    <div style={{ maxWidth: '720px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      
-      {/* HEADER & NAVIGATION TABS */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
-        <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Daily Focus & Review Workspace</h1>
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-            Execute active recall sprints, monitor focus commitments, and manage study timers.
-          </p>
+    <div className="mx-auto flex max-w-[760px] flex-col gap-8">
+      <header className="flex flex-col gap-5">
+        <div className="flex flex-col gap-2">
+          <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Review</h1>
+          <p className="m-0 text-[1.05rem] text-fg-secondary">Recall what you’ve learned just before it slips. That’s what makes it stay.</p>
         </div>
-
-        <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
-          <button
-            onClick={() => setActiveTab('spaced_sprint')}
-            className={`btn ${activeTab === 'spaced_sprint' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ fontSize: '0.8rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            ⚡ Spaced Recall Sprint ({dueConcepts.length})
-          </button>
-
-          <button
-            onClick={() => setActiveTab('weekly_audit')}
-            className={`btn ${activeTab === 'weekly_audit' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ fontSize: '0.8rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            🔄 Weekly Focus Audit
-          </button>
-
-          <button
-            onClick={() => setActiveTab('pomodoro')}
-            className={`btn ${activeTab === 'pomodoro' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ fontSize: '0.8rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            ⏱️ Pomodoro Sprint ({formattedTime})
-          </button>
+        <div role="tablist" aria-label="Review" className="flex self-start rounded-xl bg-sunk p-1">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              role="tab"
+              aria-selected={activeTab === t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`h-10 rounded-[9px] px-4 text-[0.9rem] ${activeTab === t.key ? 'bg-surface font-semibold text-fg shadow-card' : 'font-medium text-fg-secondary hover:text-fg'}`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
-      </div>
+      </header>
 
-      {/* TAB 1: SPACED RECALL SPRINT */}
       {activeTab === 'spaced_sprint' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {dueConcepts.length === 0 ? (
-            <EmptyState icon="🎉" title="No concepts due" action={<ButtonLink href="/">← Back to Today</ButtonLink>}>
-              Nothing in your spaced-repetition queue right now. Concepts come back here when FSRS says you&apos;re about to forget them.
-            </EmptyState>
+        <div className="flex flex-col gap-8">
+          {!card ? (
+            <section className="flex flex-col gap-3 py-8">
+              <h2 className="m-0 font-serif text-[2rem] font-normal">Nothing to review right now.</h2>
+              <p className="m-0 max-w-[520px] text-[1rem] text-fg-secondary">
+                Cards come back here just before you’d forget them. Finish a module or check a quiz and new ones appear.
+              </p>
+              <ButtonLink href="/" className="mt-2 self-start">Back to Today</ButtonLink>
+            </section>
+          ) : pauseAfterSlipping ? (
+            <section className="flex flex-col gap-4 py-8">
+              <h2 className="m-0 font-serif text-[2.2rem] font-normal leading-tight">
+                The {slippingTotal} slipping card{slippingTotal === 1 ? ' is' : 's are'} safe again.
+              </h2>
+              <p className="m-0 max-w-[560px] text-[1.05rem] text-fg-secondary">
+                {remainingAfterSlipping} more {remainingAfterSlipping === 1 ? 'is' : 'are'} due, about {Math.max(1, Math.ceil(remainingAfterSlipping * 0.7))} min. You can also stop here — nothing else is slipping today.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Button variant="primary" size="lg" onClick={() => { setPauseAfterSlipping(false); setSlippingDismissed(true); }}>
+                  Do the other {remainingAfterSlipping}
+                </Button>
+                <ButtonLink href="/" size="lg">Back to Today</ButtonLink>
+              </div>
+            </section>
           ) : (
-            <Card className="flex flex-col gap-5 p-7">
-              <div className="flex-between">
-                <span className="badge badge-tech text-[0.72rem]">{dueConcepts[currentConceptIdx].topicTitle}</span>
-                <span className="text-[0.75rem] text-fg-muted">Card {currentConceptIdx + 1} of {dueConcepts.length}</span>
+            <article className="flex flex-col gap-7">
+              <div
+                className="flex gap-1.5"
+                role="img"
+                aria-label={`Card ${currentConceptIdx + 1} of ${dueConcepts.length}${slippingTotal ? `; the first ${slippingTotal} are slipping` : ''}`}
+              >
+                {dueConcepts.slice(0, 40).map((c, i) => (
+                  <span
+                    key={c.conceptId}
+                    className={`block h-1.5 flex-1 rounded-full ${
+                      i < currentConceptIdx ? 'bg-ink' : i === currentConceptIdx ? 'shadow-[inset_0_0_0_2px_var(--ink)]' : c.lastRecalledAt ? 'bg-k-fading' : 'bg-sunk'
+                    }`}
+                  />
+                ))}
               </div>
 
-              <div className="rounded-md border border-line bg-sunk px-3 py-6 text-center">
-                <CardLabel>Recall from memory first</CardLabel>
-                <h2 className="mx-auto mt-2 max-w-[560px] text-xl font-bold text-fg">
-                  {dueConcepts[currentConceptIdx].prompt
-                    ? dueConcepts[currentConceptIdx].prompt
-                    : <>Can you explain or define: &quot;{dueConcepts[currentConceptIdx].conceptTitle}&quot;?</>}
-                </h2>
-                {revealedAnswer && (
-                  <div className="mt-4 border-t border-dashed border-line pt-4 text-[0.88rem]">
-                    {dueConcepts[currentConceptIdx].answer ? (
-                      <div className="mx-auto max-w-[560px] whitespace-pre-wrap text-left leading-relaxed text-fg">
-                        <span className="mb-1 block text-[0.7rem] font-bold uppercase tracking-wide text-success">Answer</span>
-                        {dueConcepts[currentConceptIdx].answer}
-                      </div>
-                    ) : (
-                      <span className="text-fg-muted">
-                        No stored answer for this card — check yourself against your notes, then grade honestly.
-                      </span>
-                    )}
-                    {dueConcepts[currentConceptIdx].moduleNote && (
-                      <div className="mx-auto mt-4 max-w-[560px] whitespace-pre-wrap rounded-md bg-fill-2 px-4 py-3 text-left text-[0.85rem] leading-relaxed text-fg-secondary">
-                        <span className="mb-1 block text-[0.7rem] font-bold uppercase tracking-wide text-fg-muted">
-                          Your notes{dueConcepts[currentConceptIdx].moduleTitle ? ` on ${dueConcepts[currentConceptIdx].moduleTitle}` : ''}
-                        </span>
-                        {dueConcepts[currentConceptIdx].moduleNote}
-                      </div>
-                    )}
-                    <div className="mt-3 text-[0.75rem] text-fg-muted">
-                      {dueConcepts[currentConceptIdx].conceptTitle} · level {dueConcepts[currentConceptIdx].conceptStatus}
-                    </div>
-                  </div>
-                )}
+              <div className="flex flex-wrap items-center gap-2.5 text-[0.9rem] text-fg-secondary">
+                <span className={`h-2.5 w-2.5 rounded-[3px] ${card.lastRecalledAt ? 'bg-k-fading' : 'bg-k-learning'}`} aria-hidden="true" />
+                <span>
+                  <strong className="text-fg">{card.topicTitle}</strong>
+                  {card.moduleTitle ? ` · ${card.moduleTitle}` : ''}
+                  {' · '}
+                  {card.lastRecalledAt ? `slipping — last recalled ${daysAgo(card.lastRecalledAt)}` : 'first review'}
+                </span>
+                <span className="ml-auto text-fg-muted">{currentConceptIdx + 1} of {dueConcepts.length}</span>
               </div>
+
+              <h2 className="m-0 font-serif text-[2.1rem] font-medium leading-[1.2] tracking-[-0.01em]">
+                {card.prompt ? card.prompt : <>Explain “{card.conceptTitle}” in your own words.</>}
+              </h2>
 
               {!revealedAnswer ? (
-                <Button variant="primary" className="self-center px-6" onClick={() => setRevealedAnswer(true)}>
-                  👁️ I&apos;ve tried — reveal &amp; grade <kbd className="ml-1 rounded bg-fill-4 px-1 text-[0.7rem]">Space</kbd>
-                </Button>
+                <div className="flex flex-col gap-3.5">
+                  <label htmlFor="recall-attempt" className="text-[0.95rem] font-semibold text-fg-secondary">
+                    Answer from memory first — out loud or typed
+                  </label>
+                  <textarea
+                    id="recall-attempt"
+                    key={card.conceptId}
+                    rows={4}
+                    placeholder="Optional. Writing it down makes the check more honest."
+                    className="form-input resize-y text-[1.05rem] leading-relaxed"
+                  />
+                  <div className="flex items-center gap-3.5">
+                    <Button variant="primary" size="lg" onClick={() => setRevealedAnswer(true)}>Show answer</Button>
+                    <span className="text-[0.875rem] text-fg-muted">
+                      or press <kbd className="rounded bg-sunk px-1.5 py-0.5 text-[0.75rem] text-fg-secondary">Space</kbd>
+                    </span>
+                  </div>
+                </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {SPRINT_GRADES.map((g) => (
-                    <button
-                      key={g.grade}
-                      onClick={() => handleLogSpacedReview(g.grade)}
-                      className={`btn flex-col gap-0.5 border py-3 ${g.cls}`}
-                    >
-                      <span className="text-[0.9rem] font-semibold">{g.label} <kbd className="ml-1 rounded bg-fill-3 px-1 text-[0.68rem]">{g.key}</kbd></span>
-                      <span className="text-[0.68rem] opacity-80">{g.hint}</span>
-                    </button>
-                  ))}
+                <div className="flex flex-col gap-6">
+                  <div className="flex flex-col gap-2.5 border-t border-line pt-6">
+                    <span className="text-[0.875rem] font-semibold text-k-solid">Answer</span>
+                    {card.answer ? (
+                      <p className="m-0 whitespace-pre-wrap font-serif text-[1.3rem] leading-relaxed">{card.answer}</p>
+                    ) : (
+                      <p className="m-0 text-[1rem] text-fg-secondary">
+                        This card has no stored answer. Check yourself against your notes, then grade honestly.
+                      </p>
+                    )}
+                  </div>
+                  {card.moduleNote && (
+                    <div className="flex flex-col gap-1.5 rounded-xl bg-sunk px-5 py-4">
+                      <span className="text-[0.8rem] font-semibold text-fg-muted">
+                        Your notes{card.moduleTitle ? ` on ${card.moduleTitle}` : ''}
+                      </span>
+                      <p className="m-0 whitespace-pre-wrap font-serif text-[1.05rem] italic leading-relaxed text-fg-secondary">{card.moduleNote}</p>
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-3">
+                    <span className="text-[0.95rem] font-semibold">How well did you remember it?</span>
+                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                      {SPRINT_GRADES.map((g) => (
+                        <button
+                          key={g.grade}
+                          onClick={() => handleLogSpacedReview(g.grade)}
+                          className={`flex min-h-[76px] flex-col items-start gap-1 rounded-xl border bg-surface px-4 py-3 text-left hover:border-line-hover ${g.grade === 'Good' ? 'border-ink' : 'border-line'}`}
+                        >
+                          <span className="flex items-center gap-2 text-[1rem] font-semibold text-fg">
+                            <kbd className="rounded bg-sunk px-1.5 text-[0.7rem] text-fg-secondary">{g.key}</kbd>
+                            {g.label}
+                          </span>
+                          <span className="text-[0.8rem] text-fg-muted">{g.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
-            </Card>
+            </article>
           )}
 
           <ResurfacedNote />
         </div>
       )}
 
-      {/* TAB 3: POMODORO TIMER WORKSPACE */}
       {activeTab === 'pomodoro' && (
-        <div className="glass-panel" style={{ padding: '36px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-primary-light)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            {mode === 'study' ? '🧠 Deep Study Sprint' : mode === 'shortBreak' ? '☕ Short Break' : '🌴 Long Break'}
+        <section className="flex flex-col items-center gap-6 py-10 text-center">
+          <span className="text-[0.95rem] font-semibold text-fg-secondary">
+            {mode === 'study' ? 'Focus block' : mode === 'shortBreak' ? 'Short break' : 'Long break'}
           </span>
-          <div style={{ fontSize: '4.5rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '2px', color: 'var(--color-text-primary)' }}>
-            {formattedTime}
-          </div>
-
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div className="font-mono text-[5rem] font-medium leading-none tracking-tight tabular-nums">{formattedTime}</div>
+          <div className="flex flex-wrap justify-center gap-2.5">
             {!isActive ? (
-              <button onClick={startTimer} className="btn btn-primary" style={{ padding: '10px 24px', fontSize: '0.9rem' }}>
-                ▶ Start Focus Timer
-              </button>
+              <Button variant="primary" size="lg" onClick={startTimer}>Start</Button>
             ) : (
-              <button onClick={pauseTimer} className="btn btn-secondary" style={{ padding: '10px 24px', fontSize: '0.9rem' }}>
-                ⏸ Pause
-              </button>
+              <Button size="lg" onClick={pauseTimer}>Pause</Button>
             )}
-            <button onClick={() => resetTimer('study')} className="btn btn-secondary" style={{ padding: '10px 16px', fontSize: '0.85rem' }}>
-              ↺ Reset 25m
-            </button>
-            <button onClick={() => resetTimer('shortBreak')} className="btn btn-secondary" style={{ padding: '10px 16px', fontSize: '0.85rem' }}>
-              ☕ 5m Break
-            </button>
+            <Button size="lg" onClick={() => resetTimer('study')}>Reset to 25 min</Button>
+            <Button size="lg" variant="ghost" onClick={() => resetTimer('shortBreak')}>5-minute break</Button>
           </div>
-
-          {isCompleted && (
-            <div style={{ padding: '12px 18px', background: 'var(--success-tint)', border: '1px solid var(--color-success)', borderRadius: 'var(--radius-sm)', color: 'var(--color-success)', fontSize: '0.85rem' }}>
-              🎉 Pomodoro sprint complete! Great focus effort.
-            </div>
-          )}
-        </div>
+          {isCompleted && <p className="m-0 text-[1rem] text-fg-secondary">Block done. Take the break — it helps it settle.</p>}
+          <p className="m-0 max-w-[460px] text-[0.875rem] text-fg-muted">
+            Studying inside a topic counts your time on its own. Use this for work away from the app.
+          </p>
+        </section>
       )}
 
       {/* TAB 2: WEEKLY FOCUS AUDIT */}
@@ -469,28 +519,27 @@ export default function ReviewPage() {
           {/* Stats strip */}
           <div className="stat-strip">
             <span className="stat-chip" style={{ background: 'var(--fill-2)', borderColor: 'var(--fill-4)', color: 'var(--color-text-secondary)' }}>
-              ⚡ {activePaused.filter(t => t.status === 'active').length} Active
+              {activePaused.filter(t => t.status === 'active').length} in Now
             </span>
             <span className="stat-chip" style={{ background: 'var(--warning-tint)', borderColor: 'var(--warning-line)', color: 'var(--color-warning)' }}>
-              ⏸️ {activePaused.filter(t => t.status === 'paused').length} Paused
+              {activePaused.filter(t => t.status === 'paused').length} resting
             </span>
             <span className="stat-chip" style={{ background: 'var(--fill-2)', borderColor: 'var(--fill-4)', color: 'var(--color-text-primary)' }}>
-              📋 {queuedTopics.length} Queued
+              {queuedTopics.length} in Next
             </span>
           </div>
 
           <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'center' }}>
-            <div style={{ fontSize: '3rem' }}>🔄</div>
             <div>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '8px' }}>Auditing {activePaused.length} Focus Cards</h2>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '8px' }}>Check in on {activePaused.length} topic{activePaused.length === 1 ? '' : 's'}</h2>
               <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>
-                Review each active and paused topic, update next actions, and decide whether to continue, pause, or close them out.
+                Five minutes a week: for each topic, keep going, rest it, or let it go — and set its next step.
               </p>
             </div>
 
             {activePaused.length === 0 ? (
               <div style={{ padding: '20px', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--color-text-muted)', fontSize: '0.88rem' }}>
-                ✨ Nothing to review — your focus is clean!
+                Nothing in Now or resting. You can still move topics up from Next.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' }}>
@@ -506,7 +555,7 @@ export default function ReviewPage() {
                       fontWeight: 600,
                       color: t.status === 'active' ? 'var(--color-primary-light)' : 'var(--color-warning)',
                     }}>
-                      {t.status.toUpperCase()}
+                      {t.status === 'active' ? 'Now' : 'resting'}
                     </span>
                   </div>
                 ))}
@@ -514,7 +563,7 @@ export default function ReviewPage() {
             )}
 
             <button onClick={startReview} className="btn btn-primary" style={{ alignSelf: 'center', marginTop: '4px' }}>
-              🚀 Start Focus Review
+              Start the check-in
             </button>
           </div>
         </div>
@@ -550,7 +599,7 @@ export default function ReviewPage() {
 
           <div style={{ borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', padding: '20px 0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Next concrete action (verb-first)</label>
+              <label className="form-label">Next step (start with a verb)</label>
               <input
                 type="text"
                 className="form-input"
@@ -575,7 +624,7 @@ export default function ReviewPage() {
                     color: currentDecision === 'continue' ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                   }}
                 >
-                  ⚡ Continue Active
+                  Keep going
                 </button>
 
                 <button
@@ -589,7 +638,7 @@ export default function ReviewPage() {
                     color: currentDecision === 'pause' ? 'var(--color-warning)' : 'var(--color-text-secondary)',
                   }}
                 >
-                  ⏸️ Pause topic
+                  Rest it
                 </button>
 
                 <button
@@ -603,7 +652,7 @@ export default function ReviewPage() {
                     color: currentDecision === 'maintenance' ? 'var(--color-success)' : 'var(--color-text-secondary)',
                   }}
                 >
-                  ✅ Complete / Maintain
+                  Done — just keep it fresh
                 </button>
 
                 <button
@@ -617,7 +666,7 @@ export default function ReviewPage() {
                     color: currentDecision === 'drop' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
                   }}
                 >
-                  🗑️ Drop learning
+                  Let it go
                 </button>
               </div>
             </div>
@@ -628,7 +677,7 @@ export default function ReviewPage() {
           )}
 
           <button onClick={handleNextTopic} className="btn btn-primary" style={{ alignSelf: 'flex-end' }}>
-            {currentIdx + 1 < activePaused.length ? 'Next Topic →' : 'Review Queue Promotion →'}
+            {currentIdx + 1 < activePaused.length ? 'Next topic' : 'Choose what moves up'}
           </button>
         </div>
       )}
@@ -637,7 +686,7 @@ export default function ReviewPage() {
       {step === 'promote' && (
         <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '6px' }}>🚀 Promote Queued Topics</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '6px' }}>Move something up from Next</h2>
             <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
               You have <strong>{activeSlotsRemaining} / 2</strong> active slots available. Decide if you would like to promote any of your queued learning topics.
             </p>
@@ -668,7 +717,7 @@ export default function ReviewPage() {
 
           {activeSlotsRemaining === 0 && (
             <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', background: 'var(--fill-1)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--fill-3)' }}>
-              🔒 <strong>Active Slots Occupied</strong>. You cannot promote any more topics to active because your 2 slots are full.
+              Both Now slots are taken. Finish or rest a topic to make room.
             </p>
           )}
 
@@ -724,22 +773,24 @@ export default function ReviewPage() {
                   <input type="text" className="form-input" value={nextAction} onChange={e => setNextAction(e.target.value)} required />
                 </div>
 
+                {reviewError && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: '0.85rem' }}>{reviewError}</p>}
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
-                  <button type="button" onClick={() => setPromotingTopic(null)} className="btn btn-secondary">Cancel</button>
+                  <button type="button" onClick={() => { setPromotingTopic(null); setReviewError(null); }} className="btn btn-secondary">Cancel</button>
                   <button type="button" onClick={submitPromotion} className="btn btn-primary">Activate Topic</button>
                 </div>
               </div>
             </div>
           )}
 
+          {reviewError && !promotingTopic && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: '0.85rem' }}>{reviewError}</p>}
           <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '20px', marginTop: '12px' }}>
             {activePaused.length > 0 && (
               <button onClick={() => setStep('reviewing')} className="btn btn-secondary">
-                ← Go Back
+                Back
               </button>
             )}
             <button onClick={finishReview} className="btn btn-primary" style={{ marginLeft: 'auto' }}>
-              Finalize Focus Audit & Log Review
+              Finish the check-in
             </button>
           </div>
         </div>
@@ -748,24 +799,23 @@ export default function ReviewPage() {
       {/* STEP: Completed */}
       {step === 'completed' && (
         <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem', color: 'var(--color-success)' }}>✅</div>
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '8px' }}>Weekly Audit Completed</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '8px' }}>Check-in done</h2>
             <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
-              Your focus and pipeline allocations have been recorded. Active counts and milestones are up to date.
+              Your topics are updated. See you next week.
             </p>
             <div style={{ background: 'var(--bg-sunk)', padding: '16px', borderRadius: 'var(--radius-sm)', textAlign: 'left', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <p style={{ fontWeight: 600, borderBottom: '1px solid var(--fill-2)', paddingBottom: '4px' }}>Summary of audit decisions:</p>
+              <p style={{ fontWeight: 600, borderBottom: '1px solid var(--fill-2)', paddingBottom: '4px' }}>What you decided</p>
               {decisions.map(d => (
                 <div key={d.topicId} className="flex-between">
                   <span>{d.title}</span>
-                  <span className={`status-${d.decision}`} style={{ fontWeight: 500 }}>{d.decision.toUpperCase()}</span>
+                  <span className={`status-${d.decision}`} style={{ fontWeight: 500 }}>{d.decision}</span>
                 </div>
               ))}
               {promotedDecisions.map(p => (
                 <div key={p.topicId} className="flex-between">
                   <span>{topics.find(t => t.id === p.topicId)?.title}</span>
-                  <span style={{ color: 'var(--color-primary-light)', fontWeight: 500 }}>PROMOTED ACTIVE</span>
+                  <span style={{ color: 'var(--color-primary-light)', fontWeight: 500 }}>moved to Now</span>
                 </div>
               ))}
             </div>

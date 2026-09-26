@@ -352,7 +352,7 @@ export default function ExplorePage() {
               />
             ) : (
               <div
-                className="form-input"
+                className="form-input md-content"
                 style={{
                   width: '100%',
                   minHeight: '250px',

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button, Card, CardLabel, StatPill } from '@/components/ui';
+import { Button } from '@/components/ui';
 
 interface ResurfacedNoteData {
   id: string;
@@ -50,22 +50,17 @@ export default function ResurfacedNote() {
   const text = excerpt(note.body);
 
   return (
-    <Card accent="success" className="flex flex-col gap-2">
-      <div className="flex-between gap-2">
-        <CardLabel>▸ Resurfaced note</CardLabel>
-        <span className="text-[0.7rem] text-fg-muted">written {ageDays} day{ageDays === 1 ? '' : 's'} ago</span>
-      </div>
-      <Link href={`/notes/${note.id}`} className="text-base font-bold text-fg">{note.title}</Link>
-      {text && <p className="text-[0.84rem] leading-relaxed text-fg-secondary">{text}</p>}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {note.topic && <StatPill label={note.topic.title} tone="primary" />}
-        {note.tags.map((t) => <StatPill key={t} label={`#${t}`} />)}
-      </div>
-      <p className="text-[0.75rem] text-fg-muted">Still true? Still how you&apos;d say it? Reading it again is the point.</p>
+    <section aria-labelledby="resurface-h" className="flex flex-col gap-3 border-t border-line pt-5">
+      <h2 id="resurface-h" className="m-0 text-[0.875rem] font-semibold text-fg-muted">
+        From your notebook, {ageDays} day{ageDays === 1 ? '' : 's'} ago{note.topic ? ` · ${note.topic.title}` : ''}
+      </h2>
+      <Link href={`/notes/${note.id}`} className="text-[1rem] font-semibold text-fg">{note.title}</Link>
+      {text && <p className="m-0 font-serif text-[1.15rem] italic leading-relaxed text-fg-secondary">“{text}”</p>}
+      <p className="m-0 text-[0.85rem] text-fg-muted">Still true? Still how you’d put it?</p>
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" disabled={busy} onClick={async () => { await markSeen(); setNote(null); }}>Still holds ✓</Button>
-        <Button size="sm" variant="primary" disabled={busy} onClick={async () => { await markSeen(); router.push(`/notes/${note.id}`); }}>Revise it ▸</Button>
+        <Button size="sm" disabled={busy} onClick={async () => { await markSeen(); setNote(null); }}>Still holds</Button>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={async () => { await markSeen(); router.push(`/notes/${note.id}`); }}>Revise it</Button>
       </div>
-    </Card>
+    </section>
   );
 }

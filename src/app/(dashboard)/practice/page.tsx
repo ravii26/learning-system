@@ -296,7 +296,7 @@ export default function PracticePage() {
 
           {/* Today's prompt + rep-logging form */}
           <Card accent="primary">
-            <CardLabel tone="primary">▸ Today&apos;s rep</CardLabel>
+            <CardLabel tone="primary">Today&apos;s rep</CardLabel>
             <div className="mt-2.5 text-[0.95rem] font-semibold">{prompt?.promptText}</div>
             {prompt?.conceptTitle && (
               <div className="mt-1 text-[0.72rem] text-fg-muted">pulled from a concept currently in review: {prompt.conceptTitle}</div>

@@ -32,10 +32,10 @@ export function Card({
   );
 }
 
-/** Small uppercase heading used at the top of cards ("▸ DUE REVIEWS"). */
+/** Small sentence-case heading at the top of a card ("Due for review"). */
 export function CardLabel({ children, tone = 'secondary', className }: { children: React.ReactNode; tone?: 'primary' | 'secondary'; className?: string }) {
   return (
-    <span className={cn('text-[0.7rem] font-bold uppercase tracking-wider', tone === 'primary' ? 'text-primary-light' : 'text-fg-secondary', className)}>
+    <span className={cn('text-[0.875rem] font-semibold', tone === 'primary' ? 'text-fg' : 'text-fg-secondary', className)}>
       {children}
     </span>
   );

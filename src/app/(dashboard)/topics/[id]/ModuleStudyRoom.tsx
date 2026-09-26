@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { CourseModule, ModuleEvidence } from './page';
 import { renderMarkdown } from '@/lib/markdown';
 import RichTextEditor from './RichTextEditor';
-import { KnowledgeMark } from '@/components/ui';
+import { Icon, KnowledgeMark } from '@/components/ui';
 import ProblemLog from './ProblemLog';
 
 interface ModuleStudyRoomProps {
@@ -197,736 +197,415 @@ export default function ModuleStudyRoom({
     setSavedBookmarkTitles((prev) => ({ ...prev, [res.title]: true }));
   };
 
+  const quiz: any[] = Array.isArray(lesson?.quiz) ? lesson.quiz : [];
+  const sources: any[] = Array.isArray(lesson?.recommendedResources) ? lesson.recommendedResources : [];
+  const listOf = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '') : []);
+  const objectives = listOf(lesson?.learningObjectives);
+  const useWhen = listOf(lesson?.whenToUse);
+  const avoidWhen = listOf(lesson?.whenNotToUse);
+  const pitfalls = listOf(lesson?.commonMistakes);
+  const checkTab: 'quiz' | 'challenge' = quiz.length ? 'quiz' : 'challenge';
+
+  const STEPS: Array<{ key: typeof activeTab; label: string }> = [
+    { key: 'guide', label: 'Read' },
+    ...(quiz.length ? [{ key: 'quiz' as const, label: 'Check' }] : []),
+    { key: 'challenge', label: 'Explain it back' },
+    { key: 'media', label: 'Go deeper' },
+  ];
+
+  const sourceHref = (r: any) =>
+    r?.url && /^https?:\/\//i.test(r.url)
+      ? r.url
+      : r?.type === 'video'
+        ? `https://www.youtube.com/results?search_query=${encodeURIComponent(r?.searchQuery || `${topicTitle} ${module.title}`)}`
+        : `https://www.google.com/search?q=${encodeURIComponent(r?.searchQuery || `${topicTitle} ${module.title} ${r?.type || ''}`)}`;
+  const sourceKind = (t: string | undefined) =>
+    t === 'video' ? 'Video' : t === 'book' ? 'Book' : t === 'course' ? 'Course' : t === 'paper' ? 'Paper' : t === 'docs' ? 'Docs' : 'Article';
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      
-      {/* ── MODULE HEADER STRIP ───────────────────────────────────────── */}
-      <div
-        className="glass-panel"
-        style={{
-          padding: '18px 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '16px',
-          borderLeft: '4px solid var(--color-primary)',
-        }}
-      >
-        <div>
-          <span style={{ fontSize: '0.72rem', color: 'var(--color-primary-light)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Current Module • {module.estimatedMinutes} Mins Study Session
-          </span>
-          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--color-text-primary)', marginTop: '2px', letterSpacing: '-0.01em' }}>
-            {module.order}. {module.title}
-          </h2>
-          {evidence && (evidence.state || evidence.quiz || evidence.challenge || evidence.reviewCards > 0) && (
-            <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[0.74rem] text-fg-secondary">
-              {evidence.state && (
-                <span className="inline-flex items-center gap-1.5">
-                  <KnowledgeMark state={evidence.state} showLabel />
-                  {evidence.reason && <span>— {evidence.reason}</span>}
-                </span>
-              )}
-              {evidence.quiz?.total ? (
-                <span>Last quiz <strong className="text-fg">{evidence.quiz.correct}/{evidence.quiz.total}</strong></span>
-              ) : null}
-              {isVerdict(evidence.challenge?.verdict) && (
-                <span>
-                  Challenge{' '}
-                  <strong style={{ color: VERDICT_STYLE[evidence.challenge!.verdict as Verdict].color }}>
-                    {VERDICT_STYLE[evidence.challenge!.verdict as Verdict].label}
-                  </strong>
-                </span>
-              )}
-              {evidence.reviewCards > 0 && (
-                <span>{evidence.reviewCards} card{evidence.reviewCards === 1 ? '' : 's'} in Daily Review</span>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            type="button"
-            onClick={() => loadLesson(true)}
-            disabled={loadingLesson || generating}
-            className="btn btn-secondary"
-            style={{ fontSize: '0.78rem', padding: '6px 12px' }}
-            title="Regenerate lesson with fresh examples"
-          >
-            {generating ? '⏳ Refreshing...' : '🔄 Refresh Guide'}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onToggleCompleted(module.id)}
-            className={module.completed ? 'btn btn-secondary' : 'btn btn-primary'}
-            style={{
-              fontSize: '0.82rem',
-              padding: '8px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: module.completed ? 'var(--success-tint)' : undefined,
-              color: module.completed ? 'var(--color-success)' : undefined,
-              border: module.completed ? '1px solid var(--color-success)' : undefined,
-            }}
-          >
-            {module.completed ? '✓ Module Completed' : 'Mark Module Complete'}
-          </button>
-        </div>
-      </div>
-
-      {/* ── 4 PILLARS NAVIGATION TABS ─────────────────────────────────── */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--fill-3)', paddingBottom: '4px' }}>
-        <button
-          type="button"
-          onClick={() => setActiveTab('guide')}
-          style={{
-            padding: '10px 18px',
-            fontSize: '0.86rem',
-            fontWeight: activeTab === 'guide' ? 700 : 500,
-            color: activeTab === 'guide' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-            borderBottom: activeTab === 'guide' ? '3px solid var(--color-primary)' : '3px solid transparent',
-            background: 'transparent',
-            borderTop: 'none',
-            borderLeft: 'none',
-            borderRight: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <span>📖</span>
-          <span>In-Depth Guide</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('media')}
-          style={{
-            padding: '10px 18px',
-            fontSize: '0.86rem',
-            fontWeight: activeTab === 'media' ? 700 : 500,
-            color: activeTab === 'media' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-            borderBottom: activeTab === 'media' ? '3px solid var(--color-primary)' : '3px solid transparent',
-            background: 'transparent',
-            borderTop: 'none',
-            borderLeft: 'none',
-            borderRight: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <span>🎬</span>
-          <span>Curated Videos & Books</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('challenge')}
-          style={{
-            padding: '10px 18px',
-            fontSize: '0.86rem',
-            fontWeight: activeTab === 'challenge' ? 700 : 500,
-            color: activeTab === 'challenge' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-            borderBottom: activeTab === 'challenge' ? '3px solid var(--color-primary)' : '3px solid transparent',
-            background: 'transparent',
-            borderTop: 'none',
-            borderLeft: 'none',
-            borderRight: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <span>🧠</span>
-          <span>Socratic Challenge</span>
-        </button>
-
-        {lesson?.quiz && lesson.quiz.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setActiveTab('quiz')}
-            style={{
-              padding: '10px 18px',
-              fontSize: '0.86rem',
-              fontWeight: activeTab === 'quiz' ? 700 : 500,
-              color: activeTab === 'quiz' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-              borderBottom: activeTab === 'quiz' ? '3px solid var(--color-primary)' : '3px solid transparent',
-              background: 'transparent',
-              borderTop: 'none',
-              borderLeft: 'none',
-              borderRight: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
-            <span>🎯</span>
-            <span>Self-Check Quiz ({lesson.quiz.length})</span>
-          </button>
-        )}
-      </div>
-
-      {/* ── LOADING SKELETON ─────────────────────────────────────────── */}
-      {loadingLesson ? (
-        <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
-          <div style={{ width: '44px', height: '44px', border: '3px solid var(--fill-4)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-          <div>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>Synthesizing Comprehensive Study Module...</h3>
-            <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-              Building deep explanations, worked real-world examples, curated video lectures, and Socratic challenges for &quot;{module.title}&quot;.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* ── TAB 1: IN-DEPTH GUIDE ─────────────────────────────────── */}
-          {activeTab === 'guide' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              
-              {/* Big Picture Summary Banner */}
-              {lesson?.summary && (
-                <div style={{ padding: '16px 20px', borderRadius: 'var(--radius-sm)', background: 'var(--fill-2)', border: '1px solid var(--fill-4)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-primary-light)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    💡 The Big Picture & Real-World Purpose
-                  </span>
-                  <p style={{ fontSize: '0.92rem', color: 'var(--color-text-primary)', lineHeight: 1.6 }}>
-                    {lesson.summary}
-                  </p>
-                </div>
-              )}
-
-              {/* Learning Objectives */}
-              {Array.isArray(lesson?.learningObjectives) && lesson.learningObjectives.length > 0 && (
-                <div className="glass-panel" style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    🎯 What You Will Be Able to Do
-                  </span>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '10px' }}>
-                    {lesson.learningObjectives.map((obj: string, i: number) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.86rem', color: 'var(--color-text-primary)' }}>
-                        <span style={{ color: 'var(--color-success)', fontWeight: 700 }}>✓</span>
-                        <span>{obj}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Comprehensive Markdown Explanation */}
-              {lesson?.explanation && (
-                <div className="glass-panel" style={{ padding: '28px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--color-primary-light)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    📚 Core Principles & Deep-Dive Mechanics
-                  </span>
-                  <div
-                    style={{ fontSize: '0.92rem', lineHeight: 1.75, color: 'var(--color-text-primary)' }}
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(lesson.explanation) }}
-                  />
-                </div>
-              )}
-
-              {/* Concrete Worked Example / Code / Data Breakdown */}
-              {lesson?.codeOrExample && (
-                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--color-warning)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      🔬 Concrete Real-World Worked Example
-                    </span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>Walkthrough</span>
-                  </div>
-                  <div
-                    style={{ fontSize: '0.88rem', lineHeight: 1.65 }}
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(lesson.codeOrExample) }}
-                  />
-                </div>
-              )}
-
-              {/* When to Use vs When NOT to Use Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                {Array.isArray(lesson?.whenToUse) && lesson.whenToUse.length > 0 && (
-                  <div className="glass-panel" style={{ padding: '18px 20px', borderLeft: '3px solid var(--color-success)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-success)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      ✅ When To Apply This
-                    </span>
-                    <ul style={{ paddingLeft: '18px', fontSize: '0.84rem', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px', listStyleType: 'disc' }}>
-                      {lesson.whenToUse.map((item: string, idx: number) => (
-                        <li key={idx}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {Array.isArray(lesson?.whenNotToUse) && lesson.whenNotToUse.length > 0 && (
-                  <div className="glass-panel" style={{ padding: '18px 20px', borderLeft: '3px solid var(--color-danger)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-danger)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      ⚠️ When NOT To Use / Limitations
-                    </span>
-                    <ul style={{ paddingLeft: '18px', fontSize: '0.84rem', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px', listStyleType: 'disc' }}>
-                      {lesson.whenNotToUse.map((item: string, idx: number) => (
-                        <li key={idx}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              {/* Common Pitfalls & Mistakes Beginners Make */}
-              {Array.isArray(lesson?.commonMistakes) && lesson.commonMistakes.length > 0 && (
-                <div className="glass-panel" style={{ padding: '20px 24px', borderLeft: '3px solid var(--color-warning)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--color-warning)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    🚨 Common Beginner Traps & How to Avoid Them
-                  </span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {lesson.commonMistakes.map((mistake: string, i: number) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.86rem', color: 'var(--color-text-primary)' }}>
-                        <span style={{ color: 'var(--color-warning)', fontWeight: 700 }}>•</span>
-                        <span>{mistake}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Ready for Challenge Callout */}
-              <div style={{ padding: '18px 24px', borderRadius: 'var(--radius-sm)', background: 'var(--fill-2)', border: '1px solid var(--fill-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                <div>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>Finished reading the guide?</h4>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                    Check curated multimedia videos or test your understanding with the Socratic Challenge.
-                  </p>
-                </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('media')}
-                    className="btn btn-secondary"
-                    style={{ fontSize: '0.8rem', padding: '6px 14px' }}
-                  >
-                    🎬 Watch Videos
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('challenge')}
-                    className="btn btn-primary"
-                    style={{ fontSize: '0.8rem', padding: '6px 16px' }}
-                  >
-                    🧠 Try Challenge →
-                  </button>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* ── TAB 2: CURATED VIDEOS & BOOKS ─────────────────────────── */}
-          {activeTab === 'media' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              
-              <div style={{ padding: '16px 20px', borderRadius: 'var(--radius-sm)', background: 'var(--fill-2)', border: '1px solid var(--fill-4)' }}>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                  🎬 Curated Video Lectures, Books & Deep References
-                </h3>
-                <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-                  A paragraph cannot replace a 10-minute visual animation or an authoritative chapter. Use these hand-picked materials to build deep intuition:
-                </p>
-              </div>
-
-              {/* Multimedia Recommendations List */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
-                
-                {/* 1. Curated YouTube Video Recommendation */}
-                <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', borderLeft: '4px solid var(--color-danger)' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', background: 'var(--danger-tint)', color: 'var(--color-danger)', fontWeight: 700 }}>
-                        🎥 VIDEO BREAKDOWN
-                      </span>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>~10-15 mins</span>
-                    </div>
-
-                    <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '10px' }}>
-                      {lesson?.recommendedResources?.[0]?.title || `Top Visual Lecture: ${module.title}`}
-                    </h4>
-
-                    <p style={{ fontSize: '0.84rem', color: 'var(--color-text-secondary)', marginTop: '6px', lineHeight: 1.5 }}>
-                      {lesson?.recommendedResources?.[0]?.whyRecommended || 'Clear visual breakdown with step-by-step graphical animations.'}
-                    </p>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <a
-                      href={`https://www.youtube.com/results?search_query=${encodeURIComponent(lesson?.recommendedResources?.[0]?.searchQuery || `${topicTitle} ${module.title}`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-primary"
-                      style={{ flex: 1, textAlign: 'center', fontSize: '0.8rem', padding: '8px 12px' }}
-                    >
-                      ▶ Watch on YouTube ↗
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => handleBookmarkResource(lesson?.recommendedResources?.[0] || { title: `${module.title} Video`, type: 'video' })}
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.75rem', padding: '8px 10px' }}
-                      title="Bookmark to Topic Resources"
-                    >
-                      {savedBookmarkTitles[lesson?.recommendedResources?.[0]?.title || ''] ? '✓ Saved' : '+ Bookmark'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2. Authoritative Book & Literature Reference */}
-                <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', borderLeft: '4px solid var(--color-text-primary)' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', background: 'var(--fill-3)', color: 'var(--color-text-primary)', fontWeight: 700 }}>
-                        📖 BOOK & READING
-                      </span>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>Reference Chapter</span>
-                    </div>
-
-                    <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '10px' }}>
-                      {lesson?.recommendedResources?.[1]?.title || `Recommended Textbook: ${topicTitle}`}
-                    </h4>
-
-                    <p style={{ fontSize: '0.84rem', color: 'var(--color-text-secondary)', marginTop: '6px', lineHeight: 1.5 }}>
-                      {lesson?.recommendedResources?.[1]?.whyRecommended || 'In-depth textbook chapter covering edge cases, historical context, and mathematical rigor.'}
-                    </p>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <a
-                      href={`https://www.google.com/search?q=${encodeURIComponent(lesson?.recommendedResources?.[1]?.searchQuery || `${topicTitle} ${module.title} textbook chapter guide`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-secondary"
-                      style={{ flex: 1, textAlign: 'center', fontSize: '0.8rem', padding: '8px 12px' }}
-                    >
-                      🔍 Search Chapter ↗
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => handleBookmarkResource(lesson?.recommendedResources?.[1] || { title: `${module.title} Chapter`, type: 'book' })}
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.75rem', padding: '8px 10px' }}
-                      title="Bookmark to Topic Resources"
-                    >
-                      {savedBookmarkTitles[lesson?.recommendedResources?.[1]?.title || ''] ? '✓ Saved' : '+ Bookmark'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* 3. Official Documentation & Interactive Sandbox */}
-                <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', borderLeft: '4px solid var(--color-success)' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', background: 'var(--success-tint)', color: 'var(--color-success)', fontWeight: 700 }}>
-                        📑 DOCS & CHEAT SHEET
-                      </span>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>Quick Reference</span>
-                    </div>
-
-                    <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '10px' }}>
-                      {module.title} Official Documentation & Specs
-                    </h4>
-
-                    <p style={{ fontSize: '0.84rem', color: 'var(--color-text-secondary)', marginTop: '6px', lineHeight: 1.5 }}>
-                      The official standards, canonical examples, and syntax cheat sheets to bookmark for regular lookups.
-                    </p>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <a
-                      href={`https://www.google.com/search?q=${encodeURIComponent(`${module.title} cheat sheet docs syntax examples`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-secondary"
-                      style={{ flex: 1, textAlign: 'center', fontSize: '0.8rem', padding: '8px 12px' }}
-                    >
-                      📄 Open Docs Search ↗
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => handleBookmarkResource({ title: `${module.title} Docs`, type: 'article', searchQuery: `${module.title} docs` })}
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.75rem', padding: '8px 10px' }}
-                      title="Bookmark to Topic Resources"
-                    >
-                      {savedBookmarkTitles[`${module.title} Docs`] ? '✓ Saved' : '+ Bookmark'}
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          )}
-
-          {/* ── TAB 3: SOCRATIC CHALLENGE ─────────────────────────────── */}
-          {activeTab === 'challenge' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              
-              <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', borderLeft: '4px solid var(--color-primary)' }}>
-                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--color-primary-light)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  🧠 The Socratic Mentor Challenge
-                </span>
-
-                {/* Scenario / Dilemma */}
-                <div style={{ fontSize: '0.92rem', color: 'var(--color-text-primary)', lineHeight: 1.6, background: 'var(--bg-sunk)', padding: '14px 18px', borderRadius: '8px', border: '1px solid var(--fill-3)' }}>
-                  <strong>Scenario:</strong> {lesson?.socraticChallenge?.scenario || `You are working on a real project involving ${module.title}. An edge case arises where applying the naive approach causes inconsistent results.`}
-                </div>
-
-                {/* Question */}
-                <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                  {lesson?.socraticChallenge?.question || `How would you solve or diagnose this situation using ${module.title}? Explain your reasoning step-by-step.`}
-                </div>
-
-                {/* Student's Answer Textarea */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
-                    Your Solution & Reasoning:
-                  </label>
-                  <textarea
-                    className="form-input"
-                    rows={4}
-                    style={{ width: '100%', fontSize: '0.88rem', lineHeight: 1.5, background: 'var(--bg-sunk)', resize: 'vertical' }}
-                    placeholder="Write your explanation or step-by-step solution here..."
-                    value={challengeAnswer}
-                    onChange={(e) => setChallengeAnswer(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleEvaluateChallenge}
-                    disabled={evaluating || challengeAnswer.trim().length < 10}
-                    className="btn btn-primary"
-                    style={{ alignSelf: 'flex-start', padding: '8px 20px', fontSize: '0.84rem' }}
-                  >
-                    {evaluating ? '🤖 AI Mentor is Evaluating...' : '🚀 Submit Answer to AI Mentor'}
-                  </button>
-                </div>
-              </div>
-
-              {/* AI Mentor Feedback Card */}
-              {evaluation && (
-                <div
-                  className="glass-panel"
-                  style={{
-                    padding: '22px 24px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '14px',
-                    borderLeft: `4px solid ${evaluation.verdict ? VERDICT_STYLE[evaluation.verdict].color : 'var(--color-text-muted)'}`,
-                  }}
+    <div className="grid items-start gap-10 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <article className="flex min-w-0 max-w-[720px] flex-col gap-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div role="tablist" aria-label="Steps in this module" className="flex flex-wrap gap-1.5">
+            {STEPS.map((step, i) => {
+              const on = activeTab === step.key;
+              return (
+                <button
+                  key={step.key}
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => setActiveTab(step.key)}
+                  className={`flex h-9 items-center gap-2 rounded-full pl-1.5 pr-3.5 text-[0.875rem] font-semibold ${on ? 'bg-ink text-on-ink' : 'text-fg-secondary hover:bg-fill-2 hover:text-fg'}`}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '1.1rem' }}>💡</span>
-                    <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                      {evaluation.fallback ? 'No AI feedback this time' : 'Mentor feedback'}
-                    </h4>
-                    {evaluation.verdict && (
-                      <span
-                        className="rounded px-2 py-0.5 text-[0.72rem] font-bold"
-                        style={{ color: VERDICT_STYLE[evaluation.verdict].color, background: VERDICT_STYLE[evaluation.verdict].bg }}
-                      >
-                        {VERDICT_STYLE[evaluation.verdict].label}
-                      </span>
-                    )}
-                    {evaluation.verdict && <span className="text-[0.72rem] text-fg-muted">saved to this module&apos;s record</span>}
-                  </div>
+                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[0.75rem] ${on ? 'bg-on-ink text-ink' : 'bg-sunk text-fg-secondary'}`}>{i + 1}</span>
+                  {step.label}
+                </button>
+              );
+            })}
+          </div>
+          {activeTab === 'guide' && !loadingLesson && (
+            <button type="button" onClick={() => setActiveTab(checkTab)} className="text-[0.875rem] font-medium text-fg-secondary underline-offset-4 hover:text-fg hover:underline">
+              Already know this? Skip to the check
+            </button>
+          )}
+        </div>
 
-                  {evaluation.captured && (
-                    <div style={{ fontSize: '0.88rem', color: 'var(--color-success)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                      <span>✅</span>
-                      <span><strong>What you nailed:</strong> {evaluation.captured}</span>
-                    </div>
-                  )}
-
-                  {evaluation.missed && (
-                    <div style={{ fontSize: '0.88rem', color: 'var(--color-warning)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                      <span>🔍</span>
-                      <span><strong>Nuance to consider:</strong> {evaluation.missed}</span>
-                    </div>
-                  )}
-
-                  {evaluation.tip && (
-                    <div style={{ fontSize: '0.88rem', color: 'var(--color-primary-light)', display: 'flex', alignItems: 'flex-start', gap: '8px', background: 'var(--fill-2)', padding: '10px 14px', borderRadius: '6px' }}>
-                      <span>📌</span>
-                      <span><strong>{evaluation.fallback ? 'Note' : 'Remember'}:</strong> {evaluation.tip}</span>
-                    </div>
-                  )}
-
-                  {evaluation.followUp && (
-                    <div className="flex flex-col gap-2 rounded-md border border-line bg-sunk px-3.5 py-3 text-[0.86rem]">
-                      <span className="text-[0.72rem] font-bold uppercase tracking-wide text-fg-secondary">Go one step further</span>
-                      <span className="text-fg">{evaluation.followUp}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const next = evaluation.followUp;
-                          setChallengeAnswer('');
-                          setEvaluation(null);
-                          if (lesson) setLesson({ ...lesson, socraticChallenge: { ...lesson.socraticChallenge, question: next } });
-                        }}
-                        className="btn btn-secondary self-start px-3 py-1 text-[0.78rem]"
-                      >
-                        Answer this next
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Ideal Model Answer Toggle */}
-                  {lesson?.socraticChallenge?.idealAnswer && (
-                    <details style={{ marginTop: '6px', fontSize: '0.84rem', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
-                      <summary style={{ fontWeight: 600, color: 'var(--color-text-muted)' }}>View Mentor&apos;s Model Solution</summary>
-                      <div style={{ marginTop: '8px', padding: '12px 14px', background: 'var(--bg-sunk)', borderRadius: '6px', lineHeight: 1.6, color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap' }}>
-                        {lesson.socraticChallenge.idealAnswer}
-                      </div>
-                    </details>
-                  )}
-                </div>
-              )}
-
+        <header className="flex flex-col gap-3">
+          <div className="text-[0.9rem] text-fg-muted">Module {module.order} · about {module.estimatedMinutes} min</div>
+          <h2 className="m-0 font-serif text-[2.75rem] font-medium leading-[1.08] tracking-[-0.02em]">{module.title}</h2>
+          {evidence?.state && (
+            <div className="flex flex-wrap items-center gap-2 text-[0.875rem] text-fg-secondary">
+              <KnowledgeMark state={evidence.state} showLabel />
+              {evidence.reason && <span>— {evidence.reason}</span>}
             </div>
           )}
+          {lesson?.summary && !loadingLesson && (
+            <p className="m-0 font-serif text-[1.35rem] italic leading-relaxed text-fg-secondary">{lesson.summary}</p>
+          )}
+        </header>
 
-          {/* ── TAB 4: SELF-CHECK QUIZ ─────────────────────────────────── */}
-          {activeTab === 'quiz' && Array.isArray(lesson?.quiz) && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ padding: '14px 18px', borderRadius: 'var(--radius-sm)', background: 'var(--fill-2)', border: '1px solid var(--fill-3)' }}>
-                <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>Diagnostic Concept Check</h4>
-                <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                  Test your grasp of the mechanics before moving on to the next module.
-                </p>
+        {loadingLesson ? (
+          <div className="flex flex-col gap-4" aria-busy="true">
+            <p className="m-0 text-[0.95rem] text-fg-secondary">Writing this lesson for you — the first time takes a few seconds.</p>
+            {[92, 100, 84, 96, 70].map((w, i) => <div key={i} className="skeleton h-4 rounded" style={{ width: `${w}%` }} />)}
+          </div>
+        ) : !lesson ? (
+          <div className="flex flex-col items-start gap-3 rounded-xl bg-sunk p-5">
+            <p className="m-0 text-[1rem] text-fg-secondary">Couldn’t load this lesson.</p>
+            <button type="button" onClick={() => loadLesson(false)} className="btn btn-secondary">Try again</button>
+          </div>
+        ) : (
+          <>
+            {activeTab === 'guide' && (
+              <div className="flex flex-col gap-9">
+                {objectives.length > 0 && (
+                  <section aria-labelledby="obj-h" className="flex flex-col gap-3">
+                    <h3 id="obj-h" className="m-0 text-[1.05rem] font-semibold">By the end, you’ll be able to</h3>
+                    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                      {objectives.map((o, i) => (
+                        <li key={i} className="flex items-start gap-2.5 text-[1rem] leading-relaxed">
+                          <Icon name="check" size={16} strokeWidth={2.2} className="mt-1 shrink-0 text-fg-muted" />
+                          <span>{o}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                {lesson.explanation && (
+                  <div className="lesson-prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(lesson.explanation) }} />
+                )}
+
+                {lesson.codeOrExample && (
+                  <section aria-labelledby="ex-h" className="flex flex-col gap-3">
+                    <h3 id="ex-h" className="m-0 text-[1.15rem] font-semibold">A worked example</h3>
+                    <div className="lesson-prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(lesson.codeOrExample) }} />
+                  </section>
+                )}
+
+                {(useWhen.length > 0 || avoidWhen.length > 0) && (
+                  <div className="grid gap-8 sm:grid-cols-2">
+                    {useWhen.length > 0 && (
+                      <section className="flex flex-col gap-2.5">
+                        <h3 className="m-0 text-[1.05rem] font-semibold">Use it when</h3>
+                        <ul className="m-0 flex flex-col gap-2 pl-5 text-[1rem] leading-relaxed">
+                          {useWhen.map((x, i) => <li key={i} className="list-disc">{x}</li>)}
+                        </ul>
+                      </section>
+                    )}
+                    {avoidWhen.length > 0 && (
+                      <section className="flex flex-col gap-2.5">
+                        <h3 className="m-0 text-[1.05rem] font-semibold">Where it breaks</h3>
+                        <ul className="m-0 flex flex-col gap-2 pl-5 text-[1rem] leading-relaxed">
+                          {avoidWhen.map((x, i) => <li key={i} className="list-disc">{x}</li>)}
+                        </ul>
+                      </section>
+                    )}
+                  </div>
+                )}
+
+                {pitfalls.length > 0 && (
+                  <section className="flex flex-col gap-2.5">
+                    <h3 className="m-0 text-[1.05rem] font-semibold">Where people go wrong</h3>
+                    <ul className="m-0 flex flex-col gap-2 pl-5 text-[1rem] leading-relaxed">
+                      {pitfalls.map((x, i) => <li key={i} className="list-disc">{x}</li>)}
+                    </ul>
+                  </section>
+                )}
+
+                <div className="flex flex-wrap items-center gap-4 border-t border-line pt-6">
+                  <button type="button" onClick={() => setActiveTab(checkTab)} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
+                    Check yourself <Icon name="arrowRight" size={16} />
+                  </button>
+                  <span className="text-[0.9rem] text-fg-muted">Recalling it now is what makes it stay.</span>
+                </div>
               </div>
+            )}
 
-              {lesson.quiz.map((q: any, qIdx: number) => {
-                const selected = quizSelections[qIdx];
-                const isCorrect = selected === q.correctIndex;
-                return (
-                  <div key={qIdx} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                      {qIdx + 1}. {q.question}
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {activeTab === 'quiz' && quiz.length > 0 && (
+              <section aria-labelledby="quiz-h" className="flex flex-col gap-7">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 id="quiz-h" className="m-0 text-[1.2rem] font-semibold">Check yourself</h3>
+                  <span className="text-[0.9rem] text-fg-muted">{quiz.length} question{quiz.length === 1 ? '' : 's'} · misses become review cards</span>
+                </div>
+                {quiz.map((q: any, qIdx: number) => {
+                  const selected = quizSelections[qIdx];
+                  return (
+                    <fieldset key={qIdx} className="m-0 flex flex-col gap-2.5 border-0 p-0">
+                      <legend className="mb-3 p-0 text-[1.05rem] font-semibold leading-snug">
+                        <span className="mr-2 text-fg-muted">{qIdx + 1}.</span>{q.question}
+                      </legend>
                       {q.options.map((opt: string, optIdx: number) => {
-                        const isChosen = selected === optIdx;
-                        let optStyle: React.CSSProperties = {
-                          padding: '10px 14px',
-                          borderRadius: '6px',
-                          fontSize: '0.84rem',
-                          textAlign: 'left',
-                          background: isChosen ? 'var(--fill-3)' : 'var(--fill-1)',
-                          border: isChosen ? '1px solid var(--color-primary-light)' : '1px solid var(--fill-3)',
-                          color: isChosen ? 'var(--color-text-primary)' : 'var(--color-text-primary)',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                        };
-
-                        if (quizSubmitted) {
-                          if (optIdx === q.correctIndex) {
-                            optStyle.border = '1px solid var(--color-success)';
-                            optStyle.background = 'var(--success-tint)';
-                            optStyle.color = 'var(--color-success)';
-                          } else if (isChosen && !isCorrect) {
-                            optStyle.border = '1px solid var(--color-danger)';
-                            optStyle.background = 'var(--danger-tint)';
-                            optStyle.color = 'var(--color-danger)';
-                          }
-                        }
-
+                        const chosen = selected === optIdx;
+                        const right = quizSubmitted && optIdx === q.correctIndex;
+                        const wrong = quizSubmitted && chosen && optIdx !== q.correctIndex;
                         return (
                           <button
                             key={optIdx}
                             type="button"
-                            onClick={() => {
-                              if (!quizSubmitted) {
-                                setQuizSelections((prev) => ({ ...prev, [qIdx]: optIdx }));
-                              }
-                            }}
-                            style={optStyle}
+                            aria-pressed={chosen}
+                            disabled={quizSubmitted}
+                            onClick={() => setQuizSelections((prev) => ({ ...prev, [qIdx]: optIdx }))}
+                            className={`flex min-h-[52px] items-center gap-3.5 rounded-xl border-[1.5px] px-4 py-2.5 text-left text-[1rem] disabled:cursor-default ${
+                              right ? 'border-k-solid bg-surface' : wrong ? 'border-danger bg-surface' : chosen ? 'border-ink bg-surface' : 'border-line bg-surface hover:border-line-hover'
+                            }`}
                           >
-                            {String.fromCharCode(65 + optIdx)}. {opt}
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sunk text-[0.8rem] font-semibold">
+                              {String.fromCharCode(65 + optIdx)}
+                            </span>
+                            <span className="flex-1">{opt}</span>
+                            {right && <span className="text-[0.8rem] font-semibold text-k-solid">Correct</span>}
+                            {wrong && <span className="text-[0.8rem] font-semibold text-danger">Your answer</span>}
                           </button>
                         );
                       })}
-                    </div>
-
-                    {quizSubmitted && q.explanation && (
-                      <div style={{ fontSize: '0.8rem', color: isCorrect ? 'var(--color-success)' : 'var(--color-warning)', background: 'var(--bg-sunk)', padding: '10px 12px', borderRadius: '6px', marginTop: '4px' }}>
-                        <strong>Explanation:</strong> {q.explanation}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleCheckQuiz}
-                  disabled={quizSubmitted || Object.keys(quizSelections).length < lesson.quiz.length}
-                  className="btn btn-primary"
-                  style={{ padding: '8px 20px', fontSize: '0.84rem' }}
-                >
-                  {quizSubmitted ? '✓ Quiz Checked' : 'Check Answers'}
-                </button>
-                {quizSubmitted && (
+                      {quizSubmitted && q.explanation && (
+                        <p className="m-0 mt-1 rounded-lg bg-sunk px-4 py-3 text-[0.95rem] leading-relaxed text-fg-secondary">{q.explanation}</p>
+                      )}
+                    </fieldset>
+                  );
+                })}
+                <div className="flex flex-wrap items-center gap-3 border-t border-line pt-6">
                   <button
                     type="button"
-                    onClick={() => { setQuizSelections({}); setQuizSubmitted(false); setQuizResult(null); }}
-                    className="btn btn-secondary"
-                    style={{ padding: '8px 14px', fontSize: '0.8rem' }}
+                    onClick={handleCheckQuiz}
+                    disabled={quizSubmitted || Object.keys(quizSelections).length < quiz.length}
+                    className="btn btn-primary h-12 px-6 py-0 text-[1rem]"
                   >
-                    Retake
+                    {quizSubmitted ? 'Checked' : 'Check answers'}
                   </button>
-                )}
-                {quizResult && <span className="text-[0.82rem] text-fg-secondary">{quizResult}</span>}
-              </div>
-            </div>
-          )}
-
-          {/* ── PROBLEM LOG: can you solve it cold, not just recall it ─── */}
-          <ProblemLog topicId={topicId} moduleId={module.id} onChanged={onEvidenceChanged} />
-
-          {/* ── INTEGRATED RICH-TEXT LESSON NOTES (Always Present) ──────── */}
-          <div className="glass-panel flex flex-col gap-3 px-6 py-5">
-            <div className="flex items-baseline justify-between gap-3">
-              <h3 className="m-0 text-base font-bold text-fg">Your notes on this module</h3>
-              <span className="text-[0.72rem] text-fg-muted">Saved as you type · shown again with this module’s review cards</span>
-            </div>
-
-            {/* Keyed by module: the editor captures its save callback when
-                it's created, so a save still pending after you switch
-                modules lands on the module you typed it in. */}
-            <RichTextEditor
-              key={module.id}
-              content={module.notes || ''}
-              onChange={(html) => saveModuleNotes(module.id, html)}
-              placeholder={`Explain ${module.title} back in your own words: the key idea, a formula, an example, where it breaks.`}
-              minHeight={160}
-            />
-
-            {notes && notes.replace(/<[^>]*>/g, '').trim() && (
-              <details className="text-[0.8rem] text-fg-secondary">
-                <summary className="cursor-pointer font-semibold">Topic notebook (notes from before per-module notes)</summary>
-                <div className="mt-2">
-                  <RichTextEditor content={notes} onChange={onSaveNotes} placeholder="" minHeight={100} />
+                  {quizSubmitted && (
+                    <button type="button" onClick={() => { setQuizSelections({}); setQuizSubmitted(false); setQuizResult(null); }} className="btn btn-secondary h-12 py-0">
+                      Retake
+                    </button>
+                  )}
+                  {quizResult ? (
+                    <span className="text-[0.95rem] text-fg-secondary" role="status">{quizResult}</span>
+                  ) : (
+                    <span className="text-[0.875rem] text-fg-muted">Answer all {quiz.length} to check.</span>
+                  )}
                 </div>
-              </details>
+              </section>
             )}
-          </div>
-        </>
-      )}
 
+            {activeTab === 'challenge' && (
+              <section aria-labelledby="ch-h" className="flex flex-col gap-6">
+                <h3 id="ch-h" className="m-0 text-[1.2rem] font-semibold">Explain it back</h3>
+                <div className="rounded-xl bg-sunk px-5 py-4 text-[1rem] leading-relaxed">
+                  <span className="mb-1 block text-[0.8rem] font-semibold text-fg-muted">The situation</span>
+                  {lesson?.socraticChallenge?.scenario || `You’re using ${module.title} on real work, and the obvious approach gives the wrong result.`}
+                </div>
+                <p className="m-0 font-serif text-[1.45rem] leading-snug">
+                  {lesson?.socraticChallenge?.question || `How would you handle it with ${module.title}? Walk through your reasoning.`}
+                </p>
+                <div className="flex flex-col gap-2.5">
+                  <label htmlFor="challenge-answer" className="text-[0.95rem] font-semibold text-fg-secondary">Your answer, in your own words</label>
+                  <textarea
+                    id="challenge-answer"
+                    rows={6}
+                    className="form-input resize-y text-[1.05rem] leading-relaxed"
+                    placeholder="Explain it as if to a colleague. Aim for why, not just what."
+                    value={challengeAnswer}
+                    onChange={(e) => setChallengeAnswer(e.target.value)}
+                  />
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleEvaluateChallenge}
+                      disabled={evaluating || challengeAnswer.trim().length < 10}
+                      className="btn btn-primary h-12 px-6 py-0 text-[1rem]"
+                    >
+                      {evaluating ? 'Reading your answer…' : 'Get feedback'}
+                    </button>
+                    <span className="text-[0.875rem] text-fg-muted">A clear verdict is saved to this module’s record.</span>
+                  </div>
+                </div>
+
+                {evaluation && (
+                  <div className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-6" role="status">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <h4 className="m-0 text-[1.05rem] font-semibold">{evaluation.fallback ? 'No AI feedback this time' : 'Feedback'}</h4>
+                      {evaluation.verdict && (
+                        <span className="rounded-full px-2.5 py-0.5 text-[0.8rem] font-bold" style={{ color: VERDICT_STYLE[evaluation.verdict].color, background: VERDICT_STYLE[evaluation.verdict].bg }}>
+                          {VERDICT_STYLE[evaluation.verdict].label}
+                        </span>
+                      )}
+                    </div>
+                    {evaluation.captured && (
+                      <div className="text-[1rem] leading-relaxed"><span className="font-semibold">What you got: </span>{evaluation.captured}</div>
+                    )}
+                    {evaluation.missed && (
+                      <div className="text-[1rem] leading-relaxed"><span className="font-semibold">What’s missing: </span>{evaluation.missed}</div>
+                    )}
+                    {evaluation.tip && (
+                      <div className="text-[1rem] leading-relaxed text-fg-secondary">
+                        <span className="font-semibold text-fg">{evaluation.fallback ? 'Note: ' : 'Remember: '}</span>{evaluation.tip}
+                      </div>
+                    )}
+                    {evaluation.followUp && (
+                      <div className="flex flex-col gap-2.5 rounded-lg bg-sunk px-4 py-3.5">
+                        <span className="text-[0.8rem] font-semibold text-fg-muted">Go one step further</span>
+                        <span className="text-[1rem]">{evaluation.followUp}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = evaluation.followUp;
+                            setChallengeAnswer('');
+                            setEvaluation(null);
+                            if (lesson) setLesson({ ...lesson, socraticChallenge: { ...lesson.socraticChallenge, question: next } });
+                          }}
+                          className="btn btn-secondary h-10 self-start py-0"
+                        >
+                          Answer this next
+                        </button>
+                      </div>
+                    )}
+                    {lesson?.socraticChallenge?.idealAnswer && (
+                      <details className="text-[0.95rem]">
+                        <summary className="cursor-pointer font-semibold text-fg-secondary">See a model answer</summary>
+                        <p className="m-0 mt-2 whitespace-pre-wrap font-serif text-[1.1rem] leading-relaxed">{lesson.socraticChallenge.idealAnswer}</p>
+                      </details>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {activeTab === 'media' && (
+              <section aria-labelledby="deeper-h" className="flex flex-col gap-5">
+                <div className="flex flex-col gap-1.5">
+                  <h3 id="deeper-h" className="m-0 text-[1.2rem] font-semibold">Go deeper</h3>
+                  <p className="m-0 text-[0.95rem] text-fg-secondary">A video or a chapter builds intuition a page can’t. Save what you use to this topic’s sources.</p>
+                </div>
+                <ul className="m-0 flex list-none flex-col p-0">
+                  {[...sources, { title: `${module.title}: official docs and cheat sheets`, type: 'docs', searchQuery: `${module.title} documentation cheat sheet`, whyRecommended: 'The canonical reference, for looking things up later.' }].map((r: any, i: number) => {
+                    const saved = !!savedBookmarkTitles[r.title];
+                    return (
+                      <li key={i} className="flex flex-wrap items-start gap-4 border-b border-line py-4 last:border-b-0">
+                        <span className="w-16 shrink-0 pt-0.5 text-[0.8rem] font-semibold text-fg-muted">{sourceKind(r.type)}</span>
+                        <div className="flex min-w-[220px] flex-1 flex-col gap-1">
+                          <a href={sourceHref(r)} target="_blank" rel="noopener noreferrer" className="text-[1.02rem] font-semibold text-fg">
+                            {r.title} <Icon name="arrowRight" size={13} className="inline -rotate-45" />
+                          </a>
+                          {r.whyRecommended && <span className="text-[0.9rem] leading-relaxed text-fg-secondary">{r.whyRecommended}</span>}
+                        </div>
+                        {onAddBookmark && (
+                          <button
+                            type="button"
+                            onClick={() => handleBookmarkResource({ ...r, url: sourceHref(r) })}
+                            disabled={saved}
+                            className="btn btn-secondary h-9 px-3 py-0 text-[0.85rem]"
+                          >
+                            {saved ? 'Saved' : 'Save to sources'}
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
+          </>
+        )}
+      </article>
+
+      <aside className="flex flex-col gap-8 xl:sticky xl:top-6">
+        <button
+          type="button"
+          onClick={() => onToggleCompleted(module.id)}
+          aria-pressed={module.completed}
+          className={`btn h-12 w-full py-0 text-[0.95rem] ${module.completed ? 'btn-secondary' : 'btn-primary'}`}
+        >
+          {module.completed ? (
+            <>
+              <Icon name="check" size={16} strokeWidth={2.4} /> Finished — undo
+            </>
+          ) : (
+            'Mark this module finished'
+          )}
+        </button>
+
+        <section aria-labelledby="notes-h" className="flex flex-col gap-2.5">
+          <div className="flex flex-col gap-0.5">
+            <h3 id="notes-h" className="m-0 text-[0.95rem] font-semibold">Your notes on this module</h3>
+            <span className="text-[0.8rem] text-fg-muted">Saved as you type · shown again with its review cards</span>
+          </div>
+          {/* Keyed by module: the editor captures its save callback when it's
+              created, so a save still pending after you switch modules lands
+              on the module you typed it in. */}
+          <RichTextEditor
+            key={module.id}
+            content={module.notes || ''}
+            onChange={(html) => saveModuleNotes(module.id, html)}
+            placeholder={`Explain ${module.title} back in your own words.`}
+            minHeight={150}
+          />
+          {notes && notes.replace(/<[^>]*>/g, '').trim() && (
+            <details className="text-[0.85rem] text-fg-secondary">
+              <summary className="cursor-pointer font-semibold">Older topic-wide notes</summary>
+              <div className="mt-2">
+                <RichTextEditor content={notes} onChange={onSaveNotes} placeholder="" minHeight={100} />
+              </div>
+            </details>
+          )}
+        </section>
+
+        <section aria-labelledby="shown-h" className="flex flex-col gap-3">
+          <h3 id="shown-h" className="m-0 text-[0.95rem] font-semibold">What you’ve shown so far</h3>
+          <dl className="m-0 grid grid-cols-2 gap-x-3 gap-y-3.5 text-[0.9rem]">
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-fg-muted">Last quiz</dt>
+              <dd className="m-0 font-semibold">{evidence?.quiz?.total ? `${evidence.quiz.correct} of ${evidence.quiz.total}` : '—'}</dd>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-fg-muted">Explain-it</dt>
+              <dd className="m-0 font-semibold" style={{ color: isVerdict(evidence?.challenge?.verdict) ? VERDICT_STYLE[evidence!.challenge!.verdict as Verdict].color : undefined }}>
+                {isVerdict(evidence?.challenge?.verdict) ? VERDICT_STYLE[evidence!.challenge!.verdict as Verdict].label : '—'}
+              </dd>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-fg-muted">In review</dt>
+              <dd className="m-0 font-semibold">{evidence?.reviewCards ? `${evidence.reviewCards} card${evidence.reviewCards === 1 ? '' : 's'}` : '—'}</dd>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-fg-muted">Where it stands</dt>
+              <dd className="m-0 font-semibold">{evidence?.state ? <KnowledgeMark state={evidence.state} showLabel /> : '—'}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <ProblemLog topicId={topicId} moduleId={module.id} onChanged={onEvidenceChanged} />
+
+        <button
+          type="button"
+          onClick={() => { setGenerating(true); loadLesson(true); }}
+          disabled={loadingLesson || generating}
+          className="self-start text-[0.85rem] font-medium text-fg-muted underline-offset-4 hover:text-fg hover:underline disabled:opacity-50"
+          title="Write this lesson again with fresh examples"
+        >
+          {generating ? 'Rewriting…' : 'Rewrite this lesson'}
+        </button>
+      </aside>
     </div>
   );
 }

@@ -3,11 +3,11 @@ import Link from 'next/link';
 import { cn } from './cn';
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
-type Size = 'sm' | 'md';
+type Size = 'sm' | 'md' | 'lg';
 
 const VARIANT: Record<Variant, string> = {
-  // primary/secondary/danger reuse the legacy .btn-* classes so gradient,
-  // hover lift and disabled styling stay identical to un-migrated screens.
+  // primary/secondary/danger reuse the legacy .btn-* classes so migrated
+  // and un-migrated screens share one look.
   primary: 'btn btn-primary',
   secondary: 'btn btn-secondary',
   danger: 'btn btn-danger',
@@ -15,8 +15,9 @@ const VARIANT: Record<Variant, string> = {
 };
 
 const SIZE: Record<Size, string> = {
-  sm: 'px-3 py-1.5 text-xs',
-  md: '',
+  sm: 'h-9 px-3 py-0 text-[0.82rem]',
+  md: 'h-11 py-0',
+  lg: 'h-12 px-6 py-0 text-[1rem]',
 };
 
 interface CommonProps {
