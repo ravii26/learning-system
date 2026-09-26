@@ -7,11 +7,13 @@ import { Icon } from '@/components/ui';
 interface Module { legacyId: string; title: string; order: number; completed: boolean; estimatedMinutes: number }
 interface SharedTopic {
   id: string; title: string; area: string; status: string; mode: string; depthTarget: string | null;
-  progressPct: number; lastTouchedDate: string; modules: Module[]; yourCopyId: string | null;
+  progressPct: number; lastTouchedDate: string; modules: Module[];
+  yourCopy: { id: string; status: string; completedModuleIds: string[] } | null;
 }
 interface SharedGoal {
   id: string; title: string; outcome: string; status: string; targetDate: string | null;
   readinessMet: number; readinessTotal: number; topics: { title: string; sharedTopicId: string | null }[];
+  yourCopyId: string | null;
 }
 interface FriendView {
   friend: { id: string; name: string };
@@ -28,21 +30,34 @@ const STATUS_WORD: Record<string, string> = {
 
 const minutes = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
 
-function ModuleStrip({ modules }: { modules: Module[] }) {
-  if (modules.length === 0) return null;
-  const done = modules.filter((m) => m.completed).length;
+function StripRow({ label, modules, isDone }: { label?: string; modules: Module[]; isDone: (m: Module) => boolean }) {
+  const done = modules.filter(isDone).length;
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className={label ? 'grid grid-cols-[90px_1fr_auto] items-center gap-3' : 'flex flex-col gap-1.5'}>
+      {label && <span className="truncate text-[0.85rem] text-fg-secondary">{label}</span>}
       <div className="flex gap-[3px]" aria-hidden>
         {modules.map((m) => (
           <span
             key={m.legacyId}
-            title={`${m.title}${m.completed ? ' (done)' : ''}`}
-            className={`h-2 flex-1 rounded-sm ${m.completed ? 'bg-[var(--color-accent)]' : 'bg-fill-2'}`}
+            title={`${m.title}${isDone(m) ? ' (done)' : ''}`}
+            className={`h-2 flex-1 rounded-sm ${isDone(m) ? 'bg-[var(--color-accent)]' : 'bg-fill-2'}`}
           />
         ))}
       </div>
-      <span className="text-[0.82rem] text-fg-muted">{done} of {modules.length} modules done</span>
+      <span className="text-[0.82rem] tabular-nums text-fg-muted">{done} of {modules.length}{label ? '' : ' modules done'}</span>
+    </div>
+  );
+}
+
+/** One strip for their progress, or You vs them on the same plan once you've copied it. */
+function ModuleStrip({ modules, friendName, yourDone }: { modules: Module[]; friendName: string; yourDone: string[] | null }) {
+  if (modules.length === 0) return null;
+  if (!yourDone) return <StripRow modules={modules} isDone={(m) => m.completed} />;
+  const mine = new Set(yourDone);
+  return (
+    <div className="flex flex-col gap-2">
+      <StripRow label="You" modules={modules} isDone={(m) => mine.has(m.legacyId)} />
+      <StripRow label={friendName} modules={modules} isDone={(m) => m.completed} />
     </div>
   );
 }
@@ -50,6 +65,8 @@ function ModuleStrip({ modules }: { modules: Module[] }) {
 export default function FriendPage({ params }: { params: { userId: string } }) {
   const [data, setData] = useState<FriendView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copying, setCopying] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -64,6 +81,24 @@ export default function FriendPage({ params }: { params: { userId: string } }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  const copy = async (kind: 'topic' | 'goal', id: string) => {
+    setCopying(id);
+    setCopyError(null);
+    try {
+      const res = await fetch('/api/friends/copy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind, id }),
+      });
+      if (!res.ok) setCopyError((await res.json().catch(() => null))?.error || 'Could not add it to your learning.');
+      await load();
+    } catch {
+      setCopyError('Could not reach the server.');
+    } finally {
+      setCopying(null);
+    }
+  };
 
   const back = (
     <Link href="/friends" className="flex items-center gap-1.5 self-start text-[0.9rem] text-fg-secondary no-underline hover:text-fg hover:no-underline">
@@ -82,8 +117,11 @@ export default function FriendPage({ params }: { params: { userId: string } }) {
       {back}
       <header className="flex flex-col gap-2">
         <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">{friend.name}</h1>
-        <p className="m-0 text-[1.05rem] text-fg-secondary">What {friend.name} shares with you. Your own progress stays yours.</p>
+        <p className="m-0 text-[1.05rem] text-fg-secondary">
+          What {friend.name} shares with you. Add any plan to your own learning: you get the modules and resources, with your own progress.
+        </p>
       </header>
+      {copyError && <p role="alert" className="m-0 text-[0.9rem] text-danger">{copyError}</p>}
 
       <section aria-labelledby="week-h" className="glass-panel flex flex-col gap-4 p-6">
         <h2 id="week-h" className="m-0 text-[1.05rem] font-semibold">Last 7 days on shared topics</h2>
@@ -120,6 +158,13 @@ export default function FriendPage({ params }: { params: { userId: string } }) {
                   {g.topics.map((t, i) => <li key={i}>{t.title}</li>)}
                 </ol>
               )}
+              {g.yourCopyId ? (
+                <Link href={`/goals/${g.yourCopyId}`} className="self-start text-[0.9rem] font-medium">Open your copy of this goal →</Link>
+              ) : (
+                <button type="button" className="btn btn-secondary h-9 self-start py-0 text-[0.85rem]" disabled={copying === g.id} onClick={() => copy('goal', g.id)}>
+                  {copying === g.id ? 'Adding…' : 'Add this goal to my learning'}
+                </button>
+              )}
             </div>
           ))}
         </section>
@@ -140,8 +185,17 @@ export default function FriendPage({ params }: { params: { userId: string } }) {
                 <span className="text-[1.1rem] font-semibold text-fg">{t.title}</span>
               </div>
               {t.modules.length > 0
-                ? <ModuleStrip modules={t.modules} />
+                ? <ModuleStrip modules={t.modules} friendName={friend.name} yourDone={t.yourCopy?.completedModuleIds ?? null} />
                 : <span className="text-[0.85rem] text-fg-muted">{t.progressPct}% progress</span>}
+              {t.yourCopy ? (
+                <Link href={`/topics/${t.yourCopy.id}`} className="self-start text-[0.9rem] font-medium">
+                  Open your copy{t.yourCopy.status === 'queued' ? ' (in Next)' : ''} →
+                </Link>
+              ) : (
+                <button type="button" className="btn btn-secondary h-9 self-start py-0 text-[0.85rem]" disabled={copying === t.id} onClick={() => copy('topic', t.id)}>
+                  {copying === t.id ? 'Adding…' : 'Add to my learning'}
+                </button>
+              )}
             </div>
           ))
         )}

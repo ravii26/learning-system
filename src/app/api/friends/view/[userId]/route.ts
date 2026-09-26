@@ -19,7 +19,7 @@ export async function GET(_request: Request, { params }: { params: { userId: str
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const [friend, topics, goals, theirMinutes, yourMinutes, yourCopies] = await Promise.all([
+    const [friend, topics, goals, theirMinutes, yourMinutes, yourCopies, yourGoalCopies] = await Promise.all([
       db.user.findUnique({ where: { id: friendId }, select: { name: true, email: true } }),
       db.topic.findMany({
         where: { userId: friendId, shared: true, deletedAt: null },
@@ -50,12 +50,17 @@ export async function GET(_request: Request, { params }: { params: { userId: str
       sharedMinutesThisWeek(userId),
       db.topic.findMany({
         where: { userId, deletedAt: null, copiedFromId: { not: null } },
-        select: { id: true, copiedFromId: true },
+        select: {
+          id: true, copiedFromId: true, status: true,
+          curriculumItems: { where: { removed: false }, select: { legacyId: true, completed: true } },
+        },
       }),
+      db.goal.findMany({ where: { userId, copiedFromId: { not: null } }, select: { id: true, copiedFromId: true } }),
     ]);
     if (!friend) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const copyOf = new Map(yourCopies.map((t) => [t.copiedFromId!, t.id]));
+    const copyOf = new Map(yourCopies.map((t) => [t.copiedFromId!, t]));
+    const goalCopyOf = new Map(yourGoalCopies.map((g) => [g.copiedFromId!, g.id]));
 
     return NextResponse.json({
       friend: { id: friendId, name: displayName(friend) },
@@ -63,10 +68,19 @@ export async function GET(_request: Request, { params }: { params: { userId: str
       topics: topics.map(({ curriculumItems, ...t }) => ({
         ...t,
         modules: curriculumItems,
-        yourCopyId: copyOf.get(t.id) ?? null,
+        // Your copy of this plan, if you took one: same module ids, your own
+        // completion. Lets the page compare you module by module.
+        yourCopy: copyOf.has(t.id)
+          ? {
+              id: copyOf.get(t.id)!.id,
+              status: copyOf.get(t.id)!.status,
+              completedModuleIds: copyOf.get(t.id)!.curriculumItems.filter((m) => m.completed).map((m) => m.legacyId),
+            }
+          : null,
       })),
       goals: goals.map(({ links, ...g }) => ({
         ...g,
+        yourCopyId: goalCopyOf.get(g.id) ?? null,
         // A goal can be shared while some of its topics aren't: name them,
         // but only link the ones the friend also shared.
         topics: links
