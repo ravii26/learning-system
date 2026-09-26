@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useToast } from '@/components/ToastProvider';
 import { computePracticeTrend, type RepForTrend } from '@/lib/practiceTrend';
 import { RUBRIC_TEMPLATES, getRubricTemplate } from '@/lib/practiceRubrics';
-import { Button, Card, CardLabel, EmptyState, Field, Input, Select, Sparkline, StatPill } from '@/components/ui';
+import { Button, Field, Input, Select, Sparkline } from '@/components/ui';
 
 /**
  * Practice mode's home (project plan's Example D — English/communication:
@@ -42,8 +42,6 @@ interface ArtifactRow {
   kind: string | null;
   occurredAt: string;
 }
-
-const TREND_TONE = { Improving: 'success', Steady: 'neutral', 'Needs focus': 'warning', New: 'primary' } as const;
 
 function defaultScores(templateKey: string | null): Record<string, number> {
   return Object.fromEntries(getRubricTemplate(templateKey).dimensions.map((d) => [d.key, 3]));
@@ -199,7 +197,7 @@ export default function PracticePage() {
         }),
       });
       if (res.ok) {
-        toast.success('Rep logged');
+        toast.success('Rep saved');
         setRecordingUrl('');
         setDurationSeconds('');
         await fetchTopicData(selectedTopicId);
@@ -227,7 +225,7 @@ export default function PracticePage() {
         body: JSON.stringify({ topicId: selectedTopicId, title: artifactTitle.trim(), kind: artifactKind, url: artifactUrl.trim() || undefined }),
       });
       if (res.ok) {
-        toast.success('Artifact logged');
+        toast.success('Added');
         setArtifactTitle('');
         setArtifactUrl('');
         await fetchTopicData(selectedTopicId);
@@ -243,163 +241,172 @@ export default function PracticePage() {
 
   if (loading) {
     return (
-      <div className="flex max-w-[760px] flex-col gap-3.5">
-        {[52, 200].map((h) => <div key={h} className="skeleton rounded-md" style={{ height: h }} />)}
+      <div className="mx-auto flex max-w-[760px] flex-col gap-4">
+        {[60, 260, 180].map((h) => <div key={h} className="skeleton rounded-md" style={{ height: h }} />)}
       </div>
     );
   }
 
+  const TREND_WORD: Record<string, string> = { Improving: 'Improving', Steady: 'Holding steady', 'Needs focus': 'Needs focus', New: 'Just started' };
+
   return (
-    <div className="flex max-w-[760px] flex-col gap-5">
-      <div>
-        <h1 className="text-2xl font-bold">Practice</h1>
-        <p className="mt-0.5 text-[0.82rem] text-fg-secondary">
-          A daily rep, with a prompt pulled from what you&apos;re already reviewing. No completion bar — a curve.
+    <div className="mx-auto flex max-w-[760px] flex-col gap-9">
+      <header className="flex flex-col gap-2">
+        <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Practice</h1>
+        <p className="m-0 text-[1.05rem] text-fg-secondary">
+          Skills you get better at by doing: speaking, writing, explaining. One short rep a day, scored honestly — the trend is the progress.
         </p>
-      </div>
+      </header>
 
       {topics.length === 0 ? (
-        <Card as="form" onSubmit={handleCreateTopic} className="flex flex-col gap-3">
-          <p className="text-[0.85rem] text-fg-muted">
-            No practice topic yet — e.g. &quot;Spoken English&quot; or &quot;Technical Writing&quot;. You can also switch any topic to Practice in its Setup.
-          </p>
-          <div className="grid gap-2.5 sm:grid-cols-[2fr_1fr_auto] sm:items-end">
-            <Field label="Topic">
-              <Input placeholder="e.g. Spoken English" value={newTopicTitle} onChange={(e) => setNewTopicTitle(e.target.value)} disabled={creatingTopic} />
+        <form onSubmit={handleCreateTopic} className="glass-panel flex flex-col gap-4 p-7">
+          <h2 className="m-0 text-[1.2rem] font-semibold">What do you want to practise?</h2>
+          <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
+            <Field label="Skill" htmlFor="new-practice">
+              <Input id="new-practice" placeholder="e.g. Spoken English" value={newTopicTitle} onChange={(e) => setNewTopicTitle(e.target.value)} disabled={creatingTopic} />
             </Field>
-            <Field label="Rubric">
-              <Select value={newTopicTemplate} onChange={(e) => setNewTopicTemplate(e.target.value)}>
+            <Field label="Scored on" htmlFor="new-rubric">
+              <Select id="new-rubric" value={newTopicTemplate} onChange={(e) => setNewTopicTemplate(e.target.value)}>
                 {RUBRIC_TEMPLATES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
               </Select>
             </Field>
-            <Button type="submit" variant="primary" disabled={creatingTopic || !newTopicTitle.trim()}>
-              {creatingTopic ? 'Starting…' : 'Start ▸'}
-            </Button>
           </div>
-        </Card>
+          <Button type="submit" variant="primary" disabled={creatingTopic || !newTopicTitle.trim()} className="self-start">
+            {creatingTopic ? 'Starting…' : 'Start practising'}
+          </Button>
+          <p className="m-0 text-[0.875rem] text-fg-muted">
+            Practice doesn’t take one of your two Now slots. For subjects with material to cover, <Link href="/learn/new" className="underline underline-offset-2">start a course</Link> instead.
+          </p>
+        </form>
       ) : (
         <>
           <div className="flex flex-wrap items-end gap-3">
             {topics.length > 1 && (
-              <Field label="Topic">
-                <Select value={selectedTopicId} onChange={(e) => setSelectedTopicId(e.target.value)} className="w-auto">
+              <Field label="Skill" htmlFor="pick-practice">
+                <Select id="pick-practice" value={selectedTopicId} onChange={(e) => setSelectedTopicId(e.target.value)} className="w-auto">
                   {topics.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
                 </Select>
               </Field>
             )}
-            <Field label="Rubric" hint={template.description}>
-              <Select value={template.key} onChange={(e) => handleChangeTemplate(e.target.value)} className="w-auto">
+            <Field label="Scored on" htmlFor="pick-rubric" hint={template.description}>
+              <Select id="pick-rubric" value={template.key} onChange={(e) => handleChangeTemplate(e.target.value)} className="w-auto">
                 {RUBRIC_TEMPLATES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
               </Select>
             </Field>
           </div>
 
-          {/* Today's prompt + rep-logging form */}
-          <Card accent="primary">
-            <CardLabel tone="primary">Today&apos;s rep</CardLabel>
-            <div className="mt-2.5 text-[0.95rem] font-semibold">{prompt?.promptText}</div>
-            {prompt?.conceptTitle && (
-              <div className="mt-1 text-[0.72rem] text-fg-muted">pulled from a concept currently in review: {prompt.conceptTitle}</div>
-            )}
+          <section aria-labelledby="rep-h" className="glass-panel flex flex-col gap-6 p-7">
+            <div className="flex flex-col gap-2">
+              <span id="rep-h" className="text-[0.9rem] text-fg-muted">
+                Today’s rep{prompt?.conceptTitle ? ` · from “${prompt.conceptTitle}”, which you’re reviewing` : ''}
+              </span>
+              <p className="m-0 font-serif text-[1.9rem] font-medium leading-snug">{prompt?.promptText ?? 'Loading a prompt…'}</p>
+              <p className="m-0 text-[0.95rem] text-fg-secondary">Do it first — out loud or written, about two minutes. Then score yourself honestly.</p>
+            </div>
 
-            <form onSubmit={handleSubmitRep} className="mt-4 flex flex-col gap-3">
-              <p className="text-[0.75rem] text-fg-muted">Do the rep first (out loud or written), then score it honestly, 1–5.</p>
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                {template.dimensions.map((dim) => (
-                  <Field key={dim.key} label={`${dim.label}${dim.inverted ? ' (lower is better)' : ''}`} hint={dim.hint}>
-                    <Select
-                      value={scores[dim.key] ?? 3}
-                      onChange={(e) => setScores((prev) => ({ ...prev, [dim.key]: Number(e.target.value) }))}
-                    >
-                      {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-                    </Select>
-                  </Field>
-                ))}
+            <form onSubmit={handleSubmitRep} className="flex flex-col gap-5">
+              {template.dimensions.map((dim) => (
+                <fieldset key={dim.key} className="m-0 flex flex-col gap-2 border-0 p-0">
+                  <legend className="mb-1 p-0 text-[0.95rem] font-semibold">
+                    {dim.label}
+                    {dim.inverted && <span className="font-normal text-fg-muted"> · lower is better</span>}
+                    {dim.hint && <span className="block text-[0.82rem] font-normal text-fg-muted">{dim.hint}</span>}
+                  </legend>
+                  <div className="flex gap-1.5">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        aria-pressed={scores[dim.key] === n}
+                        onClick={() => setScores((prev) => ({ ...prev, [dim.key]: n }))}
+                        className={`h-11 w-11 rounded-[10px] text-[1rem] font-semibold ${scores[dim.key] === n ? 'bg-ink text-on-ink' : 'border border-line bg-surface text-fg-secondary hover:border-line-hover'}`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              ))}
+              <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
+                <Field label="Recording link (optional)" htmlFor="rep-url">
+                  <Input id="rep-url" value={recordingUrl} onChange={(e) => setRecordingUrl(e.target.value)} />
+                </Field>
+                <Field label="Seconds (optional)" htmlFor="rep-secs">
+                  <Input id="rep-secs" type="number" value={durationSeconds} onChange={(e) => setDurationSeconds(e.target.value)} />
+                </Field>
               </div>
-              <div className="grid grid-cols-[2fr_1fr] gap-2.5">
-                <Input placeholder="recording URL (optional)" value={recordingUrl} onChange={(e) => setRecordingUrl(e.target.value)} />
-                <Input type="number" placeholder="seconds" value={durationSeconds} onChange={(e) => setDurationSeconds(e.target.value)} />
-              </div>
-              <Button type="submit" variant="primary" disabled={submittingRep} className="self-start">
-                {submittingRep ? 'Logging…' : 'Log rep ▸'}
+              <Button type="submit" variant="primary" size="lg" disabled={submittingRep || !prompt} className="self-start">
+                {submittingRep ? 'Saving…' : 'Save this rep'}
               </Button>
             </form>
-          </Card>
+          </section>
 
-          {/* The curve — never a completion percentage */}
-          <Card>
-            <div className="flex-between flex-wrap gap-2">
-              <span className="text-[0.9rem] font-bold">{selectedTopic?.title}</span>
-              <StatPill label={trend.overallTrend} tone={TREND_TONE[trend.overallTrend]} />
+          <section aria-labelledby="trend-h" className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="trend-h" className="m-0 text-[1.2rem] font-semibold">{selectedTopic?.title}: how it’s going</h2>
+              <span className="text-[0.9rem] text-fg-secondary">{TREND_WORD[trend.overallTrend] ?? trend.overallTrend}</span>
             </div>
             {trend.repCount === 0 ? (
-              <div className="mt-2.5 text-[0.8rem] text-fg-muted">No reps logged yet. After 3 reps, this shows whether each dimension is improving.</div>
+              <p className="m-0 text-[0.95rem] text-fg-muted">No reps yet. After three, you’ll see which parts are improving.</p>
             ) : (
               <>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <StatPill value={trend.repCount} label={trend.repCount === 1 ? 'rep' : 'reps'} />
-                  <StatPill value={trend.spanDays} label={trend.spanDays === 1 ? 'day' : 'days'} />
-                  {trend.currentStreak > 0 && <StatPill value={trend.currentStreak} label="day streak" tone="success" />}
-                </div>
-                <div className="mt-3 flex flex-col gap-2">
+                <p className="m-0 text-[0.95rem] text-fg-secondary">
+                  {trend.repCount} rep{trend.repCount === 1 ? '' : 's'} over {trend.spanDays} day{trend.spanDays === 1 ? '' : 's'}
+                  {trend.currentStreak > 0 ? ` · ${trend.currentStreak}-day streak` : ''}
+                </p>
+                <ul className="m-0 flex list-none flex-col p-0">
                   {trend.dimensions.map((d) => (
-                    <div key={d.key} className="grid grid-cols-[minmax(0,130px)_auto_1fr] items-center gap-3 text-[0.78rem]">
-                      <span className={d.key === trend.weakestKey ? 'text-danger' : 'text-fg-secondary'}>
-                        {dimensionLabel(d.key)}{d.key === trend.weakestKey ? ' ← weakest' : ''}
+                    <li key={d.key} className="grid min-h-[52px] grid-cols-[minmax(0,150px)_1fr_auto] items-center gap-4 border-b border-line last:border-b-0">
+                      <span className={`text-[0.95rem] ${d.key === trend.weakestKey ? 'font-semibold text-k-fading-text' : 'text-fg'}`}>
+                        {dimensionLabel(d.key)}
+                        {d.key === trend.weakestKey && <span className="block text-[0.78rem] font-normal">focus here</span>}
                       </span>
-                      <Sparkline
-                        values={d.values}
-                        width={96}
-                        height={22}
-                        color={d.improving ? 'var(--color-success)' : 'var(--color-primary-light)'}
-                        label={`${dimensionLabel(d.key)} scores over time: ${d.values.join(', ')}`}
-                      />
-                      <span className="whitespace-nowrap text-fg-muted">
-                        {d.first.toFixed(1)} → {d.last.toFixed(1)}{d.inverted ? ' (lower better)' : ''}
+                      <Sparkline values={d.values} width={200} height={26} color="var(--ink)" label={`${dimensionLabel(d.key)} over time: ${d.values.join(', ')}`} />
+                      <span className="whitespace-nowrap text-[0.875rem] text-fg-muted">
+                        {d.first.toFixed(1)} → <strong className="text-fg">{d.last.toFixed(1)}</strong>
                       </span>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </>
             )}
-          </Card>
+          </section>
 
-          {/* Artifacts */}
-          <Card>
-            <CardLabel>Artifacts ({artifacts.length})</CardLabel>
+          <section aria-labelledby="proof-h" className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <h2 id="proof-h" className="m-0 text-[1.2rem] font-semibold">Things you made</h2>
+              <p className="m-0 text-[0.9rem] text-fg-muted">A mock interview, a talk, an essay — real proof beyond the daily reps.</p>
+            </div>
             {artifacts.length > 0 && (
-              <div className="mt-2.5 flex flex-col gap-1.5">
+              <ul className="m-0 flex list-none flex-col p-0">
                 {artifacts.map((a) => (
-                  <div key={a.id} className="flex justify-between gap-2 text-[0.82rem]">
+                  <li key={a.id} className="flex min-h-[48px] items-center justify-between gap-3 border-b border-line text-[0.95rem] last:border-b-0">
                     <span>
-                      {a.url ? <a href={a.url} target="_blank" rel="noreferrer" className="text-primary-light">{a.title} ↗</a> : a.title}
-                      {a.kind && <span className="text-[0.7rem] text-fg-muted"> · {a.kind.replace('_', ' ')}</span>}
+                      {a.url ? <a href={a.url} target="_blank" rel="noreferrer" className="font-medium text-fg underline underline-offset-2">{a.title}</a> : <span className="font-medium">{a.title}</span>}
+                      {a.kind && <span className="text-[0.82rem] text-fg-muted"> · {a.kind.replace('_', ' ')}</span>}
                     </span>
-                    <span className="whitespace-nowrap text-[0.7rem] text-fg-muted">{new Date(a.occurredAt).toLocaleDateString()}</span>
-                  </div>
+                    <span className="whitespace-nowrap text-[0.82rem] text-fg-muted">{new Date(a.occurredAt).toLocaleDateString()}</span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
-            <form onSubmit={handleAddArtifact} className="mt-3 flex flex-wrap gap-2">
-              <Input className="min-w-[140px] flex-[2] px-2 py-1.5 text-[0.78rem]" placeholder="e.g. mock interview, essay" value={artifactTitle} onChange={(e) => setArtifactTitle(e.target.value)} />
-              <Select className="w-auto px-2 py-1.5 text-[0.78rem]" value={artifactKind} onChange={(e) => setArtifactKind(e.target.value)}>
-                <option value="project">project</option>
-                <option value="writing">writing</option>
-                <option value="presentation">presentation</option>
-                <option value="mock_interview">mock interview</option>
-                <option value="other">other</option>
+            <form onSubmit={handleAddArtifact} className="flex flex-wrap gap-2">
+              <label htmlFor="art-title" className="sr-only">What you made</label>
+              <Input id="art-title" className="h-10 min-w-[180px] flex-[2] py-0" placeholder="What you made" value={artifactTitle} onChange={(e) => setArtifactTitle(e.target.value)} />
+              <label htmlFor="art-kind" className="sr-only">Kind</label>
+              <Select id="art-kind" className="h-10 w-auto py-0" value={artifactKind} onChange={(e) => setArtifactKind(e.target.value)}>
+                <option value="project">Project</option>
+                <option value="writing">Writing</option>
+                <option value="presentation">Talk</option>
+                <option value="mock_interview">Mock interview</option>
+                <option value="other">Other</option>
               </Select>
-              <Input className="min-w-[100px] flex-1 px-2 py-1.5 text-[0.78rem]" placeholder="url (optional)" value={artifactUrl} onChange={(e) => setArtifactUrl(e.target.value)} />
-              <Button type="submit" size="sm" disabled={addingArtifact || !artifactTitle.trim()}>+ Add</Button>
+              <label htmlFor="art-url" className="sr-only">Link</label>
+              <Input id="art-url" className="h-10 min-w-[120px] flex-1 py-0" placeholder="Link (optional)" value={artifactUrl} onChange={(e) => setArtifactUrl(e.target.value)} />
+              <Button type="submit" disabled={addingArtifact || !artifactTitle.trim()}>Add</Button>
             </form>
-          </Card>
+          </section>
         </>
-      )}
-
-      {topics.length === 0 && (
-        <EmptyState icon="" title="What counts as practice?">
-          Skills you get better at by doing reps: speaking, writing, explaining. For subjects with material to cover, use a Syllabus topic from the <Link href="/plan" className="text-primary-light">board</Link> instead.
-        </EmptyState>
       )}
     </div>
   );

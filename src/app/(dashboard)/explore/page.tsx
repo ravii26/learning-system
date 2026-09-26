@@ -181,15 +181,15 @@ export default function ExplorePage() {
   };
 
   return (
-    <div style={{ maxWidth: '650px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+    <div style={{ maxWidth: '720px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px' }}>
       
       {/* HEADER */}
-      <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Exploration Mode</h1>
-        <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-          Explore random curiosities and micro-learn for 15-60 minutes without commitment.
+      <header className="flex flex-col gap-2">
+        <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Explore</h1>
+        <p className="m-0 text-[1.05rem] text-fg-secondary">
+          Try a curiosity for 15 to 60 minutes, no commitment. Then decide: worth a topic, worth a note, or not for you.
         </p>
-      </div>
+      </header>
 
       {/* SETUP STATE */}
       {sessionState === 'setup' && (
@@ -197,7 +197,7 @@ export default function ExplorePage() {
           <form onSubmit={(e) => { e.preventDefault(); startSession(); }} className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
             <div className="form-group">
-              <label className="form-label">What curiosity are you exploring?</label>
+              <label className="form-label">What are you curious about?</label>
               <input
                 type="text"
                 className="form-input"
@@ -221,18 +221,18 @@ export default function ExplorePage() {
                     style={{
                       fontSize: '0.85rem',
                       background: durationMinutes === mins ? 'var(--fill-3)' : 'var(--fill-1)',
-                      border: durationMinutes === mins ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
-                      color: durationMinutes === mins ? 'var(--color-primary-light)' : 'var(--color-text-secondary)',
+                      border: durationMinutes === mins ? '2px solid var(--ink)' : '1px solid var(--border-color)',
+                      color: durationMinutes === mins ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                     }}
                   >
-                    {mins} Minutes
+                    {mins} min
                   </button>
                 ))}
               </div>
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ alignSelf: 'center', marginTop: '12px' }}>
-              Start Exploration
+              Start exploring
             </button>
           </form>
 
@@ -373,7 +373,7 @@ export default function ExplorePage() {
       {sessionState === 'evaluate' && (
         <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div style={{ textAlign: 'center' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginTop: '8px' }}>Session Concluded: What's the verdict?</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginTop: '8px' }}>Time’s up. What’s the verdict?</h2>
             <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
               How do you evaluate <strong>"{topicTitle}"</strong> after this exploration?
             </p>
@@ -470,7 +470,7 @@ export default function ExplorePage() {
       {sessionState === 'saved' && (
         <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'center' }}>
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '8px' }}>Exploration Logged</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '8px' }}>Saved</h2>
             <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>
               Your session on <strong>"{topicTitle}"</strong> has been categorized and recorded in your learning operating system with your notes intact.
             </p>

@@ -2,11 +2,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import RoadmapWizard from '../RoadmapWizard';
+import { Icon } from '@/components/ui';
 
 /**
- * Goal list. Readiness is always shown as "met/total", never a bare
- * percentage — see src/lib/goalReadiness.ts and the project plan's
- * honesty rule on projections from a handful of goals.
+ * Goals: an outcome you want ("pass a backend interview"), broken into the
+ * topics that get you there. Readiness is always "met of total", never a
+ * percentage — see src/lib/goalReadiness.ts.
  */
 
 interface GoalRow {
@@ -20,17 +22,18 @@ interface GoalRow {
   _count?: { links: number };
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'var(--color-text-muted)',
-  active: 'var(--color-primary-light)',
-  achieved: 'var(--color-success)',
-  abandoned: 'var(--color-text-muted)',
-  paused: 'var(--color-warning)',
+const STATUS_WORD: Record<string, string> = {
+  draft: 'Draft',
+  active: 'Working on it',
+  achieved: 'Achieved',
+  abandoned: 'Let go',
+  paused: 'Paused',
 };
 
 export default function GoalsPage() {
   const [goals, setGoals] = useState<GoalRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [wizard, setWizard] = useState(false);
 
   const fetchGoals = useCallback(async () => {
     try {
@@ -47,61 +50,72 @@ export default function GoalsPage() {
     fetchGoals();
   }, [fetchGoals]);
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '760px' }}>
-        <div className="skeleton" style={{ height: '48px', borderRadius: '12px' }} />
-        {[...Array(2)].map((_, i) => <div key={i} className="skeleton" style={{ height: '90px', borderRadius: '12px' }} />)}
-      </div>
-    );
-  }
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '760px' }}>
-      <div>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Goals</h1>
-        <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-          Generate a roadmap from Plan to start one — an AI-decomposed outcome, tracked as criteria met, not a fabricated percentage.
-        </p>
-      </div>
+    <div className="mx-auto flex max-w-[860px] flex-col gap-9">
+      <header className="flex flex-wrap items-end justify-between gap-5">
+        <div className="flex flex-col gap-2">
+          <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Goals</h1>
+          <p className="m-0 max-w-[560px] text-[1.05rem] text-fg-secondary">
+            An outcome you want, broken into the topics that get you there — and how many of them are ready.
+          </p>
+        </div>
+        <button type="button" onClick={() => setWizard(true)} className="btn btn-primary h-11 py-0">
+          <Icon name="plus" size={16} /> Start a goal
+        </button>
+      </header>
 
-      {goals.length === 0 ? (
-        <div className="glass-panel" style={{ padding: '32px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-          No goals yet. Use "Generate AI Roadmap" from{' '}
-          <Link href="/plan" style={{ color: 'var(--color-primary-light)' }}>Plan</Link> to create one.
-        </div>
+      {loading ? (
+        <div className="flex flex-col gap-3">{[110, 110].map((h, i) => <div key={i} className="skeleton rounded-md" style={{ height: h }} />)}</div>
+      ) : goals.length === 0 ? (
+        <section className="flex flex-col items-start gap-3 rounded-xl bg-sunk p-7">
+          <h2 className="m-0 font-serif text-[1.6rem] font-normal">No goals yet</h2>
+          <p className="m-0 max-w-[520px] text-[1rem] text-fg-secondary">
+            Describe where you want to be — “pass a senior backend interview by June”. You’ll get a roadmap of topics to learn, each tracked on its own.
+          </p>
+          <button type="button" onClick={() => setWizard(true)} className="btn btn-secondary">Start a goal</button>
+        </section>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <ul className="m-0 flex list-none flex-col gap-3 p-0">
           {goals.map((g) => (
-            <Link
-              key={g.id}
-              href={`/goals/${g.id}`}
-              className="glass-card"
-              style={{
-                padding: '16px 18px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                borderLeft: `3px solid ${STATUS_COLORS[g.status] || 'var(--border-color)'}`,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                <span style={{ fontSize: '1rem', fontWeight: 700 }}>{g.title}</span>
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: STATUS_COLORS[g.status] }}>
-                  {g.status}
-                </span>
-              </div>
-              <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>{g.outcome}</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                <span>
-                  {g.readinessTotal > 0 ? `${g.readinessMet}/${g.readinessTotal} criteria met` : 'No criteria yet'}
-                </span>
-                {g._count && <span>· {g._count.links} linked</span>}
-                {g.targetDate && <span>· due {new Date(g.targetDate).toLocaleDateString()}</span>}
-              </div>
-            </Link>
+            <li key={g.id}>
+              <Link href={`/goals/${g.id}`} className="glass-panel flex flex-col gap-3 p-6 no-underline hover:border-line-hover hover:no-underline">
+                <div className="flex flex-wrap items-baseline justify-between gap-3">
+                  <span className="font-serif text-[1.5rem] font-medium leading-tight text-fg">{g.title}</span>
+                  <span className="text-[0.85rem] text-fg-muted">
+                    {STATUS_WORD[g.status] ?? g.status}
+                    {g.targetDate && ` · by ${new Date(g.targetDate).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}`}
+                  </span>
+                </div>
+                {g.outcome && <p className="m-0 text-[0.95rem] text-fg-secondary">{g.outcome}</p>}
+                <div className="flex flex-wrap items-center gap-3">
+                  {g.readinessTotal > 0 ? (
+                    <>
+                      <span className="flex gap-1" aria-hidden="true">
+                        {Array.from({ length: g.readinessTotal }, (_, i) => (
+                          <span key={i} className={`h-4 w-4 rounded-[4px] ${i < g.readinessMet ? 'bg-ink' : 'shadow-[inset_0_0_0_1.5px_var(--k-unseen)]'}`} />
+                        ))}
+                      </span>
+                      <span className="text-[0.9rem] font-semibold text-fg">{g.readinessMet} of {g.readinessTotal} ready</span>
+                    </>
+                  ) : (
+                    <span className="text-[0.9rem] text-fg-muted">No topics linked yet</span>
+                  )}
+                  {g._count && g._count.links > 0 && <span className="text-[0.85rem] text-fg-muted">· {g._count.links} topics</span>}
+                </div>
+              </Link>
+            </li>
           ))}
-        </div>
+        </ul>
+      )}
+
+      {wizard && (
+        <RoadmapWizard
+          onClose={() => setWizard(false)}
+          onComplete={() => {
+            setWizard(false);
+            fetchGoals();
+          }}
+        />
       )}
     </div>
   );
