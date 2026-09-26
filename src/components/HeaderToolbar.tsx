@@ -14,7 +14,7 @@ export default function HeaderToolbar() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.key?.toLowerCase() === 'k') {
         e.preventDefault();
         setIsPaletteOpen((prev) => !prev);
         return;
@@ -22,7 +22,7 @@ export default function HeaderToolbar() {
 
       // Global capture hotkey (Fix 5: capture must work from anywhere).
       // Skip while typing, or while the search palette is already open.
-      if (e.key.toLowerCase() !== 'c' || e.ctrlKey || e.metaKey || e.altKey || isPaletteOpen) return;
+      if (e.key?.toLowerCase() !== 'c' || e.ctrlKey || e.metaKey || e.altKey || isPaletteOpen) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
       e.preventDefault();

@@ -27,7 +27,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   // Keyboard shortcut Ctrl+K listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.key?.toLowerCase() === 'k') {
         e.preventDefault();
         if (isOpen) {
           onClose();
