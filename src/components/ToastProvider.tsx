@@ -1,5 +1,6 @@
 'use client';
 
+import { Icon } from '@/components/ui/Icon';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -91,38 +92,28 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                   gap: '12px',
                   padding: '14px 18px',
                   borderRadius: '12px',
-                  background: 'rgba(20, 20, 30, 0.95)',
-                  backdropFilter: 'blur(16px)',
-                  WebkitBackdropFilter: 'blur(16px)',
-                  border:
-                    t.type === 'success'
-                      ? '1px solid rgba(16, 185, 129, 0.4)'
-                      : t.type === 'error'
-                      ? '1px solid rgba(239, 68, 68, 0.4)'
-                      : t.type === 'warning'
-                      ? '1px solid rgba(245, 158, 11, 0.4)'
-                      : '1px solid rgba(99, 102, 241, 0.4)',
-                  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(0, 0, 0, 0.3)',
-                  color: '#f3f4f6',
+                  background: 'var(--bg-surface)',
+                  boxShadow: 'var(--shadow-pop)',
+                  border: t.type === 'error' ? '1px solid var(--danger-line)' : '1px solid var(--border-color)',
+                  color: 'var(--color-text-primary)',
                   animation: 'fadeIn 0.2s ease-out',
                 }}
               >
-                <div style={{ fontSize: '1.2rem', lineHeight: 1, marginTop: '2px' }}>
-                  {t.type === 'success' && '✨'}
-                  {t.type === 'error' && '🚨'}
-                  {t.type === 'warning' && '⚠️'}
-                  {t.type === 'info' && '💡'}
-                </div>
+                {(t.type === 'success' || t.type === 'error') && (
+                  <span style={{ marginTop: '1px', color: t.type === 'success' ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                    <Icon name={t.type === 'success' ? 'check' : 'close'} size={18} strokeWidth={2.2} />
+                  </span>
+                )}
                 <div style={{ flex: 1 }}>
                   {t.title && <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '2px' }}>{t.title}</div>}
-                  <div style={{ fontSize: '0.83rem', color: '#d1d5db', lineHeight: 1.4 }}>{t.message}</div>
+                  <div style={{ fontSize: '0.83rem', color: 'var(--color-text-primary)', lineHeight: 1.4 }}>{t.message}</div>
                 </div>
                 <button
                   onClick={() => removeToast(t.id)}
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: '#9ca3af',
+                    color: 'var(--color-text-muted)',
                     cursor: 'pointer',
                     fontSize: '1rem',
                     lineHeight: 1,

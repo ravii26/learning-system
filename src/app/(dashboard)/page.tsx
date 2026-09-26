@@ -255,7 +255,7 @@ export default function TodayPage() {
           <form onSubmit={handleQuickStart} className="flex gap-2.5">
             <input
               type="text"
-              className="form-input flex-1 rounded-md border border-white/10 bg-white/5 px-4 py-2.5 text-[0.95rem]"
+              className="form-input flex-1 rounded-md border border-line bg-fill-2 px-4 py-2.5 text-[0.95rem]"
               placeholder='e.g. "React", "Data Structures", "Personal Finance", "Guitar"'
               value={quickStartTitle}
               onChange={(e) => setQuickStartTitle(e.target.value)}
@@ -369,7 +369,7 @@ export default function TodayPage() {
               {time.byTopic.slice(0, 4).map((t) => (
                 <Link key={t.topicId} href={`/topics/${t.topicId}`} className="flex items-center gap-2 text-[0.8rem]">
                   <span className="min-w-0 flex-1 truncate text-fg-secondary">{t.title}</span>
-                  <span className="h-1.5 w-24 overflow-hidden rounded-full bg-white/5">
+                  <span className="h-1.5 w-24 overflow-hidden rounded-full bg-fill-2">
                     <span
                       className="block h-full rounded-full bg-primary"
                       style={{ width: `${Math.max(4, Math.round((t.seconds / Math.max(1, time.byTopic[0].seconds)) * 100))}%` }}

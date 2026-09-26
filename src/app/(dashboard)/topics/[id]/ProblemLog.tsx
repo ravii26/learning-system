@@ -114,7 +114,7 @@ export default function ProblemLog({ topicId, moduleId, onChanged }: { topicId: 
       </div>
 
       {open && (
-        <form onSubmit={submit} className="flex flex-col gap-3 rounded-md border border-line bg-black/20 p-4">
+        <form onSubmit={submit} className="flex flex-col gap-3 rounded-md border border-line bg-sunk p-4">
           <div className="grid grid-cols-[2fr_1fr] gap-2.5">
             <Field label="Problem" htmlFor="pl-title">
               <Input id="pl-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Minimum window substring" autoFocus />
@@ -136,7 +136,7 @@ export default function ProblemLog({ topicId, moduleId, onChanged }: { topicId: 
                   type="button"
                   aria-pressed={outcome === o}
                   onClick={() => setOutcome(o)}
-                  className={`min-h-[40px] rounded-md border px-3.5 text-[0.85rem] font-semibold ${outcome === o ? 'border-fg bg-white/10 text-fg' : 'border-line bg-transparent text-fg-secondary'}`}
+                  className={`min-h-[40px] rounded-md border px-3.5 text-[0.85rem] font-semibold ${outcome === o ? 'border-fg bg-fill-3 text-fg' : 'border-line bg-transparent text-fg-secondary'}`}
                 >
                   {OUTCOME_LABEL[o]}
                 </button>

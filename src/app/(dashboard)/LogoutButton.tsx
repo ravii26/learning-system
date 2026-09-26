@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Icon } from '@/components/ui/Icon';
 
 export default function LogoutButton() {
   const router = useRouter();
@@ -43,9 +44,10 @@ export default function LogoutButton() {
         aria-label="User menu"
         aria-expanded={open}
       >
-        <div className="avatar-circle">LO</div>
-        <span style={{ fontSize: '0.82rem' }}>Account</span>
-        <span style={{ fontSize: '0.65rem', opacity: 0.6, marginLeft: '-2px' }}>{open ? '▲' : '▼'}</span>
+        <div className="avatar-circle">
+          <Icon name="you" size={15} />
+        </div>
+        <span className="hidden text-[0.82rem] sm:inline">Account</span>
       </button>
 
       {open && (
@@ -56,15 +58,15 @@ export default function LogoutButton() {
             marginBottom: '4px',
           }}>
             <p style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>Learning OS</p>
-            <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>Single User Mode</p>
+            <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>Your personal workspace</p>
           </div>
           <button
             className="avatar-dropdown-item danger"
             onClick={handleSignOut}
             disabled={signingOut}
           >
-            <span>🚪</span>
-            <span>{signingOut ? 'Signing out...' : 'Sign Out'}</span>
+            <Icon name="logout" size={16} />
+            <span>{signingOut ? 'Signing out…' : 'Sign out'}</span>
           </button>
         </div>
       )}

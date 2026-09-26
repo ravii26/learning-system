@@ -233,7 +233,7 @@ export default function SocraticCoach({
   // Retrieval Guard overlay block
   if (explanationsRead >= 3) {
     return (
-      <div className="glass-panel" style={{ padding: '32px', borderLeft: '4px solid var(--color-danger)', background: 'rgba(239, 68, 68, 0.03)' }}>
+      <div className="glass-panel" style={{ padding: '32px', borderLeft: '4px solid var(--color-danger)', background: 'var(--danger-tint)' }}>
         <div style={{ fontSize: '3rem', textAlign: 'center', marginBottom: '16px' }}>🚨</div>
         <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-danger)', textAlign: 'center', marginBottom: '8px' }}>
           Fake Progress Warning (Retrieval Guard)
@@ -243,7 +243,7 @@ export default function SocraticCoach({
         </p>
 
         {stageError && (
-          <div style={{ padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', fontSize: '0.8rem', marginBottom: '16px' }}>
+          <div style={{ padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--danger-tint)', border: '1px solid var(--danger-line)', color: 'var(--color-danger)', fontSize: '0.8rem', marginBottom: '16px' }}>
             ⚠️ {stageError}
           </div>
         )}
@@ -254,7 +254,7 @@ export default function SocraticCoach({
           </label>
           <textarea
             className="form-input"
-            style={{ width: '100%', height: '120px', resize: 'none', background: 'rgba(0,0,0,0.3)', fontFamily: 'monospace' }}
+            style={{ width: '100%', height: '120px', resize: 'none', background: 'var(--bg-sunk)', fontFamily: 'monospace' }}
             placeholder="Type what you remember about this concept from memory. No looking back!"
             value={retrievalInput}
             onChange={(e) => setRetrievalInput(e.target.value)}
@@ -297,19 +297,19 @@ export default function SocraticCoach({
                 padding: '2px 8px',
                 borderRadius: '9999px',
                 background: loadingAi
-                  ? 'rgba(234, 179, 8, 0.15)'
+                  ? 'var(--warning-tint)'
                   : template.isAi
-                  ? 'rgba(16, 185, 129, 0.15)'
-                  : 'rgba(99, 102, 241, 0.15)',
+                  ? 'var(--success-tint)'
+                  : 'var(--fill-3)',
                 border: loadingAi
-                  ? '1px solid #eab308'
+                  ? '1px solid var(--color-warning)'
                   : template.isAi
-                  ? '1px solid #10b981'
+                  ? '1px solid var(--color-success)'
                   : '1px solid var(--color-primary-light)',
                 color: loadingAi
-                  ? '#eab308'
+                  ? 'var(--color-warning)'
                   : template.isAi
-                  ? '#10b981'
+                  ? 'var(--color-success)'
                   : 'var(--color-primary-light)',
                 fontWeight: 600,
               }}
@@ -320,7 +320,7 @@ export default function SocraticCoach({
 
           {!isEditingTitle ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
-              <h3 style={{ fontSize: '1.3rem', fontWeight: 700, color: '#fff' }}>{displayConceptTitle}</h3>
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>{displayConceptTitle}</h3>
               <button
                 type="button"
                 onClick={() => { setIsEditingTitle(true); setEditedTitleInput(displayConceptTitle); }}
@@ -367,7 +367,7 @@ export default function SocraticCoach({
       </div>
 
       {stageError && (
-        <div style={{ padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', fontSize: '0.8rem' }}>
+        <div style={{ padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--danger-tint)', border: '1px solid var(--danger-line)', color: 'var(--color-danger)', fontSize: '0.8rem' }}>
           ⚠️ {stageError}
         </div>
       )}
@@ -390,7 +390,7 @@ export default function SocraticCoach({
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '1.1rem' }}>{current.icon}</span>
-                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>
+                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
                   Step {current.step} of {stages.length}: {current.name}
                 </span>
               </div>
@@ -416,14 +416,14 @@ export default function SocraticCoach({
                       background: isActive
                         ? 'var(--color-primary)'
                         : isPassed
-                        ? 'rgba(99, 102, 241, 0.25)'
-                        : 'rgba(255, 255, 255, 0.05)',
+                        ? 'var(--fill-4)'
+                        : 'var(--fill-2)',
                       border: isActive
                         ? '1px solid var(--color-primary-light)'
                         : isPassed
-                        ? '1px solid rgba(99, 102, 241, 0.4)'
-                        : '1px solid rgba(255, 255, 255, 0.08)',
-                      color: isActive ? '#fff' : isPassed ? '#c7d2fe' : 'var(--color-text-muted)',
+                        ? '1px solid var(--fill-4)'
+                        : '1px solid var(--fill-3)',
+                      color: isActive ? 'var(--color-text-primary)' : isPassed ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
                       fontSize: '0.72rem',
                       fontWeight: isActive ? 700 : 500,
                       cursor: 'pointer',
@@ -444,10 +444,10 @@ export default function SocraticCoach({
             <div style={{
               padding: '12px 16px',
               borderRadius: 'var(--radius-sm)',
-              background: 'rgba(99, 102, 241, 0.08)',
-              border: '1px solid rgba(99, 102, 241, 0.25)',
+              background: 'var(--fill-2)',
+              border: '1px solid var(--fill-4)',
               fontSize: '0.84rem',
-              color: '#c7d2fe',
+              color: 'var(--color-text-primary)',
               fontWeight: 500,
               display: 'flex',
               alignItems: 'center',
@@ -519,7 +519,7 @@ export default function SocraticCoach({
             </label>
             <textarea
               className="form-input"
-              style={{ width: '100%', height: '110px', resize: 'none', background: 'rgba(0,0,0,0.25)', fontFamily: 'monospace' }}
+              style={{ width: '100%', height: '110px', resize: 'none', background: 'var(--bg-sunk)', fontFamily: 'monospace' }}
               placeholder="What did you just learn? Summarize the concept rules in your own words..."
               value={retrievalInput}
               onChange={(e) => setRetrievalInput(e.target.value)}
@@ -535,12 +535,12 @@ export default function SocraticCoach({
             <label className="form-label" style={{ color: 'var(--color-secondary-light)' }}>
               APPLICATION CHALLENGE
             </label>
-            <p style={{ fontSize: '0.9rem', fontStyle: 'italic', background: 'rgba(0,0,0,0.15)', padding: '12px', borderRadius: 'var(--radius-sm)' }}>
+            <p style={{ fontSize: '0.9rem', fontStyle: 'italic', background: 'var(--bg-sunk)', padding: '12px', borderRadius: 'var(--radius-sm)' }}>
               {template.apply}
             </p>
             <textarea
               className="form-input"
-              style={{ width: '100%', height: '100px', resize: 'none', background: 'rgba(0,0,0,0.25)', fontFamily: 'monospace' }}
+              style={{ width: '100%', height: '100px', resize: 'none', background: 'var(--bg-sunk)', fontFamily: 'monospace' }}
               placeholder="Type your design solution or code draft..."
               value={applyInput}
               onChange={(e) => setApplyInput(e.target.value)}
@@ -555,22 +555,22 @@ export default function SocraticCoach({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* AI Evaluation feedback card */}
             {loadingEval ? (
-              <div style={{ padding: '14px', borderRadius: 'var(--radius-sm)', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)', fontSize: '0.82rem', color: 'var(--color-primary-light)' }}>
+              <div style={{ padding: '14px', borderRadius: 'var(--radius-sm)', background: 'var(--fill-2)', border: '1px solid var(--fill-4)', fontSize: '0.82rem', color: 'var(--color-primary-light)' }}>
                 ✨ Groq AI is analyzing your response and comparing with ideal model...
               </div>
             ) : aiEval && (
-              <div style={{ padding: '16px', borderRadius: 'var(--radius-sm)', background: 'rgba(99, 102, 241, 0.06)', border: '1px solid rgba(99, 102, 241, 0.25)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ padding: '16px', borderRadius: 'var(--radius-sm)', background: 'var(--fill-1)', border: '1px solid var(--fill-4)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span>🤖</span>
                   <strong style={{ fontSize: '0.85rem', color: 'var(--color-primary-light)' }}>Groq AI Socratic Evaluation</strong>
                 </div>
                 {aiEval.captured && (
-                  <div style={{ fontSize: '0.8rem', color: '#10b981' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-success)' }}>
                     <strong>✅ What you captured:</strong> {aiEval.captured}
                   </div>
                 )}
                 {aiEval.missed && (
-                  <div style={{ fontSize: '0.8rem', color: '#f59e0b' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-warning)' }}>
                     <strong>⚠️ What to improve:</strong> {aiEval.missed}
                   </div>
                 )}
@@ -585,13 +585,13 @@ export default function SocraticCoach({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
                 <span className="form-label">YOUR DRAFT SOLUTION</span>
-                <div style={{ fontSize: '0.8rem', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: 'var(--radius-sm)', minHeight: '80px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                <div style={{ fontSize: '0.8rem', background: 'var(--bg-sunk)', padding: '10px', borderRadius: 'var(--radius-sm)', minHeight: '80px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
                   {applyInput}
                 </div>
               </div>
               <div>
                 <span className="form-label" style={{ color: 'var(--color-success)' }}>IDEAL ANALYSIS / COMPARISON</span>
-                <div style={{ fontSize: '0.8rem', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.15)', padding: '10px', borderRadius: 'var(--radius-sm)', minHeight: '80px', whiteSpace: 'pre-wrap' }}>
+                <div style={{ fontSize: '0.8rem', background: 'var(--success-tint)', border: '1px solid var(--success-tint)', padding: '10px', borderRadius: 'var(--radius-sm)', minHeight: '80px', whiteSpace: 'pre-wrap' }}>
                   {template.idealAnswer}
                 </div>
               </div>
@@ -599,7 +599,7 @@ export default function SocraticCoach({
 
             {/* Self-Assessment Check */}
             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-              <label className="form-label" style={{ marginBottom: '10px', fontSize: '0.82rem', color: '#fff' }}>
+              <label className="form-label" style={{ marginBottom: '10px', fontSize: '0.82rem', color: 'var(--color-text-primary)' }}>
                 SELF-ASSESSMENT: HOW DID YOU DO?
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
@@ -615,7 +615,7 @@ export default function SocraticCoach({
                     alignItems: 'flex-start',
                     gap: '4px',
                     textAlign: 'left',
-                    background: selfAssessment === 'correct' ? 'rgba(16, 185, 129, 0.18)' : 'rgba(255,255,255,0.03)',
+                    background: selfAssessment === 'correct' ? 'var(--success-tint)' : 'var(--fill-2)',
                     border: selfAssessment === 'correct' ? '2px solid var(--color-success)' : '1px solid var(--border-color)',
                     color: selfAssessment === 'correct' ? 'var(--color-success)' : 'var(--color-text-primary)',
                     cursor: 'pointer',
@@ -638,7 +638,7 @@ export default function SocraticCoach({
                     alignItems: 'flex-start',
                     gap: '4px',
                     textAlign: 'left',
-                    background: selfAssessment === 'partial' ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255,255,255,0.03)',
+                    background: selfAssessment === 'partial' ? 'var(--warning-tint)' : 'var(--fill-2)',
                     border: selfAssessment === 'partial' ? '2px solid var(--color-warning)' : '1px solid var(--border-color)',
                     color: selfAssessment === 'partial' ? 'var(--color-warning)' : 'var(--color-text-primary)',
                     cursor: 'pointer',
@@ -661,7 +661,7 @@ export default function SocraticCoach({
                     alignItems: 'flex-start',
                     gap: '4px',
                     textAlign: 'left',
-                    background: selfAssessment === 'wrong' ? 'rgba(239, 68, 68, 0.18)' : 'rgba(255,255,255,0.03)',
+                    background: selfAssessment === 'wrong' ? 'var(--danger-tint)' : 'var(--fill-2)',
                     border: selfAssessment === 'wrong' ? '2px solid var(--color-danger)' : '1px solid var(--border-color)',
                     color: selfAssessment === 'wrong' ? 'var(--color-danger)' : 'var(--color-text-primary)',
                     cursor: 'pointer',
@@ -676,7 +676,7 @@ export default function SocraticCoach({
 
             {/* Mistake Bank Logger Inline */}
             {(selfAssessment === 'wrong' || selfAssessment === 'partial') && (
-              <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(239,68,68,0.02)' }}>
+              <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', background: 'var(--danger-tint)' }}>
                 <span className="form-label" style={{ color: 'var(--color-danger)', marginBottom: 0 }}>LOG TO MISTAKE BANK</span>
                 <input
                   type="text"

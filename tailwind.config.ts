@@ -17,9 +17,18 @@ const config: Config = {
         // Not "base": `text-base` is Tailwind's font-size utility, and a
         // color of that name makes it paint text near-black as well.
         canvas: 'var(--bg-base)',
+        sunk: 'var(--bg-sunk)',
+        ink: 'var(--ink)',
+        'on-ink': 'var(--on-ink)',
+        fill: {
+          1: 'var(--fill-1)',
+          2: 'var(--fill-2)',
+          3: 'var(--fill-3)',
+          4: 'var(--fill-4)',
+        },
         surface: { DEFAULT: 'var(--bg-surface)', hover: 'var(--bg-surface-hover)' },
         card: { DEFAULT: 'var(--bg-card)', hover: 'var(--bg-card-hover)' },
-        line: { DEFAULT: 'var(--border-color)', hover: 'var(--border-color-hover)' },
+        line: { DEFAULT: 'var(--border-color)', hover: 'var(--border-color-hover)', strong: 'var(--border-strong)' },
         fg: {
           DEFAULT: 'var(--color-text-primary)',
           secondary: 'var(--color-text-secondary)',
@@ -46,6 +55,12 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-sans)'],
+        serif: ['var(--font-serif)'],
+        mono: ['var(--font-mono)'],
+      },
+      boxShadow: {
+        card: 'var(--shadow-card)',
+        pop: 'var(--shadow-pop)',
       },
     },
   },

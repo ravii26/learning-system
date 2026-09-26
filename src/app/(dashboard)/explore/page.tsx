@@ -221,7 +221,7 @@ export default function ExplorePage() {
                     className="btn"
                     style={{
                       fontSize: '0.85rem',
-                      background: durationMinutes === mins ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255,255,255,0.02)',
+                      background: durationMinutes === mins ? 'var(--fill-3)' : 'var(--fill-1)',
                       border: durationMinutes === mins ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
                       color: durationMinutes === mins ? 'var(--color-primary-light)' : 'var(--color-text-secondary)',
                     }}
@@ -285,7 +285,7 @@ export default function ExplorePage() {
               Exploring: "{topicTitle}"
             </span>
             
-            <div style={{ fontSize: '4.5rem', fontWeight: 700, fontFamily: 'monospace', color: sessionState === 'paused' ? 'var(--color-text-muted)' : '#fff', letterSpacing: '-0.05em' }}>
+            <div style={{ fontSize: '4.5rem', fontWeight: 700, fontFamily: 'monospace', color: sessionState === 'paused' ? 'var(--color-text-muted)' : 'var(--color-text-primary)', letterSpacing: '-0.05em' }}>
               {formatTime(secondsRemaining)}
             </div>
 
@@ -310,7 +310,7 @@ export default function ExplorePage() {
           <div className="glass-panel" style={{ padding: '24px' }}>
             <div className="flex-between" style={{ marginBottom: '8px' }}>
               <label className="form-label" style={{ marginBottom: 0 }}>Curiosity scratchpad (fast notes)</label>
-              <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-sunk)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
                 <button
                   type="button"
                   onClick={() => setNotesMode('write')}
@@ -320,7 +320,7 @@ export default function ExplorePage() {
                     fontWeight: 500,
                     borderRadius: '4px',
                     background: notesMode === 'write' ? 'var(--color-primary)' : 'transparent',
-                    color: notesMode === 'write' ? '#fff' : 'var(--color-text-secondary)',
+                    color: notesMode === 'write' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   }}
                 >
                   ✍️ Write
@@ -334,7 +334,7 @@ export default function ExplorePage() {
                     fontWeight: 500,
                     borderRadius: '4px',
                     background: notesMode === 'preview' ? 'var(--color-primary)' : 'transparent',
-                    color: notesMode === 'preview' ? '#fff' : 'var(--color-text-secondary)',
+                    color: notesMode === 'preview' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   }}
                 >
                   👁️ Preview
@@ -346,7 +346,7 @@ export default function ExplorePage() {
               <textarea
                 className="form-input"
                 placeholder="Jot down interesting concepts, takeaways, or links during your exploration (supports Markdown)..."
-                style={{ width: '100%', height: '250px', resize: 'vertical', background: 'rgba(0, 0, 0, 0.25)', fontFamily: 'monospace' }}
+                style={{ width: '100%', height: '250px', resize: 'vertical', background: 'var(--bg-sunk)', fontFamily: 'monospace' }}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
@@ -358,7 +358,7 @@ export default function ExplorePage() {
                   minHeight: '250px',
                   maxHeight: '400px',
                   overflowY: 'auto',
-                  background: 'rgba(0, 0, 0, 0.25)',
+                  background: 'var(--bg-sunk)',
                   border: '1px solid var(--border-color)',
                   padding: '12px 14px',
                   borderRadius: 'var(--radius-sm)',
@@ -393,7 +393,7 @@ export default function ExplorePage() {
                 style={{
                   justifyContent: 'flex-start',
                   fontSize: '0.85rem',
-                  background: outcome === 'interesting' ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                  background: outcome === 'interesting' ? 'var(--fill-2)' : 'transparent',
                   border: outcome === 'interesting' ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
                   color: outcome === 'interesting' ? 'var(--color-primary-light)' : 'var(--color-text-secondary)',
                 }}
@@ -408,7 +408,7 @@ export default function ExplorePage() {
                 style={{
                   justifyContent: 'flex-start',
                   fontSize: '0.85rem',
-                  background: outcome === 'useful' ? 'rgba(20, 184, 166, 0.1)' : 'transparent',
+                  background: outcome === 'useful' ? 'var(--fill-2)' : 'transparent',
                   border: outcome === 'useful' ? '1px solid var(--color-secondary)' : '1px solid var(--border-color)',
                   color: outcome === 'useful' ? 'var(--color-secondary-light)' : 'var(--color-text-secondary)',
                 }}
@@ -423,9 +423,9 @@ export default function ExplorePage() {
                 style={{
                   justifyContent: 'flex-start',
                   fontSize: '0.85rem',
-                  background: outcome === 'important' ? 'rgba(168, 85, 247, 0.1)' : 'transparent',
+                  background: outcome === 'important' ? 'var(--fill-2)' : 'transparent',
                   border: outcome === 'important' ? '1px solid var(--color-accent)' : '1px solid var(--border-color)',
-                  color: outcome === 'important' ? '#d8b4fe' : 'var(--color-text-secondary)',
+                  color: outcome === 'important' ? 'var(--color-text-secondary)' : 'var(--color-text-secondary)',
                 }}
               >
                 🚀 <strong>Important</strong> — Queue high-priority and plan activation
@@ -438,9 +438,9 @@ export default function ExplorePage() {
                 style={{
                   justifyContent: 'flex-start',
                   fontSize: '0.85rem',
-                  background: outcome === 'curiosity' ? 'rgba(107, 114, 128, 0.15)' : 'transparent',
-                  border: outcome === 'curiosity' ? '1px solid rgba(255,255,255,0.15)' : '1px solid var(--border-color)',
-                  color: outcome === 'curiosity' ? '#f3f4f6' : 'var(--color-text-secondary)',
+                  background: outcome === 'curiosity' ? 'var(--fill-3)' : 'transparent',
+                  border: outcome === 'curiosity' ? '1px solid var(--fill-4)' : '1px solid var(--border-color)',
+                  color: outcome === 'curiosity' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 }}
               >
                 📖 <strong>Just Curiosity</strong> — File in Reference only for future lookup
@@ -453,7 +453,7 @@ export default function ExplorePage() {
                 style={{
                   justifyContent: 'flex-start',
                   fontSize: '0.85rem',
-                  background: outcome === 'useless' ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
+                  background: outcome === 'useless' ? 'var(--danger-tint)' : 'transparent',
                   border: outcome === 'useless' ? '1px solid var(--color-danger)' : '1px solid var(--border-color)',
                   color: outcome === 'useless' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
                 }}

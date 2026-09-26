@@ -20,27 +20,27 @@ interface KnowledgeMapProps {
 }
 
 const MASTERY_COLORS: Record<string, string> = {
-  Unknown: 'rgba(107, 114, 128, 0.2)', // Gray
-  Exposed: 'rgba(99, 102, 241, 0.15)', // Indigo
-  Understood: 'rgba(59, 130, 246, 0.15)', // Blue
-  'Can Recall': 'rgba(168, 85, 247, 0.15)', // Purple
-  'Can Apply': 'rgba(20, 184, 166, 0.15)', // Teal
-  'Can Solve': 'rgba(236, 72, 153, 0.15)', // Pink
-  'Can Explain': 'rgba(245, 158, 11, 0.15)', // Orange
-  'Can Teach': 'rgba(16, 185, 129, 0.15)', // Emerald
-  'Can Create': 'rgba(16, 185, 129, 0.25)', // Bright Emerald
+  Unknown: 'var(--fill-4)', // Gray
+  Exposed: 'var(--fill-3)', // Indigo
+  Understood: 'var(--fill-3)', // Blue
+  'Can Recall': 'var(--fill-3)', // Purple
+  'Can Apply': 'var(--fill-3)', // Teal
+  'Can Solve': 'var(--fill-2)', // Pink
+  'Can Explain': 'var(--warning-tint)', // Orange
+  'Can Teach': 'var(--success-tint)', // Emerald
+  'Can Create': 'var(--success-line)', // Bright Emerald
 };
 
 const MASTERY_TEXT: Record<string, string> = {
-  Unknown: '#9ca3af',
-  Exposed: '#818cf8',
-  Understood: '#60a5fa',
-  'Can Recall': '#c084fc',
-  'Can Apply': '#2dd4bf',
-  'Can Solve': '#f472b6',
-  'Can Explain': '#fb923c',
-  'Can Teach': '#34d399',
-  'Can Create': '#059669',
+  Unknown: 'var(--color-text-muted)',
+  Exposed: 'var(--color-text-primary)',
+  Understood: 'var(--color-text-primary)',
+  'Can Recall': 'var(--color-text-secondary)',
+  'Can Apply': 'var(--color-text-secondary)',
+  'Can Solve': 'var(--color-text-secondary)',
+  'Can Explain': 'var(--color-warning)',
+  'Can Teach': 'var(--color-success)',
+  'Can Create': 'var(--color-success)',
 };
 
 export default function KnowledgeMap({
@@ -179,7 +179,7 @@ export default function KnowledgeMap({
           className={`glass-card ${isSelected ? 'glass-panel-hover' : ''}`}
           style={{
             padding: '12px 16px',
-            background: isSelected ? 'rgba(99, 102, 241, 0.12)' : 'rgba(25, 25, 35, 0.35)',
+            background: isSelected ? 'var(--fill-2)' : 'var(--bg-surface)',
             border: isSelected ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
             display: 'flex',
             alignItems: 'center',
@@ -274,7 +274,7 @@ export default function KnowledgeMap({
 
       {/* Add Concept Inline Form */}
       {showAddConcept && (
-        <form onSubmit={handleAddConcept} className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.2)' }}>
+        <form onSubmit={handleAddConcept} className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--bg-sunk)' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label" style={{ fontSize: '0.7rem' }}>CONCEPT TITLE</label>
             <input
@@ -295,7 +295,7 @@ export default function KnowledgeMap({
                 className="form-input"
                 value={newParent}
                 onChange={(e) => setNewParent(e.target.value)}
-                style={{ fontSize: '0.85rem', padding: '8px', background: '#121218' }}
+                style={{ fontSize: '0.85rem', padding: '8px', background: 'var(--bg-surface)' }}
               >
                 <option value="">None (Root Node)</option>
                 {concepts.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
@@ -308,7 +308,7 @@ export default function KnowledgeMap({
                 className="form-input"
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value as any)}
-                style={{ fontSize: '0.85rem', padding: '8px', background: '#121218' }}
+                style={{ fontSize: '0.85rem', padding: '8px', background: 'var(--bg-surface)' }}
               >
                 <option value="Low">Low</option>
                 <option value="Medium">Medium</option>
@@ -322,7 +322,7 @@ export default function KnowledgeMap({
                 className="form-input"
                 value={importance}
                 onChange={(e) => setImportance(e.target.value as any)}
-                style={{ fontSize: '0.85rem', padding: '8px', background: '#121218' }}
+                style={{ fontSize: '0.85rem', padding: '8px', background: 'var(--bg-surface)' }}
               >
                 <option value="Low">Low</option>
                 <option value="Medium">Medium</option>

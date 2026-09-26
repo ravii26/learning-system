@@ -3,7 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import CommandPalette from './CommandPalette';
+import ThemeToggle from './ThemeToggle';
 import LogoutButton from '@/app/(dashboard)/LogoutButton';
+import { Icon } from '@/components/ui/Icon';
 
 export default function HeaderToolbar() {
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
@@ -23,7 +25,6 @@ export default function HeaderToolbar() {
       if (e.key.toLowerCase() !== 'c' || e.ctrlKey || e.metaKey || e.altKey || isPaletteOpen) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
-
       e.preventDefault();
       if (pathname === '/') {
         // Already on the Today screen — focus its capture input directly,
@@ -36,46 +37,25 @@ export default function HeaderToolbar() {
         router.push('/?focus=capture');
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isPaletteOpen, pathname, router]);
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => setIsPaletteOpen(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '6px 14px',
-            borderRadius: '9999px',
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            color: 'var(--color-text-secondary)',
-            fontSize: '0.82rem',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-          className="glass-panel-hover"
-          title="Search topics or actions (Ctrl+K)"
+          className="flex h-10 items-center gap-2.5 rounded-[10px] border border-line bg-surface px-3 text-[0.875rem] text-fg-muted hover:border-line-hover sm:min-w-[240px]"
+          title="Search topics and actions (Ctrl+K)"
         >
-          <span>🔍</span>
-          <span>Quick Search...</span>
-          <kbd
-            style={{
-              background: 'rgba(255, 255, 255, 0.1)',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              fontSize: '0.72rem',
-              color: '#818cf8',
-            }}
-          >
-            ⌘K
-          </kbd>
+          <Icon name="search" size={16} />
+          <span className="hidden flex-1 text-left sm:inline">Search</span>
+          <kbd className="hidden rounded bg-sunk px-1.5 py-0.5 font-mono text-[0.7rem] text-fg-secondary sm:inline">Ctrl K</kbd>
         </button>
+        <ThemeToggle />
         <LogoutButton />
       </div>
 
@@ -83,5 +63,3 @@ export default function HeaderToolbar() {
     </>
   );
 }
-
-

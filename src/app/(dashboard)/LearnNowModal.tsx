@@ -151,7 +151,7 @@ export default function LearnNowModal({
     <div style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.88)',
+      background: 'var(--bg-overlay)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 1400, padding: '16px'
     }}>
@@ -174,7 +174,7 @@ export default function LearnNowModal({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label" style={{ fontSize: '0.7rem' }}>TIME AVAILABLE</label>
-                <select className="form-input" value={time} onChange={(e) => setTime(Number(e.target.value))} style={{ background: '#121218' }}>
+                <select className="form-input" value={time} onChange={(e) => setTime(Number(e.target.value))} style={{ background: 'var(--bg-surface)' }}>
                   <option value={5}>5 Minutes</option>
                   <option value={15}>15 Minutes</option>
                   <option value={30}>30 Minutes</option>
@@ -185,7 +185,7 @@ export default function LearnNowModal({
 
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label" style={{ fontSize: '0.7rem' }}>ENERGY LEVEL</label>
-                <select className="form-input" value={energy} onChange={(e) => setEnergy(e.target.value as any)} style={{ background: '#121218' }}>
+                <select className="form-input" value={energy} onChange={(e) => setEnergy(e.target.value as any)} style={{ background: 'var(--bg-surface)' }}>
                   <option value="low">Low Energy (Review)</option>
                   <option value="normal">Normal Energy</option>
                   <option value="high">High Energy (Focus)</option>
@@ -194,7 +194,7 @@ export default function LearnNowModal({
 
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label" style={{ fontSize: '0.7rem' }}>CONTEXT</label>
-                <select className="form-input" value={context} onChange={(e) => setContext(e.target.value as any)} style={{ background: '#121218' }}>
+                <select className="form-input" value={context} onChange={(e) => setContext(e.target.value as any)} style={{ background: 'var(--bg-surface)' }}>
                   <option value="desk">At Desk (Coding/Project)</option>
                   <option value="commute">On Commute (Audio/Reading)</option>
                   <option value="break">Short Break (Recall)</option>
@@ -204,7 +204,7 @@ export default function LearnNowModal({
             </div>
 
             {/* Plan Recommendation Previews */}
-            <div className="glass-card" style={{ padding: '16px', background: 'rgba(99, 102, 241, 0.04)', border: '1px solid rgba(99, 102, 241, 0.15)' }}>
+            <div className="glass-card" style={{ padding: '16px', background: 'var(--fill-1)', border: '1px solid var(--fill-3)' }}>
               <span className="badge badge-tech" style={{ textTransform: 'uppercase', marginBottom: '6px' }}>
                 Topic: {plan.topicTitle}
               </span>
@@ -256,7 +256,7 @@ export default function LearnNowModal({
                 {plan.steps[activeStepIdx].description}
               </span>
               
-              <div style={{ fontSize: '4.5rem', fontWeight: 700, fontFamily: 'monospace', color: sessionActive ? '#fff' : 'var(--color-text-muted)', letterSpacing: '-0.02em', margin: '8px 0' }}>
+              <div style={{ fontSize: '4.5rem', fontWeight: 700, fontFamily: 'monospace', color: sessionActive ? 'var(--color-text-primary)' : 'var(--color-text-muted)', letterSpacing: '-0.02em', margin: '8px 0' }}>
                 {formatTime(secondsRemaining)}
               </div>
 
@@ -279,7 +279,7 @@ export default function LearnNowModal({
               <textarea
                 className="form-input"
                 placeholder="Jot down formulas, code templates, draft answers, or recall outlines here..."
-                style={{ width: '100%', height: '140px', resize: 'none', background: 'rgba(0,0,0,0.3)', fontFamily: 'monospace', fontSize: '0.85rem' }}
+                style={{ width: '100%', height: '140px', resize: 'none', background: 'var(--bg-sunk)', fontFamily: 'monospace', fontSize: '0.85rem' }}
                 value={scratchpad}
                 onChange={(e) => setScratchpad(e.target.value)}
               />

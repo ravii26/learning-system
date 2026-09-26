@@ -26,7 +26,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
 
 export function Select({ className, children, ...rest }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={cn('form-input bg-[#121218]', className)} {...rest}>
+    <select className={cn('form-input', className)} {...rest}>
       {children}
     </select>
   );

@@ -33,10 +33,10 @@ const TEMPLATES: Record<string, string> = {
 };
 
 const GRADE_BUTTONS: Array<{ grade: Grade; key: string; label: string; emoji: string; activeBg: string; activeBorder: string; activeColor: string }> = [
-  { grade: 'Again', key: '1', label: 'Again', emoji: '❌', activeBg: 'rgba(239, 68, 68, 0.15)', activeBorder: 'var(--color-danger)', activeColor: 'var(--color-danger)' },
-  { grade: 'Hard', key: '2', label: 'Hard', emoji: '😓', activeBg: 'rgba(245, 158, 11, 0.15)', activeBorder: 'var(--color-warning)', activeColor: 'var(--color-warning)' },
-  { grade: 'Good', key: '3', label: 'Good', emoji: '✅', activeBg: 'rgba(16, 185, 129, 0.15)', activeBorder: 'var(--color-success)', activeColor: 'var(--color-success)' },
-  { grade: 'Easy', key: '4', label: 'Easy', emoji: '⚡', activeBg: 'rgba(99, 102, 241, 0.15)', activeBorder: 'var(--color-primary)', activeColor: 'var(--color-primary-light)' },
+  { grade: 'Again', key: '1', label: 'Again', emoji: '❌', activeBg: 'var(--danger-tint)', activeBorder: 'var(--color-danger)', activeColor: 'var(--color-danger)' },
+  { grade: 'Hard', key: '2', label: 'Hard', emoji: '😓', activeBg: 'var(--warning-tint)', activeBorder: 'var(--color-warning)', activeColor: 'var(--color-warning)' },
+  { grade: 'Good', key: '3', label: 'Good', emoji: '✅', activeBg: 'var(--success-tint)', activeBorder: 'var(--color-success)', activeColor: 'var(--color-success)' },
+  { grade: 'Easy', key: '4', label: 'Easy', emoji: '⚡', activeBg: 'var(--fill-3)', activeBorder: 'var(--color-primary)', activeColor: 'var(--color-primary-light)' },
 ];
 
 export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueueProps) {
@@ -220,11 +220,11 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <label className="form-label">{testingConcept.prompt ? 'ANSWER FROM MEMORY' : 'EXPLAIN THIS CONCEPT FROM MEMORY'}</label>
               {testingConcept.prompt && (
-                <p style={{ fontSize: '0.9rem', fontWeight: 600, color: '#fff' }}>{testingConcept.prompt}</p>
+                <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>{testingConcept.prompt}</p>
               )}
               <textarea
                 className="form-input"
-                style={{ width: '100%', height: '90px', resize: 'none', background: 'rgba(0,0,0,0.25)', fontFamily: 'monospace', fontSize: '0.8rem' }}
+                style={{ width: '100%', height: '90px', resize: 'none', background: 'var(--bg-sunk)', fontFamily: 'monospace', fontSize: '0.8rem' }}
                 placeholder="Close all resources. Write a one-sentence summary or definition..."
                 value={recallText}
                 onChange={(e) => setRecallText(e.target.value)}
@@ -249,13 +249,13 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <span className="form-label" style={{ fontSize: '0.7rem' }}>YOUR RECALL</span>
-                  <div style={{ fontSize: '0.75rem', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '4px', minHeight: '60px', fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: '0.75rem', background: 'var(--bg-sunk)', padding: '8px', borderRadius: '4px', minHeight: '60px', fontFamily: 'monospace' }}>
                     {recallText}
                   </div>
                 </div>
                 <div>
                   <span className="form-label" style={{ fontSize: '0.7rem', color: 'var(--color-success)' }}>IDEAL MODEL KEYPOINTS</span>
-                  <div style={{ fontSize: '0.75rem', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.15)', padding: '8px', borderRadius: '4px', minHeight: '60px' }}>
+                  <div style={{ fontSize: '0.75rem', background: 'var(--success-tint)', border: '1px solid var(--success-tint)', padding: '8px', borderRadius: '4px', minHeight: '60px' }}>
                     {testingConcept.answer || getIdealAnswer(testingConcept.conceptTitle)}
                   </div>
                 </div>
@@ -265,7 +265,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                   <label className="form-label" style={{ fontSize: '0.7rem', marginBottom: 0 }}>HOW WELL DID YOU RECALL IT?</label>
-                  <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>Press <kbd style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '3px' }}>1-4</kbd> to grade, <kbd style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '3px' }}>Enter</kbd> to save</span>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Press <kbd style={{ background: 'var(--fill-3)', padding: '1px 4px', borderRadius: '3px' }}>1-4</kbd> to grade, <kbd style={{ background: 'var(--fill-3)', padding: '1px 4px', borderRadius: '3px' }}>Enter</kbd> to save</span>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   {GRADE_BUTTONS.map((b) => (
@@ -275,7 +275,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
                       className="btn"
                       style={{
                         flex: 1, fontSize: '0.75rem', padding: '6px',
-                        background: selfGrade === b.grade ? b.activeBg : 'rgba(255,255,255,0.02)',
+                        background: selfGrade === b.grade ? b.activeBg : 'var(--fill-1)',
                         border: selfGrade === b.grade ? `1px solid ${b.activeBorder}` : '1px solid var(--border-color)',
                         color: selfGrade === b.grade ? b.activeColor : 'var(--color-text-secondary)',
                       }}
@@ -288,7 +288,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
 
               {/* If forgotten, inline log to mistake bank */}
               {selfGrade === 'Again' && (
-                <div className="glass-panel" style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(239, 68, 68, 0.02)' }}>
+                <div className="glass-panel" style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--danger-tint)' }}>
                   <span className="form-label" style={{ color: 'var(--color-danger)', fontSize: '0.7rem', marginBottom: 0 }}>LOG TO MISTAKE BANK</span>
                   <input
                     type="text"
@@ -353,7 +353,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
                 onClick={handleStartInterleaved}
                 disabled={dueConcepts.length === 0}
                 className="btn btn-primary"
-                style={{ padding: '6px 12px', fontSize: '0.75rem', background: 'var(--color-accent)', borderColor: 'var(--color-accent)', color: '#fff' }}
+                style={{ padding: '6px 12px', fontSize: '0.75rem', background: 'var(--ink)', borderColor: 'var(--ink)', color: 'var(--on-ink)' }}
               >
                 🔀 Interleaved Practice
               </button>
@@ -370,7 +370,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '12px 16px',
-                  background: 'rgba(0,0,0,0.15)',
+                  background: 'var(--bg-sunk)',
                   borderLeft: '3px solid var(--color-primary-light)',
                 }}
               >

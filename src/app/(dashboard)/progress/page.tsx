@@ -188,13 +188,13 @@ export default function ProgressPage() {
                 )}
 
                 <div className="grid grid-cols-3 gap-2 text-center text-[0.72rem]">
-                  <div className="rounded-sm bg-black/20 px-2 py-1.5">
+                  <div className="rounded-sm bg-sunk px-2 py-1.5">
                     <div className="text-[0.9rem] font-bold text-fg">
                       {t.quizAvg === null ? '—' : `${Math.round(t.quizAvg * 100)}%`}
                     </div>
                     <div className="text-fg-muted">{t.quizCount ? `avg of ${t.quizCount} quiz${t.quizCount === 1 ? '' : 'zes'}` : 'no quizzes'}</div>
                   </div>
-                  <div className="rounded-sm bg-black/20 px-2 py-1.5">
+                  <div className="rounded-sm bg-sunk px-2 py-1.5">
                     <div className="text-[0.9rem] font-bold">
                       {verdicts === 0 ? '—' : (
                         <>
@@ -208,7 +208,7 @@ export default function ProgressPage() {
                     </div>
                     <div className="text-fg-muted">{verdicts ? 'challenges ✓ / ~ / ✗' : 'no challenges'}</div>
                   </div>
-                  <div className="rounded-sm bg-black/20 px-2 py-1.5">
+                  <div className="rounded-sm bg-sunk px-2 py-1.5">
                     <div className="text-[0.9rem] font-bold text-fg">{t.cardsTotal}</div>
                     <div className={t.cardsDue > 0 ? 'text-warning' : 'text-fg-muted'}>
                       {t.cardsDue > 0 ? `${t.cardsDue} due now` : 'review cards'}

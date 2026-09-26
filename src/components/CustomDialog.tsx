@@ -92,8 +92,7 @@ export default function CustomDialog({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgba(0, 0, 0, 0.75)',
-        backdropFilter: 'blur(8px)',
+        background: 'var(--bg-overlay)',
         WebkitBackdropFilter: 'blur(8px)',
         padding: '20px',
         animation: 'fadeIn 0.2s ease-out',
@@ -106,9 +105,9 @@ export default function CustomDialog({
           width: '100%',
           maxWidth: '440px',
           padding: '24px',
-          background: 'rgba(18, 18, 28, 0.95)',
-          border: '1px solid rgba(99, 102, 241, 0.3)',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 20px rgba(99, 102, 241, 0.2)',
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--fill-4)',
+          boxShadow: '0 20px 50px var(--bg-overlay), 0 0 20px var(--fill-4)',
           borderRadius: 'var(--radius-lg)',
           display: 'flex',
           flexDirection: 'column',
@@ -159,8 +158,8 @@ export default function CustomDialog({
               padding: '8px 20px',
               fontSize: '0.82rem',
               borderRadius: '9999px',
-              boxShadow: '0 0 12px rgba(99, 102, 241, 0.4)',
-              background: type === 'error' ? 'var(--color-danger)' : 'linear-gradient(135deg, #6366f1, #a855f7)',
+              background: type === 'error' ? 'var(--color-danger)' : 'var(--ink)',
+              color: type === 'error' ? 'var(--on-danger)' : 'var(--on-ink)',
             }}
           >
             {confirmLabel}

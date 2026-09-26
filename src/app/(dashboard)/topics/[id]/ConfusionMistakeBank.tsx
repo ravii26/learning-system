@@ -187,7 +187,7 @@ export default function ConfusionMistakeBank({
                 className="glass-card"
                 style={{
                   padding: '14px',
-                  background: c.resolved ? 'rgba(16, 185, 129, 0.03)' : 'rgba(0,0,0,0.15)',
+                  background: c.resolved ? 'var(--success-tint)' : 'var(--bg-sunk)',
                   borderLeft: c.resolved ? '3px solid var(--color-success)' : '3px solid var(--color-danger)',
                   opacity: c.resolved ? 0.75 : 1,
                 }}
@@ -196,7 +196,7 @@ export default function ConfusionMistakeBank({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexGrow: 1, marginRight: '16px' }}>
                     <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{c.text}</span>
                     {c.resolved && c.answer && (
-                      <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '4px', marginTop: '6px' }}>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', background: 'var(--bg-sunk)', padding: '8px', borderRadius: '4px', marginTop: '6px' }}>
                         <strong>Resolution:</strong> {c.answer}
                       </p>
                     )}
@@ -272,7 +272,7 @@ export default function ConfusionMistakeBank({
           </div>
 
           {showAddMistake && (
-            <form onSubmit={handleAddMistake} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(239, 68, 68, 0.01)' }}>
+            <form onSubmit={handleAddMistake} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--danger-tint)' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label" style={{ fontSize: '0.7rem' }}>CONCEPT/SUBTOPIC</label>
@@ -337,12 +337,12 @@ export default function ConfusionMistakeBank({
                 className="glass-card"
                 style={{
                   padding: '14px',
-                  background: 'rgba(239, 68, 68, 0.01)',
-                  border: '1px solid rgba(239, 68, 68, 0.12)',
+                  background: 'var(--danger-tint)',
+                  border: '1px solid var(--danger-tint)',
                   borderLeft: '4px solid var(--color-danger)',
                 }}
               >
-                <div className="flex-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '6px', marginBottom: '8px' }}>
+                <div className="flex-between" style={{ borderBottom: '1px solid var(--fill-2)', paddingBottom: '6px', marginBottom: '8px' }}>
                   <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-primary-light)' }}>
                     {m.concept}
                   </span>
@@ -406,7 +406,7 @@ export default function ConfusionMistakeBank({
             </button>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.15)', padding: '12px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}>
+              <div style={{ background: 'var(--success-tint)', border: '1px solid var(--success-tint)', padding: '12px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}>
                 <p style={{ fontWeight: 600, color: 'var(--color-success)', marginBottom: '4px' }}>HOW TO AVOID:</p>
                 <p>{mistakes[testIdx].howToAvoid || 'Self-check core parameters.'}</p>
               </div>

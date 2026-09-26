@@ -163,7 +163,7 @@ export default function LearningContract({
               className="form-input"
               value={currentLevel}
               onChange={(e) => setCurrentLevel(e.target.value)}
-              style={{ background: '#121218' }}
+              style={{ background: 'var(--bg-surface)' }}
             >
               <option value="Beginner">Beginner</option>
               <option value="Intermediate">Intermediate</option>
@@ -212,7 +212,7 @@ export default function LearningContract({
             className="form-input"
             value={newPrereqStatus}
             onChange={(e) => setNewPrereqStatus(e.target.value as any)}
-            style={{ fontSize: '0.85rem', width: '130px', background: '#121218' }}
+            style={{ fontSize: '0.85rem', width: '130px', background: 'var(--bg-surface)' }}
           >
             <option value="missing">Need to learn</option>
             <option value="known">Already Know</option>
@@ -232,7 +232,7 @@ export default function LearningContract({
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '10px 14px',
-                background: 'rgba(0,0,0,0.15)',
+                background: 'var(--bg-sunk)',
                 borderLeft: p.status === 'known' ? '3px solid var(--color-success)' : '3px solid var(--color-warning)',
                 opacity: p.status === 'known' ? 0.7 : 1,
               }}
@@ -253,7 +253,7 @@ export default function LearningContract({
                     padding: '2px 6px',
                     borderRadius: '4px',
                     fontWeight: 600,
-                    background: p.status === 'known' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                    background: p.status === 'known' ? 'var(--success-tint)' : 'var(--warning-tint)',
                     color: p.status === 'known' ? 'var(--color-success)' : 'var(--color-warning)',
                   }}
                 >
@@ -279,7 +279,7 @@ export default function LearningContract({
       </div>
 
       {/* Adaptive Diagnostic Tool */}
-      <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(99, 102, 241, 0.03)', border: '1px solid rgba(99, 102, 241, 0.15)' }}>
+      <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--fill-1)', border: '1px solid var(--fill-3)' }}>
         <h3 style={{ fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span>🧠</span> Engine 2 — Adaptive Learning Diagnostic
         </h3>
@@ -308,7 +308,7 @@ export default function LearningContract({
         <div style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.85)',
+          background: 'var(--bg-overlay)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 2000, padding: '16px'
         }}>
@@ -320,7 +320,7 @@ export default function LearningContract({
 
             <div style={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px', paddingRight: '8px' }}>
               {concepts.map((c) => (
-                <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+                <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderBottom: '1px solid var(--fill-2)', paddingBottom: '10px' }}>
                   <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{c.title}</span>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
                     <button
@@ -330,7 +330,7 @@ export default function LearningContract({
                       style={{
                         fontSize: '0.75rem',
                         padding: '6px',
-                        background: diagnosticLevels[c.id] === 'Unknown' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255,255,255,0.02)',
+                        background: diagnosticLevels[c.id] === 'Unknown' ? 'var(--danger-tint)' : 'var(--fill-1)',
                         border: diagnosticLevels[c.id] === 'Unknown' ? '1px solid var(--color-danger)' : '1px solid var(--border-color)',
                         color: diagnosticLevels[c.id] === 'Unknown' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
                       }}
@@ -344,7 +344,7 @@ export default function LearningContract({
                       style={{
                         fontSize: '0.75rem',
                         padding: '6px',
-                        background: diagnosticLevels[c.id] === 'Exposed' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.02)',
+                        background: diagnosticLevels[c.id] === 'Exposed' ? 'var(--warning-tint)' : 'var(--fill-1)',
                         border: diagnosticLevels[c.id] === 'Exposed' ? '1px solid var(--color-warning)' : '1px solid var(--border-color)',
                         color: diagnosticLevels[c.id] === 'Exposed' ? 'var(--color-warning)' : 'var(--color-text-secondary)',
                       }}
@@ -358,7 +358,7 @@ export default function LearningContract({
                       style={{
                         fontSize: '0.75rem',
                         padding: '6px',
-                        background: diagnosticLevels[c.id] === 'Can Apply' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255,255,255,0.02)',
+                        background: diagnosticLevels[c.id] === 'Can Apply' ? 'var(--success-tint)' : 'var(--fill-1)',
                         border: diagnosticLevels[c.id] === 'Can Apply' ? '1px solid var(--color-success)' : '1px solid var(--border-color)',
                         color: diagnosticLevels[c.id] === 'Can Apply' ? 'var(--color-success)' : 'var(--color-text-secondary)',
                       }}

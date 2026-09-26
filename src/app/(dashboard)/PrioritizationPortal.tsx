@@ -70,7 +70,7 @@ export default function PrioritizationPortal({
     <div style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.85)',
+      background: 'var(--bg-overlay)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 1500, padding: '16px'
     }}>
@@ -100,7 +100,7 @@ export default function PrioritizationPortal({
                     alignItems: 'center',
                     gap: '12px',
                     padding: '10px 12px',
-                    background: selectedTopicId === t.id ? 'rgba(99, 102, 241, 0.08)' : 'rgba(0,0,0,0.15)',
+                    background: selectedTopicId === t.id ? 'var(--fill-2)' : 'var(--bg-sunk)',
                     border: selectedTopicId === t.id ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
                     cursor: 'pointer',
                     borderRadius: 'var(--radius-md)',
@@ -162,7 +162,7 @@ export default function PrioritizationPortal({
                   className="form-input"
                   value={pendingDepth}
                   onChange={(e) => setPendingDepth(e.target.value)}
-                  style={{ background: '#121218' }}
+                  style={{ background: 'var(--bg-surface)' }}
                 >
                   <option value="Awareness">Awareness</option>
                   <option value="Working Knowledge">Working Knowledge</option>
@@ -190,7 +190,7 @@ export default function PrioritizationPortal({
 
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
             <button type="button" onClick={onClose} className="btn btn-secondary">Cancel Activation</button>
-            <button type="submit" disabled={submitting} className="btn btn-primary" style={{ background: 'var(--color-warning)', borderColor: 'var(--color-warning)', color: '#000' }}>
+            <button type="submit" disabled={submitting} className="btn btn-primary">
               {submitting ? 'Swapping Focus...' : 'Pause Selected & Activate New'}
             </button>
           </div>

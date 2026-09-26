@@ -156,7 +156,7 @@ export default function TopicTimeDrawer({ open, onClose, topicId, modules, onCha
               const src = SOURCE_LABEL[e.source] ?? SOURCE_LABEL.manual;
               const isEditing = editingId === e.id;
               return (
-                <div key={e.id} className="rounded-sm border border-line bg-black/20 px-3 py-2 text-[0.8rem]">
+                <div key={e.id} className="rounded-sm border border-line bg-sunk px-3 py-2 text-[0.8rem]">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                       <span className="font-semibold text-fg">{formatDuration(e.seconds)}</span>

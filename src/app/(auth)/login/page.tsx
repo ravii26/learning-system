@@ -27,80 +27,47 @@ export default function LoginPage() {
         router.push('/');
         router.refresh();
       } else {
-        setError(data.error || 'Authentication failed');
+        setError(data.error || 'That password didn’t work.');
       }
-    } catch (err) {
-      setError('An error occurred. Please try again.');
+    } catch {
+      setError('Couldn’t reach the server. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundImage: 'radial-gradient(circle at center, rgba(99, 102, 241, 0.08) 0%, transparent 60%)',
-      padding: '16px'
-    }}>
-      <div className="glass-panel" style={{
-        width: '100%',
-        maxWidth: '400px',
-        padding: '40px 32px',
-        textAlign: 'center'
-      }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
-          <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))' }}></div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.025em' }}>Learning OS</h1>
+    <main className="flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="flex w-full max-w-[380px] flex-col gap-8">
+        <div className="flex flex-col gap-2">
+          <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-none tracking-[-0.02em] text-fg">Learning OS</h1>
+          <p className="m-0 text-[1rem] text-fg-secondary">Learn many things. Know where you stand. Keep what you learn.</p>
         </div>
 
-        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', marginBottom: '32px' }}>
-          Please enter your password to access your learning workspace.
-        </p>
-
-        <form onSubmit={handleSubmit}>
-          <div className="form-group" style={{ textAlign: 'left', marginBottom: '24px' }}>
-            <label className="form-label" htmlFor="password">WORKSPACE PASSWORD</label>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-[0.9rem] font-semibold text-fg" htmlFor="password">Password</label>
             <input
               id="password"
               type="password"
-              className="form-input"
-              placeholder="••••••••"
+              className="form-input h-12"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              style={{ letterSpacing: password ? '0.25em' : 'normal', textAlign: 'center' }}
+              autoComplete="current-password"
               required
               autoFocus
             />
           </div>
 
           {error && (
-            <div style={{
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
-              color: 'var(--color-danger)',
-              fontSize: '0.8rem',
-              padding: '10px',
-              borderRadius: 'var(--radius-sm)',
-              marginBottom: '20px',
-              fontWeight: 500
-            }}>
-              ⚠️ {error}
-            </div>
+            <p role="alert" className="m-0 text-[0.875rem] font-medium text-danger">{error}</p>
           )}
 
-          <button
-            type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%', padding: '12px' }}
-            disabled={loading}
-          >
-            {loading ? 'Authenticating...' : 'Enter Workspace'}
+          <button type="submit" className="btn btn-primary h-12 w-full text-[1rem]" disabled={loading}>
+            {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
       </div>
-    </div>
+    </main>
   );
 }

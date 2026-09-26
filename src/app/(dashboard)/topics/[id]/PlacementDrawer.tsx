@@ -176,7 +176,7 @@ export default function PlacementDrawer({ open, onClose, topicId, openModuleCoun
                   {q.options.map((opt, o) => (
                     <label
                       key={o}
-                      className={`flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border px-3 py-2 text-[0.88rem] ${answers[i] === o ? 'border-fg bg-white/10 text-fg' : 'border-line text-fg-secondary'}`}
+                      className={`flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border px-3 py-2 text-[0.88rem] ${answers[i] === o ? 'border-fg bg-fill-3 text-fg' : 'border-line text-fg-secondary'}`}
                     >
                       <input
                         type="radio"

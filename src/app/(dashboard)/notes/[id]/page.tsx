@@ -215,7 +215,7 @@ export default function NoteDetailPage() {
               <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>LINKS TO</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
                 {note.outgoing.map((l) => l.to && (
-                  <Link key={l.id} href={`/notes/${l.to.id}`} style={{ fontSize: '0.78rem', padding: '3px 10px', borderRadius: '9999px', background: 'rgba(99,102,241,0.1)', color: 'var(--color-primary-light)', textDecoration: 'none' }}>
+                  <Link key={l.id} href={`/notes/${l.to.id}`} style={{ fontSize: '0.78rem', padding: '3px 10px', borderRadius: '9999px', background: 'var(--fill-2)', color: 'var(--color-primary-light)', textDecoration: 'none' }}>
                     {l.to.title}
                   </Link>
                 ))}
@@ -227,7 +227,7 @@ export default function NoteDetailPage() {
               <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>BACKLINKS — NOTES THAT LINK HERE</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
                 {note.incoming.map((l) => l.from && (
-                  <Link key={l.id} href={`/notes/${l.from.id}`} style={{ fontSize: '0.78rem', padding: '3px 10px', borderRadius: '9999px', background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-secondary)', textDecoration: 'none' }}>
+                  <Link key={l.id} href={`/notes/${l.from.id}`} style={{ fontSize: '0.78rem', padding: '3px 10px', borderRadius: '9999px', background: 'var(--fill-2)', color: 'var(--color-text-secondary)', textDecoration: 'none' }}>
                     {l.from.title}
                   </Link>
                 ))}

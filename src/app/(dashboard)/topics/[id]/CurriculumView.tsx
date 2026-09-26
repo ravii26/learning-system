@@ -220,12 +220,12 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
         </div>
 
         {/* Progress bar */}
-        <div style={{ height: '6px', borderRadius: '9999px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+        <div style={{ height: '6px', borderRadius: '9999px', background: 'var(--fill-3)', overflow: 'hidden' }}>
           <div style={{
             height: '100%',
             borderRadius: '9999px',
             width: `${progressPct}%`,
-            background: 'linear-gradient(90deg, var(--color-primary), #818cf8)',
+            background: 'var(--ink)',
             transition: 'width 0.5s ease',
           }} />
         </div>
@@ -236,7 +236,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
           </p>
         )}
         {completedCount === modules.length && modules.length > 0 && (
-          <p style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 600 }}>🎉 Course complete!</p>
+          <p style={{ fontSize: '0.78rem', color: 'var(--color-success)', fontWeight: 600 }}>🎉 Course complete!</p>
         )}
       </div>
 
@@ -246,7 +246,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
           <div className="glass-panel" style={{ padding: '32px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
             <span style={{ fontSize: '2.5rem' }}>📋</span>
             <div>
-              <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#fff' }}>No curriculum modules yet</h4>
+              <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>No curriculum modules yet</h4>
               <p style={{ fontSize: '0.84rem', color: 'var(--color-text-secondary)', maxWidth: '420px', marginTop: '6px', lineHeight: 1.5 }}>
                 Break down this topic into structured lessons. Let AI generate 4-6 sequential modules, or add your own modules below.
               </p>
@@ -277,7 +277,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
               className="glass-panel"
               style={{
                 padding: 0,
-                border: isCurrent ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border-color)',
+                border: isCurrent ? '1px solid var(--fill-4)' : '1px solid var(--border-color)',
                 overflow: 'hidden',
                 transition: 'border-color 0.2s',
               }}
@@ -336,7 +336,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                 {/* Expand Lesson & Quiz toggle */}
                 <button
                   onClick={() => setExpandedId(isExpanded ? null : mod.id)}
-                  style={{ fontSize: '0.7rem', color: isExpanded ? 'var(--color-primary-light)' : 'var(--color-text-muted)', padding: '4px 10px', borderRadius: '4px', border: '1px solid var(--border-color)', background: isExpanded ? 'rgba(99,102,241,0.1)' : 'transparent', cursor: 'pointer', fontWeight: 600 }}
+                  style={{ fontSize: '0.7rem', color: isExpanded ? 'var(--color-primary-light)' : 'var(--color-text-muted)', padding: '4px 10px', borderRadius: '4px', border: '1px solid var(--border-color)', background: isExpanded ? 'var(--fill-2)' : 'transparent', cursor: 'pointer', fontWeight: 600 }}
                 >
                   {isExpanded ? '▲ Close Lesson' : '📖 View Lesson & Quiz'}
                 </button>
@@ -352,7 +352,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
 
               {/* Expanded Lesson & Quiz Area */}
               {isExpanded && (
-                <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', background: 'var(--bg-sunk)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   
                   {!lessonData && !isGenerating && (
                     <div style={{ textAlign: 'center', padding: '16px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
@@ -378,7 +378,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                   {lessonData && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       {lessonData.fallback && (
-                        <div style={{ padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                        <div style={{ padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--warning-tint)', border: '1px solid var(--warning-line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                           <span style={{ fontSize: '0.78rem', color: 'var(--color-warning)' }}>
                             ⚠️ Placeholder content — the AI provider was unavailable, so this is generic filler, not a real lesson. It wasn&apos;t saved.
                           </span>
@@ -393,7 +393,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                         </div>
                       )}
                       {/* Summary & Takeaways */}
-                      <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                      <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--fill-2)', border: '1px solid var(--fill-4)' }}>
                         <p style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-primary-light)', marginBottom: '4px' }}>
                           💡 Summary: {lessonData.summary}
                         </p>
@@ -420,7 +420,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                       {lessonData.codeOrExample && (
                         <div>
                           <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>💻 Practical Example / Drill</h4>
-                          <pre style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', background: '#0a0a0f', border: '1px solid var(--border-color)', fontSize: '0.78rem', color: '#38bdf8', overflowX: 'auto', fontFamily: 'monospace' }}>
+                          <pre style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-sunk)', border: '1px solid var(--border-color)', fontSize: '0.78rem', color: 'var(--color-text-primary)', overflowX: 'auto', fontFamily: 'monospace' }}>
                             {lessonData.codeOrExample}
                           </pre>
                         </div>
@@ -429,7 +429,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                       {/* Interactive Quiz Sandbox */}
                       {Array.isArray(lessonData.quiz) && lessonData.quiz.length > 0 && (
                         <div style={{ borderTop: '1px border-dashed var(--border-color)', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--color-warning)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             📝 Interactive Self-Check Quiz ({lessonData.quiz.length} Questions)
                           </h4>
 
@@ -440,7 +440,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                             const isCorrect = selected === q.correctIndex;
 
                             return (
-                              <div key={qIdx} style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div key={qIdx} style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--fill-1)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 <p style={{ fontSize: '0.82rem', fontWeight: 600 }}>{qIdx + 1}. {q.question}</p>
 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
@@ -448,19 +448,19 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                                     const isThisSelected = selected === optIdx;
                                     const isThisCorrect = optIdx === q.correctIndex;
 
-                                    let bg = 'rgba(255,255,255,0.03)';
+                                    let bg = 'var(--fill-2)';
                                     let border = '1px solid var(--border-color)';
                                     let color = 'var(--color-text-secondary)';
 
                                     if (isAnswered) {
                                       if (isThisCorrect) {
-                                        bg = 'rgba(16, 185, 129, 0.2)';
-                                        border = '1px solid #10b981';
-                                        color = '#10b981';
+                                        bg = 'var(--success-line)';
+                                        border = '1px solid var(--color-success)';
+                                        color = 'var(--color-success)';
                                       } else if (isThisSelected) {
-                                        bg = 'rgba(239, 68, 68, 0.2)';
-                                        border = '1px solid #ef4444';
-                                        color = '#ef4444';
+                                        bg = 'var(--danger-line)';
+                                        border = '1px solid var(--color-danger)';
+                                        color = 'var(--color-danger)';
                                       }
                                     }
 
@@ -489,7 +489,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                                 </div>
 
                                 {isAnswered && (
-                                  <div style={{ marginTop: '4px', padding: '6px 10px', borderRadius: '4px', background: isCorrect ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', fontSize: '0.72rem', color: isCorrect ? '#10b981' : '#ef4444' }}>
+                                  <div style={{ marginTop: '4px', padding: '6px 10px', borderRadius: '4px', background: isCorrect ? 'var(--success-tint)' : 'var(--danger-tint)', fontSize: '0.72rem', color: isCorrect ? 'var(--color-success)' : 'var(--color-danger)' }}>
                                     {isCorrect ? '✅ Correct! ' : '❌ Incorrect. '} {q.explanation}
                                   </div>
                                 )}

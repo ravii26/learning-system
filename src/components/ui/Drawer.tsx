@@ -23,12 +23,12 @@ export function Drawer({ open, onClose, title, label, children }: {
   if (!open) return null;
 
   return (
-    <div onClick={onClose} className="fixed inset-0 z-[60] flex justify-end bg-black/55">
+    <div onClick={onClose} className="fixed inset-0 z-[60] flex justify-end bg-sunk">
       <aside
         role="dialog"
         aria-label={label}
         onClick={(e) => e.stopPropagation()}
-        className="flex h-full w-[min(680px,100vw)] flex-col gap-6 overflow-y-auto border-l border-line bg-[#0f0f15] px-6 py-5"
+        className="flex h-full w-[min(680px,100vw)] flex-col gap-6 overflow-y-auto border-l border-line bg-surface shadow-pop px-6 py-5"
       >
         <div className="flex-between">
           <h2 className="text-lg font-bold">{title}</h2>

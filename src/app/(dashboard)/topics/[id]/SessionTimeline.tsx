@@ -8,12 +8,12 @@ interface SessionTimelineProps {
 }
 
 const ACTIVITY_META: Record<ActivityType, { icon: string; label: string; color: string }> = {
-  read_watch:     { icon: '📖', label: 'Read / Watch',     color: '#6366f1' },
-  write_practice: { icon: '✍️', label: 'Write / Practice', color: '#14b8a6' },
-  speak_converse: { icon: '🗣️', label: 'Speak / Converse', color: '#10b981' },
-  drill_repeat:   { icon: '🎯', label: 'Drill / Repeat',   color: '#f59e0b' },
-  course_module:  { icon: '📚', label: 'Course Module',    color: '#a855f7' },
-  free_explore:   { icon: '🔬', label: 'Free Explore',     color: '#f43f5e' },
+  read_watch:     { icon: '📖', label: 'Read / Watch',     color: 'var(--ink)' },
+  write_practice: { icon: '✍️', label: 'Write / Practice', color: 'var(--color-text-secondary)' },
+  speak_converse: { icon: '🗣️', label: 'Speak / Converse', color: 'var(--color-success)' },
+  drill_repeat:   { icon: '🎯', label: 'Drill / Repeat',   color: 'var(--color-warning)' },
+  course_module:  { icon: '📚', label: 'Course Module',    color: 'var(--color-text-secondary)' },
+  free_explore:   { icon: '🔬', label: 'Free Explore',     color: 'var(--color-danger)' },
 };
 
 function relativeTime(iso: string): string {
@@ -94,7 +94,7 @@ export default function SessionTimeline({ sessionLogs }: SessionTimelineProps) {
         </span>
         {streak > 0 && (
           <span style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
-            🔥 <strong style={{ color: '#f59e0b' }}>{streak}-day</strong> streak
+            🔥 <strong style={{ color: 'var(--color-warning)' }}>{streak}-day</strong> streak
           </span>
         )}
         {topActivity && (
@@ -127,7 +127,7 @@ export default function SessionTimeline({ sessionLogs }: SessionTimelineProps) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ fontSize: '1rem' }}>{meta.icon}</span>
                 <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: meta.color }}>{meta.label}</span>
-                <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', padding: '1px 6px', borderRadius: '9999px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', padding: '1px 6px', borderRadius: '9999px', background: 'var(--fill-2)', border: '1px solid var(--border-color)' }}>
                   {log.durationMinutes} min
                 </span>
                 <span style={{ marginLeft: 'auto', fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{relativeTime(log.timestamp)}</span>
@@ -142,7 +142,7 @@ export default function SessionTimeline({ sessionLogs }: SessionTimelineProps) {
               {log.oneInsight && (
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '0.75rem' }}>💡</span>
-                  <p style={{ fontSize: '0.8rem', color: '#f59e0b', fontStyle: 'italic' }}>{log.oneInsight}</p>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--color-warning)', fontStyle: 'italic' }}>{log.oneInsight}</p>
                 </div>
               )}
 
@@ -152,7 +152,7 @@ export default function SessionTimeline({ sessionLogs }: SessionTimelineProps) {
                   <span style={{ fontSize: '0.75rem' }}>😤</span>
                   <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>{log.whatWasHard}</p>
                   {isRecurring && (
-                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '1px 6px', borderRadius: '9999px', border: '1px solid rgba(239,68,68,0.2)', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--color-danger)', background: 'var(--danger-tint)', padding: '1px 6px', borderRadius: '9999px', border: '1px solid var(--danger-line)', whiteSpace: 'nowrap' }}>
                       ⚠️ Recurring ({struggleCounts.get(hardKey)}×)
                     </span>
                   )}

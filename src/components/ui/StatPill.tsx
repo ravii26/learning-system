@@ -6,11 +6,11 @@ type Tone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger';
 // Explicit rgba tints: theme colors are CSS variables, which Tailwind's
 // `/15`-style opacity modifiers can't blend (they'd emit no rule at all).
 const TONE: Record<Tone, string> = {
-  neutral: 'bg-white/5 text-fg-secondary',
-  primary: 'bg-[rgba(99,102,241,0.15)] text-primary-light',
-  success: 'bg-[rgba(16,185,129,0.15)] text-success',
-  warning: 'bg-[rgba(245,158,11,0.15)] text-warning',
-  danger: 'bg-[rgba(239,68,68,0.15)] text-danger',
+  neutral: 'bg-fill-2 text-fg-secondary',
+  primary: 'bg-[var(--fill-3)] text-primary-light',
+  success: 'bg-[var(--success-tint)] text-success',
+  warning: 'bg-[var(--warning-tint)] text-warning',
+  danger: 'bg-[var(--danger-tint)] text-danger',
 };
 
 /** A compact "label value" pill — e.g. "47 notes", "streak 6". */

@@ -133,22 +133,22 @@ export default function GoalDetailPage() {
             onChange={(e) => handleStatusChange(e.target.value)}
             disabled={updatingStatus}
             className="form-input"
-            style={{ width: 'auto', fontSize: '0.8rem', padding: '6px 10px', background: '#121218' }}
+            style={{ width: 'auto', fontSize: '0.8rem', padding: '6px 10px', background: 'var(--bg-surface)' }}
           >
             {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
 
         {/* Readiness — criteria met/total, never a bare percentage */}
-        <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: '1px solid var(--fill-3)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>
               Readiness: {goal.readiness.met} / {goal.readiness.total} criteria met
             </span>
           </div>
           {goal.readiness.total > 0 && (
-            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden', marginBottom: '12px' }}>
-              <div style={{ width: `${(goal.readiness.met / goal.readiness.total) * 100}%`, height: '100%', background: 'linear-gradient(90deg, var(--color-primary), var(--color-success))' }} />
+            <div style={{ width: '100%', height: '6px', background: 'var(--fill-3)', borderRadius: '3px', overflow: 'hidden', marginBottom: '12px' }}>
+              <div style={{ width: `${(goal.readiness.met / goal.readiness.total) * 100}%`, height: '100%', background: 'var(--ink)' }} />
             </div>
           )}
 

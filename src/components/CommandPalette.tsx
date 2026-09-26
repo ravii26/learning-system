@@ -122,9 +122,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
         alignItems: 'flex-start',
         justifyContent: 'center',
         paddingTop: '12vh',
-        background: 'rgba(0, 0, 0, 0.75)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
+        background: 'var(--bg-overlay)',
         animation: 'fadeIn 0.15s ease-out',
       }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -134,10 +132,10 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
         style={{
           width: '90%',
           maxWidth: '620px',
-          background: 'rgba(18, 18, 28, 0.96)',
-          border: '1px solid rgba(99, 102, 241, 0.35)',
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--fill-4)',
           borderRadius: '16px',
-          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(99, 102, 241, 0.25)',
+          boxShadow: '0 25px 60px var(--bg-overlay), 0 0 30px var(--fill-4)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
@@ -150,10 +148,10 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
             alignItems: 'center',
             gap: '12px',
             padding: '16px 20px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            borderBottom: '1px solid var(--fill-3)',
           }}
         >
-          <span style={{ fontSize: '1.2rem', color: '#818cf8' }}>⚡</span>
+          <span style={{ fontSize: '1.2rem', color: 'var(--color-text-primary)' }}>⚡</span>
           <input
             ref={inputRef}
             type="text"
@@ -169,7 +167,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
               background: 'none',
               border: 'none',
               outline: 'none',
-              color: '#f3f4f6',
+              color: 'var(--color-text-primary)',
               fontSize: '1rem',
               fontWeight: 500,
             }}
@@ -178,10 +176,10 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
             style={{
               padding: '3px 8px',
               borderRadius: '6px',
-              background: 'rgba(255, 255, 255, 0.1)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
+              background: 'var(--fill-3)',
+              border: '1px solid var(--fill-4)',
               fontSize: '0.75rem',
-              color: '#9ca3af',
+              color: 'var(--color-text-muted)',
             }}
           >
             ESC
@@ -191,13 +189,13 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
         {/* Results List */}
         <div style={{ maxHeight: '380px', overflowY: 'auto', padding: '8px' }}>
           {loading && (
-            <div style={{ padding: '24px', textAlign: 'center', color: '#9ca3af', fontSize: '0.9rem' }}>
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
               Loading suggestions...
             </div>
           )}
 
           {!loading && allItems.length === 0 && (
-            <div style={{ padding: '32px', textAlign: 'center', color: '#9ca3af', fontSize: '0.9rem' }}>
+            <div style={{ padding: '32px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
               No matching topics or actions found for "{query}"
             </div>
           )}
@@ -220,19 +218,19 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
                     padding: '12px 16px',
                     borderRadius: '10px',
                     cursor: 'pointer',
-                    background: isSelected ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
-                    border: isSelected ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid transparent',
+                    background: isSelected ? 'var(--fill-4)' : 'transparent',
+                    border: isSelected ? '1px solid var(--fill-4)' : '1px solid transparent',
                     transition: 'all 0.15s ease',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <span style={{ fontSize: '1.1rem' }}>{item.icon}</span>
-                    <span style={{ fontSize: '0.92rem', color: isSelected ? '#ffffff' : '#d1d5db', fontWeight: 500 }}>
+                    <span style={{ fontSize: '0.92rem', color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-primary)', fontWeight: 500 }}>
                       {item.title}
                     </span>
                   </div>
                   {isSelected && (
-                    <span style={{ fontSize: '0.78rem', color: '#818cf8', fontWeight: 600 }}>Press ↵</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--color-text-primary)', fontWeight: 600 }}>Press ↵</span>
                   )}
                 </div>
               );
@@ -243,13 +241,13 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
         <div
           style={{
             padding: '10px 20px',
-            background: 'rgba(10, 10, 15, 0.6)',
-            borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+            background: 'var(--bg-surface)',
+            borderTop: '1px solid var(--fill-2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             fontSize: '0.78rem',
-            color: '#6b7280',
+            color: 'var(--color-text-muted)',
           }}
         >
           <span>Use ↑ ↓ arrows to navigate</span>

@@ -8,10 +8,10 @@ import { Button, ButtonLink, Card, CardLabel, EmptyState } from '@/components/ui
 import ResurfacedNote from '@/components/ResurfacedNote';
 
 const SPRINT_GRADES = [
-  { grade: 'Again', key: '1', label: '❌ Again', hint: 'Forgot it', cls: 'border-danger bg-[rgba(239,68,68,0.12)] text-danger' },
-  { grade: 'Hard', key: '2', label: '😓 Hard', hint: 'Got it, with effort', cls: 'border-warning bg-[rgba(245,158,11,0.12)] text-warning' },
-  { grade: 'Good', key: '3', label: '✅ Good', hint: 'Recalled fine', cls: 'border-success bg-[rgba(16,185,129,0.12)] text-success' },
-  { grade: 'Easy', key: '4', label: '⚡ Easy', hint: 'Instant', cls: 'border-primary bg-[rgba(99,102,241,0.12)] text-primary-light' },
+  { grade: 'Again', key: '1', label: '❌ Again', hint: 'Forgot it', cls: 'border-danger bg-[var(--danger-tint)] text-danger' },
+  { grade: 'Hard', key: '2', label: '😓 Hard', hint: 'Got it, with effort', cls: 'border-warning bg-[var(--warning-tint)] text-warning' },
+  { grade: 'Good', key: '3', label: '✅ Good', hint: 'Recalled fine', cls: 'border-success bg-[var(--success-tint)] text-success' },
+  { grade: 'Easy', key: '4', label: '⚡ Easy', hint: 'Instant', cls: 'border-primary bg-[var(--fill-2)] text-primary-light' },
 ] as const;
 
 interface Topic {
@@ -364,9 +364,9 @@ export default function ReviewPage() {
                 <span className="text-[0.75rem] text-fg-muted">Card {currentConceptIdx + 1} of {dueConcepts.length}</span>
               </div>
 
-              <div className="rounded-md border border-line bg-black/20 px-3 py-6 text-center">
+              <div className="rounded-md border border-line bg-sunk px-3 py-6 text-center">
                 <CardLabel>Recall from memory first</CardLabel>
-                <h2 className="mx-auto mt-2 max-w-[560px] text-xl font-bold text-white">
+                <h2 className="mx-auto mt-2 max-w-[560px] text-xl font-bold text-fg">
                   {dueConcepts[currentConceptIdx].prompt
                     ? dueConcepts[currentConceptIdx].prompt
                     : <>Can you explain or define: &quot;{dueConcepts[currentConceptIdx].conceptTitle}&quot;?</>}
@@ -384,7 +384,7 @@ export default function ReviewPage() {
                       </span>
                     )}
                     {dueConcepts[currentConceptIdx].moduleNote && (
-                      <div className="mx-auto mt-4 max-w-[560px] whitespace-pre-wrap rounded-md bg-white/5 px-4 py-3 text-left text-[0.85rem] leading-relaxed text-fg-secondary">
+                      <div className="mx-auto mt-4 max-w-[560px] whitespace-pre-wrap rounded-md bg-fill-2 px-4 py-3 text-left text-[0.85rem] leading-relaxed text-fg-secondary">
                         <span className="mb-1 block text-[0.7rem] font-bold uppercase tracking-wide text-fg-muted">
                           Your notes{dueConcepts[currentConceptIdx].moduleTitle ? ` on ${dueConcepts[currentConceptIdx].moduleTitle}` : ''}
                         </span>
@@ -400,7 +400,7 @@ export default function ReviewPage() {
 
               {!revealedAnswer ? (
                 <Button variant="primary" className="self-center px-6" onClick={() => setRevealedAnswer(true)}>
-                  👁️ I&apos;ve tried — reveal &amp; grade <kbd className="ml-1 rounded bg-white/20 px-1 text-[0.7rem]">Space</kbd>
+                  👁️ I&apos;ve tried — reveal &amp; grade <kbd className="ml-1 rounded bg-fill-4 px-1 text-[0.7rem]">Space</kbd>
                 </Button>
               ) : (
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -410,7 +410,7 @@ export default function ReviewPage() {
                       onClick={() => handleLogSpacedReview(g.grade)}
                       className={`btn flex-col gap-0.5 border py-3 ${g.cls}`}
                     >
-                      <span className="text-[0.9rem] font-semibold">{g.label} <kbd className="ml-1 rounded bg-white/10 px-1 text-[0.68rem]">{g.key}</kbd></span>
+                      <span className="text-[0.9rem] font-semibold">{g.label} <kbd className="ml-1 rounded bg-fill-3 px-1 text-[0.68rem]">{g.key}</kbd></span>
                       <span className="text-[0.68rem] opacity-80">{g.hint}</span>
                     </button>
                   ))}
@@ -429,7 +429,7 @@ export default function ReviewPage() {
           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-primary-light)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             {mode === 'study' ? '🧠 Deep Study Sprint' : mode === 'shortBreak' ? '☕ Short Break' : '🌴 Long Break'}
           </span>
-          <div style={{ fontSize: '4.5rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '2px', color: '#fff' }}>
+          <div style={{ fontSize: '4.5rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '2px', color: 'var(--color-text-primary)' }}>
             {formattedTime}
           </div>
 
@@ -452,7 +452,7 @@ export default function ReviewPage() {
           </div>
 
           {isCompleted && (
-            <div style={{ padding: '12px 18px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', borderRadius: 'var(--radius-sm)', color: '#10b981', fontSize: '0.85rem' }}>
+            <div style={{ padding: '12px 18px', background: 'var(--success-tint)', border: '1px solid var(--color-success)', borderRadius: 'var(--radius-sm)', color: 'var(--color-success)', fontSize: '0.85rem' }}>
               🎉 Pomodoro sprint complete! Great focus effort.
             </div>
           )}
@@ -468,13 +468,13 @@ export default function ReviewPage() {
 
           {/* Stats strip */}
           <div className="stat-strip">
-            <span className="stat-chip" style={{ background: 'rgba(168,85,247,0.08)', borderColor: 'rgba(168,85,247,0.25)', color: '#c084fc' }}>
+            <span className="stat-chip" style={{ background: 'var(--fill-2)', borderColor: 'var(--fill-4)', color: 'var(--color-text-secondary)' }}>
               ⚡ {activePaused.filter(t => t.status === 'active').length} Active
             </span>
-            <span className="stat-chip" style={{ background: 'rgba(245,158,11,0.08)', borderColor: 'rgba(245,158,11,0.25)', color: '#fbbf24' }}>
+            <span className="stat-chip" style={{ background: 'var(--warning-tint)', borderColor: 'var(--warning-line)', color: 'var(--color-warning)' }}>
               ⏸️ {activePaused.filter(t => t.status === 'paused').length} Paused
             </span>
-            <span className="stat-chip" style={{ background: 'rgba(99,102,241,0.08)', borderColor: 'rgba(99,102,241,0.25)', color: '#818cf8' }}>
+            <span className="stat-chip" style={{ background: 'var(--fill-2)', borderColor: 'var(--fill-4)', color: 'var(--color-text-primary)' }}>
               📋 {queuedTopics.length} Queued
             </span>
           </div>
@@ -570,7 +570,7 @@ export default function ReviewPage() {
                   className="btn"
                   style={{
                     fontSize: '0.8rem',
-                    background: currentDecision === 'continue' ? 'rgba(168, 85, 247, 0.15)' : 'rgba(255,255,255,0.02)',
+                    background: currentDecision === 'continue' ? 'var(--fill-3)' : 'var(--fill-1)',
                     border: currentDecision === 'continue' ? '1px solid var(--color-accent)' : '1px solid var(--border-color)',
                     color: currentDecision === 'continue' ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                   }}
@@ -584,7 +584,7 @@ export default function ReviewPage() {
                   className="btn"
                   style={{
                     fontSize: '0.8rem',
-                    background: currentDecision === 'pause' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.02)',
+                    background: currentDecision === 'pause' ? 'var(--warning-tint)' : 'var(--fill-1)',
                     border: currentDecision === 'pause' ? '1px solid var(--color-warning)' : '1px solid var(--border-color)',
                     color: currentDecision === 'pause' ? 'var(--color-warning)' : 'var(--color-text-secondary)',
                   }}
@@ -598,7 +598,7 @@ export default function ReviewPage() {
                   className="btn"
                   style={{
                     fontSize: '0.8rem',
-                    background: currentDecision === 'maintenance' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255,255,255,0.02)',
+                    background: currentDecision === 'maintenance' ? 'var(--success-tint)' : 'var(--fill-1)',
                     border: currentDecision === 'maintenance' ? '1px solid var(--color-success)' : '1px solid var(--border-color)',
                     color: currentDecision === 'maintenance' ? 'var(--color-success)' : 'var(--color-text-secondary)',
                   }}
@@ -612,7 +612,7 @@ export default function ReviewPage() {
                   className="btn"
                   style={{
                     fontSize: '0.8rem',
-                    background: currentDecision === 'drop' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255,255,255,0.02)',
+                    background: currentDecision === 'drop' ? 'var(--danger-tint)' : 'var(--fill-1)',
                     border: currentDecision === 'drop' ? '1px solid var(--color-danger)' : '1px solid var(--border-color)',
                     color: currentDecision === 'drop' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
                   }}
@@ -647,7 +647,7 @@ export default function ReviewPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>Available in Queue</span>
               {queuedTopics.map((qt) => (
-                <div key={qt.id} className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,0,0,0.15)' }}>
+                <div key={qt.id} className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--bg-sunk)' }}>
                   <div>
                     <span className={`badge badge-${qt.area.toLowerCase()}`} style={{ marginRight: '8px' }}>{qt.area}</span>
                     <strong style={{ fontSize: '0.9rem' }}>{qt.title}</strong>
@@ -667,7 +667,7 @@ export default function ReviewPage() {
           )}
 
           {activeSlotsRemaining === 0 && (
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', background: 'rgba(99, 102, 241, 0.05)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(99, 102, 241, 0.15)' }}>
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', background: 'var(--fill-1)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--fill-3)' }}>
               🔒 <strong>Active Slots Occupied</strong>. You cannot promote any more topics to active because your 2 slots are full.
             </p>
           )}
@@ -693,7 +693,7 @@ export default function ReviewPage() {
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'rgba(0,0,0,0.8)',
+              background: 'var(--bg-overlay)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -710,7 +710,7 @@ export default function ReviewPage() {
 
                 <div className="form-group">
                   <label className="form-label">Depth target</label>
-                  <select className="form-input" value={depthTarget} onChange={e => setDepthTarget(e.target.value)} style={{ background: '#121218' }}>
+                  <select className="form-input" value={depthTarget} onChange={e => setDepthTarget(e.target.value)} style={{ background: 'var(--bg-surface)' }}>
                     <option value="Awareness">Awareness</option>
                     <option value="Working Knowledge">Working Knowledge</option>
                     <option value="Proficiency">Proficiency</option>
@@ -754,8 +754,8 @@ export default function ReviewPage() {
             <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
               Your focus and pipeline allocations have been recorded. Active counts and milestones are up to date.
             </p>
-            <div style={{ background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: 'var(--radius-sm)', textAlign: 'left', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <p style={{ fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px' }}>Summary of audit decisions:</p>
+            <div style={{ background: 'var(--bg-sunk)', padding: '16px', borderRadius: 'var(--radius-sm)', textAlign: 'left', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <p style={{ fontWeight: 600, borderBottom: '1px solid var(--fill-2)', paddingBottom: '4px' }}>Summary of audit decisions:</p>
               {decisions.map(d => (
                 <div key={d.topicId} className="flex-between">
                   <span>{d.title}</span>

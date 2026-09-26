@@ -57,12 +57,12 @@ const PCT = (n: number) => `${Math.round(n * 100)}%`;
 
 function MasteryBar({ score }: { score: number }) {
   return (
-    <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
+    <div style={{ width: '100%', height: '6px', background: 'var(--fill-3)', borderRadius: '3px', overflow: 'hidden' }}>
       <div
         style={{
           width: `${Math.max(2, Math.round(score * 100))}%`,
           height: '100%',
-          background: 'linear-gradient(90deg, var(--color-primary), var(--color-accent))',
+          background: 'var(--ink)',
         }}
       />
     </div>
@@ -126,7 +126,7 @@ function SkillCard({ node, topicsBySkill, depth }: { node: SkillNode; topicsBySk
         {hasEvidence && <MasteryBar score={node.masteryScore} />}
 
         {hasEvidence && expanded && node.masteryBreakdown && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px', paddingTop: '8px', borderTop: '1px solid var(--fill-2)' }}>
             <BreakdownRow label="Retention" value={node.masteryBreakdown.retention} />
             <BreakdownRow label="Coverage" value={node.masteryBreakdown.coverage} />
             <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
@@ -137,7 +137,7 @@ function SkillCard({ node, topicsBySkill, depth }: { node: SkillNode; topicsBySk
         )}
 
         {expanded && topics.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px', paddingTop: '8px', borderTop: '1px solid var(--fill-2)' }}>
             <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>EVIDENCE — TOPICS</span>
             {topics.map((t) => (
               <a

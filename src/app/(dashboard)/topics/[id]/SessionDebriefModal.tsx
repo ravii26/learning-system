@@ -31,12 +31,12 @@ interface SessionDebriefModalProps {
 }
 
 const ACTIVITY_TYPES: { type: ActivityType; icon: string; label: string; color: string }[] = [
-  { type: 'read_watch',     icon: '📖', label: 'Read / Watch',      color: '#6366f1' },
-  { type: 'write_practice', icon: '✍️', label: 'Write / Practice',  color: '#14b8a6' },
-  { type: 'speak_converse', icon: '🗣️', label: 'Speak / Converse',  color: '#10b981' },
-  { type: 'drill_repeat',   icon: '🎯', label: 'Drill / Repeat',    color: '#f59e0b' },
-  { type: 'course_module',  icon: '📚', label: 'Course Module',     color: '#a855f7' },
-  { type: 'free_explore',   icon: '🔬', label: 'Free Explore',      color: '#f43f5e' },
+  { type: 'read_watch',     icon: '📖', label: 'Read / Watch',      color: 'var(--ink)' },
+  { type: 'write_practice', icon: '✍️', label: 'Write / Practice',  color: 'var(--color-text-secondary)' },
+  { type: 'speak_converse', icon: '🗣️', label: 'Speak / Converse',  color: 'var(--color-success)' },
+  { type: 'drill_repeat',   icon: '🎯', label: 'Drill / Repeat',    color: 'var(--color-warning)' },
+  { type: 'course_module',  icon: '📚', label: 'Course Module',     color: 'var(--color-text-secondary)' },
+  { type: 'free_explore',   icon: '🔬', label: 'Free Explore',      color: 'var(--color-danger)' },
 ];
 
 export default function SessionDebriefModal({
@@ -79,7 +79,7 @@ export default function SessionDebriefModal({
   const StepDot = ({ n }: { n: number }) => (
     <span style={{
       width: '8px', height: '8px', borderRadius: '50%',
-      background: step >= n ? 'var(--color-primary)' : 'rgba(255,255,255,0.12)',
+      background: step >= n ? 'var(--color-primary)' : 'var(--fill-4)',
       display: 'inline-block',
       transition: 'background 0.25s',
     }} />
@@ -115,7 +115,7 @@ export default function SessionDebriefModal({
                     padding: '14px 12px',
                     borderRadius: 'var(--radius-md)',
                     border: activityType === a.type ? `1.5px solid ${a.color}` : '1.5px solid var(--border-color)',
-                    background: activityType === a.type ? `${a.color}18` : 'rgba(255,255,255,0.02)',
+                    background: activityType === a.type ? `${a.color}18` : 'var(--fill-1)',
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
@@ -207,8 +207,8 @@ export default function SessionDebriefModal({
         {/* Step 3 — Next Action + Duration */}
         {step === 3 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ padding: '12px 16px', borderRadius: 'var(--radius-sm)', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
-              <p style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600, marginBottom: '4px' }}>✅ Great session logged!</p>
+            <div style={{ padding: '12px 16px', borderRadius: 'var(--radius-sm)', background: 'var(--success-tint)', border: '1px solid var(--success-line)' }}>
+              <p style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 600, marginBottom: '4px' }}>✅ Great session logged!</p>
               {oneInsight && <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>"{oneInsight}"</p>}
             </div>
 

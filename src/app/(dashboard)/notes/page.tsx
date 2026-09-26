@@ -299,7 +299,7 @@ export default function NotesPage() {
                     value={conceptTopicChoice[c.id] || ''}
                     onChange={(e) => setConceptTopicChoice((prev) => ({ ...prev, [c.id]: e.target.value }))}
                     className="form-input"
-                    style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 8px', background: '#121218' }}
+                    style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 8px', background: 'var(--bg-surface)' }}
                   >
                     <option value="">Topic (optional for note, needed for concept)…</option>
                     {topics.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
@@ -331,7 +331,7 @@ export default function NotesPage() {
                   <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{n.title}</span>
                   {n.tags.length > 0 && (
                     <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                      {n.tags.map((t) => <span key={t} style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '9999px', background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-muted)' }}>#{t}</span>)}
+                      {n.tags.map((t) => <span key={t} style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '9999px', background: 'var(--fill-3)', color: 'var(--color-text-muted)' }}>#{t}</span>)}
                     </div>
                   )}
                 </div>

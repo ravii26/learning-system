@@ -443,7 +443,7 @@ export default function PlanPage() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             {/* View Mode Toggle: List vs Board */}
-            <div style={{ display: 'inline-flex', padding: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'inline-flex', padding: '3px', background: 'var(--fill-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
               <button
                 type="button"
                 onClick={() => setViewMode('list')}
@@ -453,7 +453,7 @@ export default function PlanPage() {
                   fontWeight: 600,
                   borderRadius: '4px',
                   background: viewMode === 'list' ? 'var(--color-primary)' : 'transparent',
-                  color: viewMode === 'list' ? '#fff' : 'var(--color-text-muted)',
+                  color: viewMode === 'list' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
                   border: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
@@ -470,7 +470,7 @@ export default function PlanPage() {
                   fontWeight: 600,
                   borderRadius: '4px',
                   background: viewMode === 'board' ? 'var(--color-primary)' : 'transparent',
-                  color: viewMode === 'board' ? '#fff' : 'var(--color-text-muted)',
+                  color: viewMode === 'board' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
                   border: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
@@ -483,14 +483,14 @@ export default function PlanPage() {
             <button
               onClick={() => setShowRoadmapWizard(true)}
               className="btn btn-secondary"
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid rgba(99, 102, 241, 0.4)', color: 'var(--color-primary-light)' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid var(--fill-4)', color: 'var(--color-primary-light)' }}
             >
               🤖 Generate AI Roadmap
             </button>
             <button
               onClick={() => setShowLearnNow(true)}
               className="btn btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))', color: '#fff' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--ink)', color: 'var(--on-ink)' }}
             >
               ⚡ Learn Now
             </button>
@@ -520,8 +520,8 @@ export default function PlanPage() {
           const totalTodayMins = todayLogs.reduce((s, l) => s + l.durationMinutes, 0);
 
           return (
-            <div className="glass-panel" style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', borderLeft: '3px solid #10b981' }}>
-              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#10b981' }}>
+            <div className="glass-panel" style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', borderLeft: '3px solid var(--color-success)' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-success)' }}>
                 📅 Today: {todayLogs.length} session{todayLogs.length > 1 ? 's' : ''} ({totalTodayMins}m)
               </span>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -532,7 +532,7 @@ export default function PlanPage() {
                       fontSize: '0.7rem',
                       padding: '3px 8px',
                       borderRadius: '9999px',
-                      background: 'rgba(255,255,255,0.04)',
+                      background: 'var(--fill-2)',
                       border: '1px solid var(--border-color)',
                       color: 'var(--color-text-secondary)',
                     }}
@@ -577,7 +577,7 @@ export default function PlanPage() {
             className="form-input"
             value={selectedArea}
             onChange={(e) => setSelectedArea(e.target.value)}
-            style={{ fontSize: '0.85rem', padding: '8px 12px', background: '#121218' }}
+            style={{ fontSize: '0.85rem', padding: '8px 12px', background: 'var(--bg-surface)' }}
           >
             {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
@@ -592,7 +592,7 @@ export default function PlanPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '1.1rem' }}>⚡</span>
                   <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Active Topics</h2>
-                  <span style={{ fontSize: '0.72rem', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--color-primary-light)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.72rem', background: 'var(--fill-3)', color: 'var(--color-primary-light)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
                     {filteredTopics.filter(t => t.status === 'active').length}/2 active
                   </span>
                 </div>
@@ -615,17 +615,17 @@ export default function PlanPage() {
                         justifyContent: 'space-between',
                         gap: '16px',
                         flexWrap: 'wrap',
-                        background: 'rgba(255,255,255,0.02)',
+                        background: 'var(--fill-1)',
                       }}
                     >
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '220px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <Link href={`/topics/${t.id}`} style={{ fontSize: '0.98rem', fontWeight: 700, color: '#fff' }}>
+                          <Link href={`/topics/${t.id}`} style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
                             {t.title}
                           </Link>
                           <span className={`badge badge-${t.area.toLowerCase()}`} style={{ fontSize: '0.65rem' }}>{t.area}</span>
                           {t.depthTarget && (
-                            <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.04)', padding: '2px 6px', borderRadius: '4px' }}>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', background: 'var(--fill-2)', padding: '2px 6px', borderRadius: '4px' }}>
                               {t.depthTarget}
                             </span>
                           )}
@@ -645,7 +645,7 @@ export default function PlanPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         {t.progressPct > 0 && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
-                            <div style={{ width: '48px', height: '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{ width: '48px', height: '5px', background: 'var(--fill-3)', borderRadius: '3px', overflow: 'hidden' }}>
                               <div style={{ width: `${t.progressPct}%`, height: '100%', background: 'var(--color-primary)' }} />
                             </div>
                             <span>{t.progressPct}%</span>
@@ -667,7 +667,7 @@ export default function PlanPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '1.1rem' }}>📋</span>
                   <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Queued for Next</h2>
-                  <span style={{ fontSize: '0.72rem', background: 'rgba(255, 255, 255, 0.08)', color: 'var(--color-text-secondary)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.72rem', background: 'var(--fill-3)', color: 'var(--color-text-secondary)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
                     {filteredTopics.filter(t => t.status === 'queued').length}
                   </span>
                 </div>
@@ -694,7 +694,7 @@ export default function PlanPage() {
                     >
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, minWidth: '200px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Link href={`/topics/${t.id}`} style={{ fontSize: '0.92rem', fontWeight: 600, color: '#fff' }}>
+                          <Link href={`/topics/${t.id}`} style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                             {t.title}
                           </Link>
                           <span className={`badge badge-${t.area.toLowerCase()}`} style={{ fontSize: '0.62rem' }}>{t.area}</span>
@@ -729,7 +729,7 @@ export default function PlanPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '1.1rem' }}>💡</span>
                     <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Inbox Ideas</h2>
-                    <span style={{ fontSize: '0.72rem', background: 'rgba(255, 255, 255, 0.08)', color: 'var(--color-text-secondary)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.72rem', background: 'var(--fill-3)', color: 'var(--color-text-secondary)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
                       {filteredTopics.filter(t => t.status === 'inbox').length}
                     </span>
                   </div>
@@ -748,7 +748,7 @@ export default function PlanPage() {
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Link href={`/topics/${t.id}`} style={{ fontSize: '0.88rem', fontWeight: 600, color: '#fff' }}>
+                        <Link href={`/topics/${t.id}`} style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                           {t.title}
                         </Link>
                         <span className={`badge badge-${t.area.toLowerCase()}`} style={{ fontSize: '0.6rem' }}>{t.area}</span>
@@ -806,7 +806,7 @@ export default function PlanPage() {
                           <Link href={`/topics/${t.id}`} style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
                             {t.title}
                           </Link>
-                          <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-muted)' }}>
+                          <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: 'var(--fill-3)', color: 'var(--color-text-muted)' }}>
                             {t.status}
                           </span>
                         </div>
@@ -898,7 +898,7 @@ export default function PlanPage() {
                 onDragLeave={() => setDragOverColumn(null)}
                 onDrop={(e) => handleDrop(e, colStatus)}
                 style={{
-                  background: isOver ? 'rgba(99, 102, 241, 0.04)' : 'rgba(255,255,255,0.01)',
+                  background: isOver ? 'var(--fill-1)' : 'var(--fill-1)',
                   border: isOver ? '1px dashed var(--color-primary)' : '1px solid var(--border-color)',
                   borderRadius: 'var(--radius-md)',
                   minHeight: '450px',
@@ -909,7 +909,7 @@ export default function PlanPage() {
                   transition: 'all var(--transition-fast)',
                 }}
               >
-                <div className="flex-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '8px' }}>
+                <div className="flex-between" style={{ borderBottom: '1px solid var(--fill-2)', paddingBottom: '8px' }}>
                   <span style={{
                     fontSize: '0.72rem',
                     fontWeight: 600,
@@ -922,7 +922,7 @@ export default function PlanPage() {
                   <span style={{
                     fontSize: '0.68rem',
                     color: 'var(--color-text-muted)',
-                    background: 'rgba(255,255,255,0.05)',
+                    background: 'var(--fill-2)',
                     padding: '2px 6px',
                     borderRadius: '4px',
                     fontWeight: 600,
@@ -947,7 +947,7 @@ export default function PlanPage() {
                         style={{
                           padding: '10px 12px',
                           cursor: 'grab',
-                          background: t.activeSlotType === 'primary' ? 'rgba(99, 102, 241, 0.08)' : 'rgba(25, 25, 35, 0.45)',
+                          background: t.activeSlotType === 'primary' ? 'var(--fill-2)' : 'var(--bg-surface)',
                           borderLeft: t.activeSlotType === 'primary'
                             ? '3px solid var(--color-primary)'
                             : t.activeSlotType === 'secondary'
@@ -956,7 +956,7 @@ export default function PlanPage() {
                         }}
                       >
                         <Link href={`/topics/${t.id}`} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fff', lineHeight: 1.35 }}>{t.title}</span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.35 }}>{t.title}</span>
                           <span className={`badge badge-${t.area.toLowerCase()}`} style={{ fontSize: '0.65rem', alignSelf: 'flex-start' }}>{t.area}</span>
 
                           {colStatus === 'active' && hasRealNextAction && (
@@ -1046,7 +1046,7 @@ export default function PlanPage() {
         <div style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.85)',
+          background: 'var(--bg-overlay)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 1500, padding: '16px'
         }}>
@@ -1065,7 +1065,7 @@ export default function PlanPage() {
 
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Depth target</label>
-              <select className="form-input" value={depthTarget} onChange={e => setDepthTarget(e.target.value)} style={{ background: '#121218' }}>
+              <select className="form-input" value={depthTarget} onChange={e => setDepthTarget(e.target.value)} style={{ background: 'var(--bg-surface)' }}>
                 <option value="Awareness">Awareness</option>
                 <option value="Working Knowledge">Working Knowledge</option>
                 <option value="Proficiency">Proficiency</option>

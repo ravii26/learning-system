@@ -154,14 +154,14 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
         </div>
 
         {error && (
-          <div style={{ padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: 'var(--color-danger)', fontSize: '0.8rem', marginBottom: '16px' }}>
+          <div style={{ padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--danger-tint)', border: '1px solid var(--danger-line)', color: 'var(--color-danger)', fontSize: '0.8rem', marginBottom: '16px' }}>
             ⚠️ {error}
           </div>
         )}
 
         {/* Suggestions when input is invalid or ambiguous */}
         {suggestions.length > 0 && step === 1 && (
-          <div style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+          <div style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--fill-2)', border: '1px solid var(--fill-4)' }}>
             <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-primary-light)', marginBottom: '8px' }}>💡 Did you mean one of these topics?</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {suggestions.map((sug, i) => (
@@ -173,7 +173,7 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
                     padding: '4px 10px',
                     borderRadius: '9999px',
                     fontSize: '0.75rem',
-                    background: 'rgba(99, 102, 241, 0.15)',
+                    background: 'var(--fill-3)',
                     border: '1px solid var(--color-primary)',
                     color: 'var(--color-primary-light)',
                     cursor: 'pointer',
@@ -214,7 +214,7 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
                       padding: '6px 12px',
                       borderRadius: '9999px',
                       fontSize: '0.78rem',
-                      background: goal === p.goal ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255,255,255,0.03)',
+                      background: goal === p.goal ? 'var(--fill-4)' : 'var(--fill-2)',
                       border: goal === p.goal ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
                       color: goal === p.goal ? 'var(--color-primary-light)' : 'var(--color-text-secondary)',
                       cursor: 'pointer',
@@ -259,7 +259,7 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
                       padding: '10px 12px',
                       borderRadius: 'var(--radius-sm)',
                       border: currentLevel === lvl.id ? '1.5px solid var(--color-primary)' : '1px solid var(--border-color)',
-                      background: currentLevel === lvl.id ? 'rgba(99, 102, 241, 0.12)' : 'rgba(255,255,255,0.02)',
+                      background: currentLevel === lvl.id ? 'var(--fill-2)' : 'var(--fill-1)',
                       textAlign: 'left',
                       cursor: 'pointer',
                     }}
@@ -295,7 +295,7 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
                       padding: '8px',
                       borderRadius: 'var(--radius-sm)',
                       border: weeklyHours === hrs ? '1.5px solid var(--color-primary)' : '1px solid var(--border-color)',
-                      background: weeklyHours === hrs ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                      background: weeklyHours === hrs ? 'var(--fill-3)' : 'transparent',
                       color: weeklyHours === hrs ? 'var(--color-primary-light)' : 'var(--color-text-secondary)',
                       fontWeight: 600,
                       fontSize: '0.8rem',
@@ -331,7 +331,7 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
         {/* Step 4: Preview & Confirm */}
         {step === 4 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--fill-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--fill-4)' }}>
               <span style={{ fontSize: '0.78rem', color: 'var(--color-primary-light)' }}>
                 🗓️ Estimated duration: <strong>~{estimatedWeeks} weeks</strong> at {weeklyHours}h/week
               </span>
@@ -351,15 +351,15 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
                     style={{
                       padding: '10px 14px',
                       borderRadius: 'var(--radius-sm)',
-                      background: i === 0 ? 'rgba(16, 185, 129, 0.06)' : 'rgba(255,255,255,0.02)',
-                      border: i === 0 ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border-color)',
+                      background: i === 0 ? 'var(--success-tint)' : 'var(--fill-1)',
+                      border: i === 0 ? '1px solid var(--success-line)' : '1px solid var(--border-color)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '6px',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: i === 0 ? '#10b981' : 'var(--color-text-muted)', minWidth: '18px', marginTop: '2px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: i === 0 ? 'var(--color-success)' : 'var(--color-text-muted)', minWidth: '18px', marginTop: '2px' }}>
                         {i + 1}
                       </span>
 
@@ -367,7 +367,7 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
                         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                           <p style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>{t.title}</p>
                           {i === 0 && (
-                            <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '9999px', background: '#10b98120', color: '#10b981', fontWeight: 700 }}>
+                            <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '9999px', background: 'var(--success-tint)', color: 'var(--color-success)', fontWeight: 700 }}>
                               STARTS ACTIVE
                             </span>
                           )}
@@ -375,14 +375,14 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
                             fontSize: '0.62rem',
                             padding: '1px 6px',
                             borderRadius: '9999px',
-                            background: t.mode === 'course' ? 'rgba(168,85,247,0.15)' : t.mode === 'project' ? 'rgba(245,158,11,0.15)' : 'rgba(99,102,241,0.15)',
-                            color: t.mode === 'course' ? '#c084fc' : t.mode === 'project' ? '#f59e0b' : 'var(--color-primary-light)',
+                            background: t.mode === 'course' ? 'var(--fill-3)' : t.mode === 'project' ? 'var(--warning-tint)' : 'var(--fill-3)',
+                            color: t.mode === 'course' ? 'var(--color-text-secondary)' : t.mode === 'project' ? 'var(--color-warning)' : 'var(--color-primary-light)',
                             fontWeight: 600,
                           }}>
                             {t.mode === 'course' ? '📚 Course' : t.mode === 'project' ? '🛠️ Project' : '🧭 Self-Directed'}
                           </span>
                           {t.area && (
-                            <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-muted)' }}>
+                            <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '4px', background: 'var(--fill-2)', color: 'var(--color-text-muted)' }}>
                               {t.area}
                             </span>
                           )}
@@ -434,7 +434,7 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
                         </button>
 
                         {isExpanded && (
-                          <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '12px', borderLeft: '2px solid rgba(99, 102, 241, 0.3)' }}>
+                          <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '12px', borderLeft: '2px solid var(--fill-4)' }}>
                             {t.curriculum!.map((mod, modIdx) => (
                               <div key={modIdx} style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)' }}>
                                 📌 {mod}

@@ -531,7 +531,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
   if (loading) {
     return (
       <div className="flex-center" style={{ minHeight: '60vh', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ width: '40px', height: '40px', border: '3px solid rgba(99,102,241,0.2)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <div style={{ width: '40px', height: '40px', border: '3px solid var(--fill-4)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
         <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Opening Study Room...</p>
       </div>
     );
@@ -554,7 +554,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1440px', margin: '0 auto', width: '100%' }}>
       
       {/* ── TOP BAR: Navigation, Title & Header Actions ──────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid var(--fill-3)', paddingBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <Link
             href="/"
@@ -567,7 +567,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
               fontWeight: 500,
               padding: '6px 10px',
               borderRadius: '6px',
-              background: 'rgba(255,255,255,0.03)',
+              background: 'var(--fill-2)',
               border: '1px solid var(--border-color)',
             }}
           >
@@ -575,8 +575,8 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           </Link>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>{title}</h1>
-              <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(99,102,241,0.15)', color: 'var(--color-primary-light)', fontWeight: 600 }}>
+              <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>{title}</h1>
+              <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', background: 'var(--fill-3)', color: 'var(--color-primary-light)', fontWeight: 600 }}>
                 {area}
               </span>
             </div>
@@ -591,7 +591,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           <button
             type="button"
             onClick={() => setTimeDrawerOpen(true)}
-            className="flex items-center gap-2 rounded-lg border border-line bg-black/30 px-3 py-1.5 text-left hover:border-line-hover"
+            className="flex items-center gap-2 rounded-lg border border-line bg-sunk px-3 py-1.5 text-left hover:border-line-hover"
             title="Time you actually spent on this topic — click to see history, log or correct time"
           >
             <span className="text-base">⏱</span>
@@ -606,8 +606,8 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           </button>
 
           {/* Focus Sprint Timer Card (pomodoro pacing; while it runs, reading without input still counts) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '5px 12px', borderRadius: '8px' }}>
-            <span style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'monospace', color: timerActive ? '#10b981' : '#fff' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-sunk)', border: '1px solid var(--fill-3)', padding: '5px 12px', borderRadius: '8px' }}>
+            <span style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'monospace', color: timerActive ? 'var(--color-success)' : 'var(--color-text-primary)' }}>
               🍅 {formatTimer(secondsRemaining)}
             </span>
             <button
@@ -618,8 +618,8 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                 fontWeight: 600,
                 padding: '3px 8px',
                 borderRadius: '4px',
-                background: timerActive ? 'rgba(239,68,68,0.2)' : 'var(--color-primary)',
-                color: '#fff',
+                background: timerActive ? 'var(--danger-line)' : 'var(--color-primary)',
+                color: 'var(--color-text-primary)',
                 border: 'none',
                 cursor: 'pointer',
               }}
@@ -703,7 +703,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
             {/* Syllabus Header with Progress */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>Course Syllabus</h3>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>Course Syllabus</h3>
                 <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
                   {completedCount} of {curriculum.length} completed ({progressPct}%)
                 </span>
@@ -729,12 +729,12 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
             </div>
 
             {/* Progress Bar */}
-            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '9999px', overflow: 'hidden' }}>
+            <div style={{ width: '100%', height: '6px', background: 'var(--fill-3)', borderRadius: '9999px', overflow: 'hidden' }}>
               <div
                 style={{
                   width: `${progressPct}%`,
                   height: '100%',
-                  background: 'linear-gradient(90deg, var(--color-primary), #10b981)',
+                  background: 'var(--ink)',
                   borderRadius: '9999px',
                   transition: 'width 0.3s ease',
                 }}
@@ -745,7 +745,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
             {editingSyllabus ? (
               <div className="flex max-h-[520px] flex-col gap-2 overflow-y-auto pr-1">
                 {draftModules.map((mod, idx) => (
-                  <div key={mod.id} className="flex flex-col gap-1.5 rounded-lg border border-line bg-white/[0.02] p-2">
+                  <div key={mod.id} className="flex flex-col gap-1.5 rounded-lg border border-line bg-fill-1 p-2">
                     <input
                       className="form-input px-2 py-1.5 text-[0.82rem]"
                       value={mod.title}
@@ -775,7 +775,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
             ) : curriculum.length > 0 ? (
               <>
               {completedCount === 0 && curriculum.length >= 2 && (
-                <div className="flex flex-col gap-2 rounded-md border border-line bg-white/[0.03] px-3.5 py-3">
+                <div className="flex flex-col gap-2 rounded-md border border-line bg-fill-1 px-3.5 py-3">
                   <span className="text-[0.85rem] font-semibold text-fg">Already know some of this?</span>
                   <span className="text-[0.78rem] text-fg-secondary">A few minutes of questions. Modules you get fully right start as known, so you don’t relearn them.</span>
                   <button type="button" onClick={() => setPlacementOpen(true)} className="btn btn-secondary self-start px-3 py-1 text-[0.78rem]">
@@ -797,8 +797,8 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                         gap: '10px',
                         padding: '10px 12px',
                         borderRadius: '8px',
-                        background: isSelected ? 'rgba(99, 102, 241, 0.16)' : 'rgba(255,255,255,0.02)',
-                        border: isSelected ? '1px solid var(--color-primary-light)' : '1px solid rgba(255,255,255,0.06)',
+                        background: isSelected ? 'var(--fill-3)' : 'var(--fill-1)',
+                        border: isSelected ? '1px solid var(--color-primary-light)' : '1px solid var(--fill-3)',
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
                       }}
@@ -811,9 +811,9 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                             width: '20px',
                             height: '20px',
                             borderRadius: '50%',
-                            border: mod.completed ? 'none' : '2px solid rgba(255,255,255,0.3)',
-                            background: mod.completed ? '#10b981' : 'transparent',
-                            color: '#fff',
+                            border: mod.completed ? 'none' : '2px solid var(--fill-4)',
+                            background: mod.completed ? 'var(--color-success)' : 'transparent',
+                            color: 'var(--color-text-primary)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -831,7 +831,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                             style={{
                               fontSize: '0.84rem',
                               fontWeight: isSelected ? 700 : 500,
-                              color: mod.completed ? 'var(--color-text-muted)' : isSelected ? '#fff' : 'var(--color-text-primary)',
+                              color: mod.completed ? 'var(--color-text-muted)' : isSelected ? 'var(--color-text-primary)' : 'var(--color-text-primary)',
                               textDecoration: mod.completed ? 'line-through' : 'none',
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
@@ -947,7 +947,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           ) : (
             <div className="glass-panel" style={{ padding: '48px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
               <span style={{ fontSize: '3rem' }}>🎯</span>
-              <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: '#fff' }}>Welcome to {title}</h2>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>Welcome to {title}</h2>
               <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', maxWidth: '480px', lineHeight: 1.6 }}>
                 Generate your personalized course syllabus to start interactive Socratic tutoring and taking structured notes.
               </p>
@@ -1028,7 +1028,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                   className="form-input"
                   value={newResType}
                   onChange={(e) => setNewResType(e.target.value)}
-                  style={{ background: '#121218' }}
+                  style={{ background: 'var(--bg-surface)' }}
                 >
                   <option value="ARTICLE">Article</option>
                   <option value="VIDEO">Video</option>
@@ -1053,11 +1053,11 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {resources.map((res, i) =>
               editingResourceIdx === i && resourceDraft ? (
-                <div key={res.id || i} className="flex flex-col gap-2 rounded-md border border-primary bg-black/20 p-3">
+                <div key={res.id || i} className="flex flex-col gap-2 rounded-md border border-primary bg-sunk p-3">
                   <input className="form-input text-[0.85rem]" value={resourceDraft.title} onChange={(e) => setResourceDraft({ ...resourceDraft, title: e.target.value })} placeholder="Title" aria-label="Resource title" />
                   <div className="grid grid-cols-[2fr_1fr] gap-2">
                     <input className="form-input text-[0.82rem]" value={resourceDraft.url} onChange={(e) => setResourceDraft({ ...resourceDraft, url: e.target.value })} placeholder="https://... (optional)" aria-label="Resource link" />
-                    <select className="form-input bg-[#121218] text-[0.82rem]" value={resourceDraft.type} onChange={(e) => setResourceDraft({ ...resourceDraft, type: e.target.value })} aria-label="Resource type">
+                    <select className="form-input bg-[var(--bg-surface)] text-[0.82rem]" value={resourceDraft.type} onChange={(e) => setResourceDraft({ ...resourceDraft, type: e.target.value })} aria-label="Resource type">
                       {['ARTICLE', 'VIDEO', 'BOOK', 'COURSE', 'PAPER', 'TOOL', 'WEBSITE', 'OTHER'].map((t) => <option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</option>)}
                     </select>
                   </div>
@@ -1068,10 +1068,10 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                   </div>
                 </div>
               ) : (
-                <div key={res.id || i} className="flex items-start justify-between gap-3 rounded-md border border-line bg-black/20 px-3.5 py-2.5">
+                <div key={res.id || i} className="flex items-start justify-between gap-3 rounded-md border border-line bg-sunk px-3.5 py-2.5">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="rounded bg-[rgba(99,102,241,0.15)] px-1.5 py-px text-[0.65rem] font-bold text-primary-light">{res.type}</span>
+                      <span className="rounded bg-[var(--fill-3)] px-1.5 py-px text-[0.65rem] font-bold text-primary-light">{res.type}</span>
                       {res.url ? (
                         <a href={res.url} target="_blank" rel="noreferrer" className="text-[0.88rem] font-semibold text-primary-light">{res.title} ↗</a>
                       ) : (
@@ -1084,7 +1084,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                     <select
                       value={res.status || 'NOT_STARTED'}
                       onChange={(e) => handleResourceStatus(i, e.target.value)}
-                      className="form-input w-auto bg-[#121218] px-1.5 py-1 text-[0.7rem]"
+                      className="form-input w-auto bg-[var(--bg-surface)] px-1.5 py-1 text-[0.7rem]"
                       aria-label={`Status of ${res.title}`}
                     >
                       <option value="NOT_STARTED">To do</option>
@@ -1131,7 +1131,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
               className="form-input"
               value={area}
               onChange={(e) => setArea(e.target.value)}
-              style={{ background: '#121218' }}
+              style={{ background: 'var(--bg-surface)' }}
             >
               <option value="Tech">Tech</option>
               <option value="Business">Business</option>
@@ -1174,7 +1174,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
             Save Settings
           </button>
 
-          <hr style={{ borderColor: 'rgba(255,255,255,0.06)', margin: '12px 0' }} />
+          <hr style={{ borderColor: 'var(--fill-3)', margin: '12px 0' }} />
 
           <div>
             <h4 style={{ fontSize: '0.85rem', color: 'var(--color-danger)', fontWeight: 600, marginBottom: '6px' }}>Danger Zone</h4>
@@ -1185,7 +1185,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
               type="button"
               onClick={handleDeleteTopic}
               className="btn btn-secondary"
-              style={{ color: 'var(--color-danger)', borderColor: 'rgba(239,68,68,0.3)', fontSize: '0.8rem', padding: '6px 14px' }}
+              style={{ color: 'var(--color-danger)', borderColor: 'var(--danger-line)', fontSize: '0.8rem', padding: '6px 14px' }}
             >
               🗑️ Delete Topic
             </button>

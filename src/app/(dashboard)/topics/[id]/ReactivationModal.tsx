@@ -79,7 +79,7 @@ export default function ReactivationModal({
     <div style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.85)',
+      background: 'var(--bg-overlay)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 1500, padding: '16px'
     }}>
@@ -109,7 +109,7 @@ export default function ReactivationModal({
             </p>
             <textarea
               className="form-input"
-              style={{ width: '100%', height: '140px', resize: 'none', background: 'rgba(0,0,0,0.2)', fontFamily: 'monospace' }}
+              style={{ width: '100%', height: '140px', resize: 'none', background: 'var(--bg-sunk)', fontFamily: 'monospace' }}
               placeholder="Start typing what you remember..."
               value={freeRecallText}
               onChange={(e) => setFreeRecallText(e.target.value)}
@@ -171,7 +171,7 @@ export default function ReactivationModal({
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '10px 14px',
-                    background: forgottenIds.includes(tc.id) ? 'rgba(239, 68, 68, 0.08)' : 'rgba(0,0,0,0.15)',
+                    background: forgottenIds.includes(tc.id) ? 'var(--danger-tint)' : 'var(--bg-sunk)',
                     border: forgottenIds.includes(tc.id) ? '1px solid var(--color-danger)' : '1px solid var(--border-color)',
                     cursor: 'pointer',
                   }}
@@ -203,7 +203,7 @@ export default function ReactivationModal({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {concepts.filter(c => forgottenIds.includes(c.id)).map((tc) => (
-                <div key={tc.id} className="glass-card" style={{ padding: '10px 14px', background: 'rgba(245, 158, 11, 0.04)', border: '1px solid rgba(245, 158, 11, 0.15)' }}>
+                <div key={tc.id} className="glass-card" style={{ padding: '10px 14px', background: 'var(--warning-tint)', border: '1px solid var(--warning-tint)' }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-warning)' }}>{tc.title}</span>
                   <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
                     Scheduled for immediate spaced retrieval review.
