@@ -15,7 +15,7 @@ const LINKS: Array<{ name: string; href: string; icon: IconName; match: string[]
   { name: 'Learn', href: '/plan', icon: 'learn', match: ['/plan', '/learn', '/topics', '/goals', '/explore', '/practice'] },
   { name: 'Review', href: '/review', icon: 'review', match: ['/review'] },
   { name: 'Notebook', href: '/notes', icon: 'notebook', match: ['/notes'] },
-  { name: 'You', href: '/progress', icon: 'you', match: ['/progress', '/skills'] },
+  { name: 'You', href: '/progress', icon: 'you', match: ['/progress', '/skills', '/friends'] },
 ];
 
 const isActive = (pathname: string, match: string[]) =>

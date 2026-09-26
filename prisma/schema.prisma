@@ -88,6 +88,8 @@ model User {
   studyTime        StudyTimeEntry[]
   problemAttempts  ProblemAttempt[]
   placementChecks  PlacementCheck[]
+  friendRequestsSent     Friendship[] @relation("FriendshipRequester")
+  friendRequestsReceived Friendship[] @relation("FriendshipAddressee")
 }
 
 model Topic {
@@ -108,6 +110,13 @@ model Topic {
   // topics filters deletedAt: null (see src/app/api/topics/**).
   deletedAt       DateTime?
   progressPct     Int            @default(0) // 0-100
+  // Visible to accepted friends (title, status, progress, module plan) —
+  // never notes. Off by default.
+  shared          Boolean        @default(false)
+  // Set when this topic's plan was copied from a friend's shared topic;
+  // lets the two be compared module by module. Not a FK: the source may be
+  // deleted or unshared later, and the copy must not care.
+  copiedFromId    String?
   currentStage    String         // Define, Map, Fundamentals, Core Knowledge, Application, Advanced, Proof
   lastCompleted   String?
   nextAction      String?        // Required for active or paused
@@ -555,6 +564,9 @@ model Goal {
   // actually generated. Never parsed back out for logic; display/debug only.
   roadmapRaw Json?
 
+  shared       Boolean @default(false) // see Topic.shared
+  copiedFromId String? // see Topic.copiedFromId
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -899,4 +911,21 @@ model RateLimitHit {
 
   @@id([key, windowStart])
   @@index([windowStart])
+}
+
+/// Mutual friendship. One row per pair: the requester asks, the addressee
+/// accepts or declines. Once accepted, each side sees what the other has
+/// marked shared — nothing else. Declined requests are deleted, not kept.
+model Friendship {
+  id          String    @id @default(uuid())
+  requesterId String
+  requester   User      @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addresseeId String
+  addressee   User      @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+  status      String    @default("pending") // pending | accepted
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime?
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
 
@@ -68,6 +69,10 @@ export default function LogoutButton() {
             <p style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>{account?.name || 'Learning OS'}</p>
             <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>{account?.email || 'Owner workspace — set up email login from the sign-in page'}</p>
           </div>
+          <Link href="/friends" className="avatar-dropdown-item no-underline hover:no-underline" onClick={() => setOpen(false)}>
+            <Icon name="you" size={16} />
+            <span>Friends</span>
+          </Link>
           <button
             className="avatar-dropdown-item danger"
             onClick={handleSignOut}
