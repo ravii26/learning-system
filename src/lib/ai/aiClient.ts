@@ -11,6 +11,19 @@
  */
 import { callGroqContent, GroqCallError, type GroqMessage } from './groqClient';
 import { callAICreditsContent, AICreditsCallError, type AICreditsMessage } from './aiCreditsClient';
+import { getSessionUserId } from '../auth';
+import { consumeAiQuota } from '../rateLimit';
+
+// Every AI call made during a signed-in request counts toward that user's
+// daily quota — enforced here so no route can forget to. Outside a request
+// (tests, scripts) there's no session and nothing to count.
+function requestUserId(): string | null {
+  try {
+    return getSessionUserId();
+  } catch {
+    return null;
+  }
+}
 
 export type AIMessage = GroqMessage | AICreditsMessage; // identical shape
 
@@ -45,6 +58,9 @@ export function hasAnyAIProviderConfigured(): boolean {
 }
 
 export async function callAIContent(messages: AIMessage[], options: AICallOptions = {}): Promise<AICallResult> {
+  const userId = requestUserId();
+  if (userId) await consumeAiQuota(userId);
+
   const failures: ProviderFailure[] = [];
 
   const aiCreditsKey = process.env.AICREDITS_API_KEY;

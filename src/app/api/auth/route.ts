@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { checkPassword, signSessionToken, setSessionCookie, clearSessionCookie, getSessionUserId } from '@/lib/auth';
 import { SEED_USER_ID } from '@/lib/currentUser';
 import { db } from '@/lib/db';
+import { consume, peek, tooManyRequests, clientIp, MINUTE, HOUR } from '@/lib/rateLimit';
 import { hashPassword, verifyPassword, normalizeEmail, isValidEmail, MIN_PASSWORD_LENGTH } from '@/lib/password';
 
 // Public sign-up stays off unless explicitly enabled: every account can
@@ -31,6 +32,31 @@ function checkNewCredentials(email: unknown, password: unknown): string | null {
   return null;
 }
 
+// Failed sign-ins per 15 minutes, per IP and per email. Only failures
+// count, so a user who types their password right is never slowed down.
+const FAIL_WINDOW = 15 * MINUTE;
+const FAILS_PER_IP = 20;
+const FAILS_PER_EMAIL = 8;
+const SIGNUPS_PER_IP_HOUR = 5;
+
+function failKeys(ip: string, email?: unknown): [string, number][] {
+  const keys: [string, number][] = [[`login-ip:${ip}`, FAILS_PER_IP]];
+  if (typeof email === 'string' && email.trim()) keys.push([`login-email:${normalizeEmail(email)}`, FAILS_PER_EMAIL]);
+  return keys;
+}
+
+async function lockedOut(keys: [string, number][]) {
+  for (const [key, limit] of keys) {
+    const s = await peek(key, limit, FAIL_WINDOW);
+    if (s.blocked) return tooManyRequests('Too many failed attempts. Try again in a few minutes.', s);
+  }
+  return null;
+}
+
+async function recordFailure(keys: [string, number][]) {
+  await Promise.all(keys.map(([key, limit]) => consume(key, limit, FAIL_WINDOW)));
+}
+
 export async function GET() {
   const userId = getSessionUserId();
   const user = userId
@@ -48,6 +74,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { action, email, password, name, appPassword } = body;
+    const ip = clientIp(request);
 
     if (action === 'logout') {
       clearSessionCookie();
@@ -56,6 +83,8 @@ export async function POST(request: Request) {
 
     if (action === 'signup') {
       if (!signupOpen()) return NextResponse.json({ error: 'Sign-up is closed.' }, { status: 403 });
+      const signups = await consume(`signup-ip:${ip}`, SIGNUPS_PER_IP_HOUR, HOUR);
+      if (signups.blocked) return tooManyRequests('Too many new accounts from this network. Try again later.', signups);
       const problem = checkNewCredentials(email, password);
       if (problem) return NextResponse.json({ error: problem }, { status: 400 });
       const normalized = normalizeEmail(email);
@@ -74,7 +103,11 @@ export async function POST(request: Request) {
 
     if (action === 'claim') {
       if (!(await ownerUnclaimed())) return NextResponse.json({ error: 'This workspace already has an owner account.' }, { status: 409 });
+      const keys = failKeys(ip);
+      const locked = await lockedOut(keys);
+      if (locked) return locked;
       if (typeof appPassword !== 'string' || !checkPassword(appPassword)) {
+        await recordFailure(keys);
         return NextResponse.json({ error: 'The current app password is incorrect.' }, { status: 401 });
       }
       const problem = checkNewCredentials(email, password);
@@ -97,12 +130,18 @@ export async function POST(request: Request) {
 
     // Email + password sign-in
     if (typeof email === 'string' && email.trim()) {
+      const keys = failKeys(ip, email);
+      const locked = await lockedOut(keys);
+      if (locked) return locked;
       if (typeof password !== 'string' || !password) return invalidLogin();
       const user = await db.user.findUnique({
         where: { email: normalizeEmail(email) },
         select: { id: true, passwordHash: true },
       });
-      if (!user?.passwordHash || !(await verifyPassword(password, user.passwordHash))) return invalidLogin();
+      if (!user?.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
+        await recordFailure(keys);
+        return invalidLogin();
+      }
       return signIn(user.id);
     }
 
@@ -111,7 +150,13 @@ export async function POST(request: Request) {
       if (!(await ownerUnclaimed())) {
         return NextResponse.json({ error: 'Sign in with your email and password.' }, { status: 401 });
       }
-      if (!checkPassword(password)) return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
+      const keys = failKeys(ip);
+      const locked = await lockedOut(keys);
+      if (locked) return locked;
+      if (!checkPassword(password)) {
+        await recordFailure(keys);
+        return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
+      }
       return signIn(SEED_USER_ID);
     }
 

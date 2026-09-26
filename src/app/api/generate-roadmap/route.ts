@@ -1,3 +1,4 @@
+import { aiQuotaGate } from '@/lib/rateLimit';
 import { NextResponse } from 'next/server';
 import {
   callAIContent,
@@ -286,6 +287,8 @@ export async function POST(request: Request) {
   if (auth instanceof NextResponse) {
     return auth;
   }
+  const overQuota = await aiQuotaGate(auth.userId);
+  if (overQuota) return overQuota;
 
   /*
    * Read request body once.

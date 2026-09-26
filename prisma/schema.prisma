@@ -888,3 +888,15 @@ model PlacementCheck {
 
   @@index([userId, topicId, createdAt])
 }
+
+/// Fixed-window counters for rate limits and the daily AI quota. Kept in
+/// Postgres because serverless instances don't share memory. Old windows are
+/// pruned opportunistically (see src/lib/rateLimit.ts).
+model RateLimitHit {
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+}

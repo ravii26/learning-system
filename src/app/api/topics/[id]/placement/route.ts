@@ -1,3 +1,4 @@
+import { aiQuotaGate } from '@/lib/rateLimit';
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
@@ -14,6 +15,9 @@ export async function POST(_request: Request, { params }: { params: { id: string
   const auth = requireAuth();
   if (auth instanceof NextResponse) return auth;
   const { userId } = auth;
+
+  const overQuota = await aiQuotaGate(userId);
+  if (overQuota) return overQuota;
 
   try {
     const topic = await db.topic.findFirst({

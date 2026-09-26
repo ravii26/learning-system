@@ -1,3 +1,4 @@
+import { aiQuotaGate } from '@/lib/rateLimit';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/apiAuth';
 import {
@@ -73,6 +74,9 @@ export async function POST(request: Request) {
   if (auth instanceof NextResponse) return auth;
 
   const { userId } = auth;
+
+  const overQuota = await aiQuotaGate(userId);
+  if (overQuota) return overQuota;
 
   // Parse the request body exactly once.
   let body: Record<string, any>;
