@@ -38,6 +38,9 @@ interface DueConcept {
   /** Set on cards made from lessons and quiz misses; plain concepts have neither. */
   prompt?: string | null;
   answer?: string | null;
+  moduleTitle?: string | null;
+  /** Your own notes on the module this card came from, as plain text. */
+  moduleNote?: string | null;
 }
 
 interface ReviewDecision {
@@ -379,6 +382,14 @@ export default function ReviewPage() {
                       <span className="text-fg-muted">
                         No stored answer for this card — check yourself against your notes, then grade honestly.
                       </span>
+                    )}
+                    {dueConcepts[currentConceptIdx].moduleNote && (
+                      <div className="mx-auto mt-4 max-w-[560px] whitespace-pre-wrap rounded-md bg-white/5 px-4 py-3 text-left text-[0.85rem] leading-relaxed text-fg-secondary">
+                        <span className="mb-1 block text-[0.7rem] font-bold uppercase tracking-wide text-fg-muted">
+                          Your notes{dueConcepts[currentConceptIdx].moduleTitle ? ` on ${dueConcepts[currentConceptIdx].moduleTitle}` : ''}
+                        </span>
+                        {dueConcepts[currentConceptIdx].moduleNote}
+                      </div>
                     )}
                     <div className="mt-3 text-[0.75rem] text-fg-muted">
                       {dueConcepts[currentConceptIdx].conceptTitle} · level {dueConcepts[currentConceptIdx].conceptStatus}

@@ -897,6 +897,9 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
               onEvidenceChanged={fetchEvidence}
               notes={notes}
               onSaveNotes={handleSaveNotes}
+              onModuleNotesSaved={(moduleId, html) =>
+                setCurriculum((prev) => prev.map((m) => (m.id === moduleId ? { ...m, notes: html } : m)))
+              }
               onToggleCompleted={handleToggleModuleCompleted}
               onAddBookmark={async (res) => {
                 const newRes: Resource = {

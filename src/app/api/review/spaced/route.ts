@@ -5,6 +5,7 @@ import { schedule, type Grade } from '@/lib/fsrs';
 import { enumToLabel, MASTERY_ENUM_VALUES } from '@/lib/masteryLevel';
 import { mirrorConceptsToJson } from '@/lib/conceptSync';
 import { createMistakeRow, mirrorMistakesToJson } from '@/lib/mistakeSync';
+import { htmlToText } from '@/lib/htmlText';
 
 export async function GET() {
   const auth = requireAuth();
@@ -35,6 +36,16 @@ export async function GET() {
     // Same response shape as before the migration, so SpacedReviewQueue.tsx
     // and review/page.tsx (both consumers of this endpoint) keep working
     // without changes beyond conceptId now being a row id.
+    // Your own notes on the module a card came from, shown when you reveal it.
+    const moduleKeys = rows.filter((c) => c.sourceModuleId).map((c) => ({ topicId: c.topicId, legacyId: c.sourceModuleId! }));
+    const moduleRows = moduleKeys.length
+      ? await db.curriculumItem.findMany({
+          where: { userId, OR: moduleKeys },
+          select: { topicId: true, legacyId: true, title: true, notes: true },
+        })
+      : [];
+    const moduleByKey = new Map(moduleRows.map((m) => [`${m.topicId}|${m.legacyId}`, m]));
+
     const dueConcepts = rows.map((c) => ({
       topicId: c.topicId,
       topicTitle: c.topic.title,
@@ -44,6 +55,8 @@ export async function GET() {
       // Review-card question/answer (null for concept-map concepts)
       prompt: c.prompt,
       answer: c.answer,
+      moduleTitle: c.sourceModuleId ? moduleByKey.get(`${c.topicId}|${c.sourceModuleId}`)?.title ?? null : null,
+      moduleNote: c.sourceModuleId ? htmlToText(moduleByKey.get(`${c.topicId}|${c.sourceModuleId}`)?.notes) || null : null,
       conceptStatus: enumToLabel(c.masteryLevel),
       difficulty: c.difficultyTag || 'Medium',
       importance: c.importance || 'Medium',

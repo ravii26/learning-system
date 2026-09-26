@@ -100,10 +100,15 @@ export async function syncCurriculumFromJson(
   const plan = planCurriculumSync(active.map((r) => r.legacyId), incoming);
 
   for (const { legacyId, data } of plan.upserts) {
+    // Notes are only set on create. After that they belong to the module
+    // notes route: the topic page re-sends the whole syllabus whenever a
+    // module is ticked or reordered, and its copy of a note can be seconds
+    // stale — letting that overwrite the row would lose what you just typed.
+    const { notes: _notes, ...structural } = data;
     await db.curriculumItem.upsert({
       where: { topicId_legacyId: { topicId, legacyId } },
       create: { ...data, legacyId, userId, topicId },
-      update: { ...data, removed: false },
+      update: { ...structural, removed: false },
     });
   }
   if (plan.removeLegacyIds.length > 0) {
