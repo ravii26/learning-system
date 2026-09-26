@@ -52,12 +52,12 @@ export default function CustomDialog({
 
   const getIcon = () => {
     switch (type) {
-      case 'error': return '🚨';
-      case 'warning': return '⚠️';
-      case 'success': return '✅';
-      case 'confirm': return '❓';
-      case 'prompt': return '💬';
-      default: return '💡';
+      case 'error': return '';
+      case 'warning': return '';
+      case 'success': return '';
+      case 'confirm': return '';
+      case 'prompt': return '';
+      default: return '';
     }
   };
 

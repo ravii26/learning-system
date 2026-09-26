@@ -3,16 +3,19 @@ import { cn } from './cn';
 
 type Accent = 'primary' | 'accent' | 'success' | 'warning' | 'danger' | 'none';
 
+// Coloured left edges are gone in the redesign (colour only means
+// knowledge state). The prop stays so existing callers keep compiling;
+// 'danger' keeps a full border because it marks something destructive.
 const ACCENT: Record<Accent, string> = {
-  primary: 'border-l-4 border-l-primary',
-  accent: 'border-l-4 border-l-accent',
-  success: 'border-l-4 border-l-success',
-  warning: 'border-l-4 border-l-warning',
-  danger: 'border-l-4 border-l-danger',
+  primary: '',
+  accent: '',
+  success: '',
+  warning: '',
+  danger: 'border-danger',
   none: '',
 };
 
-/** The glass surface every screen uses (legacy .glass-panel), with an optional left accent bar. */
+/** The surface every screen uses (legacy .glass-panel). */
 export function Card({
   accent = 'none',
   className,

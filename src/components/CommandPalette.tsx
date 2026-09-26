@@ -73,9 +73,9 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   if (!isOpen || !mounted) return null;
 
   const quickActions = [
-    { id: 'act-home', title: 'Go to Dashboard', icon: '🏠', action: () => router.push('/') },
-    { id: 'act-review', title: 'Open Spaced Review Queue', icon: '🧠', action: () => router.push('/review') },
-    { id: 'act-explore', title: 'Explore Topic Ideas', icon: '🔍', action: () => router.push('/explore') },
+    { id: 'act-home', title: 'Go to Dashboard', icon: '', action: () => router.push('/') },
+    { id: 'act-review', title: 'Open Spaced Review Queue', icon: '', action: () => router.push('/review') },
+    { id: 'act-explore', title: 'Explore Topic Ideas', icon: '', action: () => router.push('/explore') },
   ];
 
   const filteredTopics = topics.filter((t) =>
@@ -88,7 +88,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     ...filteredTopics.map((t) => ({
       id: `topic-${t.id}`,
       title: t.title,
-      icon: '📚',
+      icon: '',
       action: () => router.push(`/topics/${t.id}`),
     })),
   ];
@@ -151,7 +151,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
             borderBottom: '1px solid var(--fill-3)',
           }}
         >
-          <span style={{ fontSize: '1.2rem', color: 'var(--color-text-primary)' }}>⚡</span>
+          <span style={{ fontSize: '1.2rem', color: 'var(--color-text-primary)' }}></span>
           <input
             ref={inputRef}
             type="text"

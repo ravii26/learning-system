@@ -77,7 +77,6 @@ export default function PrioritizationPortal({
       <div className="glass-panel" style={{ width: '100%', maxWidth: '520px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px', maxHeight: '90vh', overflowY: 'auto' }}>
         
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '2.5rem', color: 'var(--color-warning)' }}>🔒</div>
           <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginTop: '4px' }}>Active Focus Limit Reached</h3>
           <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
             You already have <strong>2 active commitments</strong>. Choose which active topic to pause and confirm activation details for <strong>"{pendingTopic.title}"</strong>.
@@ -186,7 +185,7 @@ export default function PrioritizationPortal({
             </div>
           </div>
 
-          {error && <p style={{ color: 'var(--color-danger)', fontSize: '0.8rem' }}>⚠️ {error}</p>}
+          {error && <p style={{ color: 'var(--color-danger)', fontSize: '0.8rem' }}>{error}</p>}
 
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
             <button type="button" onClick={onClose} className="btn btn-secondary">Cancel Activation</button>

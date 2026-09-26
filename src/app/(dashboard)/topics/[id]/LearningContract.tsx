@@ -132,7 +132,7 @@ export default function LearningContract({
       {/* Contract Details Form */}
       <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <h3 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span>📜</span> Learning Contract
+          Learning Contract
         </h3>
 
         <div className="form-group" style={{ marginBottom: 0 }}>
@@ -189,14 +189,14 @@ export default function LearningContract({
           className="btn btn-primary"
           style={{ padding: '8px 16px', fontSize: '0.85rem', alignSelf: 'flex-start' }}
         >
-          💾 Update Learning Contract
+          Update Learning Contract
         </button>
       </div>
 
       {/* Prerequisites Checklist */}
       <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <h3 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span>🛠️</span> Foundation Prerequisites
+          Foundation Prerequisites
         </h3>
         
         <form onSubmit={handleAddPrereq} style={{ display: 'flex', gap: '8px' }}>
@@ -281,7 +281,7 @@ export default function LearningContract({
       {/* Adaptive Diagnostic Tool */}
       <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--fill-1)', border: '1px solid var(--fill-3)' }}>
         <h3 style={{ fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span>🧠</span> Engine 2 — Adaptive Learning Diagnostic
+          Engine 2 — Adaptive Learning Diagnostic
         </h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
           Don't relearn what you already know. Take a diagnostic self-assessment to map your starting levels, skip functional blocks, and highlight weak areas.
@@ -293,12 +293,12 @@ export default function LearningContract({
           disabled={concepts.length === 0}
           style={{ alignSelf: 'flex-start' }}
         >
-          ⚡ Run Adaptive Diagnostic Assessment
+          Run Adaptive Diagnostic Assessment
         </button>
 
         {concepts.length === 0 && (
           <p style={{ fontSize: '0.75rem', color: 'var(--color-warning)' }}>
-            ⚠️ Define concepts in the Knowledge Map first before taking a diagnostic.
+            Define concepts in the Knowledge Map first before taking a diagnostic.
           </p>
         )}
       </div>

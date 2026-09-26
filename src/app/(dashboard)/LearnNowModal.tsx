@@ -162,7 +162,7 @@ export default function LearnNowModal({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div className="flex-between" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
               <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>⚡ Socratic Learn Now</h3>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Socratic Learn Now</h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
                   Aligns your study block dynamically to available constraints.
                 </p>
@@ -230,7 +230,7 @@ export default function LearnNowModal({
             </div>
 
             <button onClick={handleStartSession} className="btn btn-primary" style={{ width: '100%', marginTop: '8px' }}>
-              ⚡ Launch Timed Study Session
+              Launch Timed Study Session
             </button>
           </div>
         )}
@@ -262,13 +262,13 @@ export default function LearnNowModal({
 
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                 <button onClick={() => setSessionActive(!sessionActive)} className="btn btn-primary" style={{ padding: '6px 16px', fontSize: '0.8rem' }}>
-                  {sessionActive ? '⏸️ Pause Timer' : '▶️ Resume Timer'}
+                  {sessionActive ? 'Pause Timer' : '▶️ Resume Timer'}
                 </button>
                 <button onClick={handleSkipStep} className="btn btn-secondary" style={{ padding: '6px 16px', fontSize: '0.8rem' }}>
                   ⏭️ Next Step
                 </button>
                 <button onClick={handleFinishEarly} className="btn btn-danger" style={{ padding: '6px 16px', fontSize: '0.8rem' }}>
-                  🛑 Finish Early
+                  Finish Early
                 </button>
               </div>
             </div>
@@ -291,7 +291,6 @@ export default function LearnNowModal({
         {view === 'completed' && plan && (
           <form onSubmit={handleSaveReflection} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '3rem', color: 'var(--color-success)' }}>🧠</div>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginTop: '8px' }}>Session Metacognition Reflection</h3>
               <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
                 Take 20 seconds to evaluate what has changed in your understanding.
@@ -337,7 +336,7 @@ export default function LearnNowModal({
             </div>
 
             <button type="submit" disabled={submitting} className="btn btn-primary" style={{ width: '100%' }}>
-              {submitting ? 'Syncing reflection logs...' : '💾 Save Reflection & Conclude Session'}
+              {submitting ? 'Syncing reflection logs...' : 'Save Reflection & Conclude Session'}
             </button>
           </form>
         )}

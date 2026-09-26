@@ -33,10 +33,10 @@ const TEMPLATES: Record<string, string> = {
 };
 
 const GRADE_BUTTONS: Array<{ grade: Grade; key: string; label: string; emoji: string; activeBg: string; activeBorder: string; activeColor: string }> = [
-  { grade: 'Again', key: '1', label: 'Again', emoji: '❌', activeBg: 'var(--danger-tint)', activeBorder: 'var(--color-danger)', activeColor: 'var(--color-danger)' },
-  { grade: 'Hard', key: '2', label: 'Hard', emoji: '😓', activeBg: 'var(--warning-tint)', activeBorder: 'var(--color-warning)', activeColor: 'var(--color-warning)' },
-  { grade: 'Good', key: '3', label: 'Good', emoji: '✅', activeBg: 'var(--success-tint)', activeBorder: 'var(--color-success)', activeColor: 'var(--color-success)' },
-  { grade: 'Easy', key: '4', label: 'Easy', emoji: '⚡', activeBg: 'var(--fill-3)', activeBorder: 'var(--color-primary)', activeColor: 'var(--color-primary-light)' },
+  { grade: 'Again', key: '1', label: 'Again', emoji: '', activeBg: 'var(--danger-tint)', activeBorder: 'var(--color-danger)', activeColor: 'var(--color-danger)' },
+  { grade: 'Hard', key: '2', label: 'Hard', emoji: '', activeBg: 'var(--warning-tint)', activeBorder: 'var(--color-warning)', activeColor: 'var(--color-warning)' },
+  { grade: 'Good', key: '3', label: 'Good', emoji: '', activeBg: 'var(--success-tint)', activeBorder: 'var(--color-success)', activeColor: 'var(--color-success)' },
+  { grade: 'Easy', key: '4', label: 'Easy', emoji: '', activeBg: 'var(--fill-3)', activeBorder: 'var(--color-primary)', activeColor: 'var(--color-primary-light)' },
 ];
 
 export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueueProps) {
@@ -191,7 +191,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
 
       {/* Test overlay pane */}
       {testingConcept && (
-        <div className="glass-panel" style={{ padding: '24px', borderLeft: '4px solid var(--color-primary)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
           <div className="flex-between">
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-primary-light)' }}>
@@ -240,7 +240,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
                 className="btn btn-primary"
                 style={{ alignSelf: 'flex-start', padding: '6px 14px', fontSize: '0.8rem' }}
               >
-                👁️ Reveal Answer Checklist
+                Reveal Answer Checklist
               </button>
             </div>
           ) : (
@@ -325,7 +325,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
                 className="btn btn-primary"
                 style={{ alignSelf: 'flex-end', padding: '6px 14px', fontSize: '0.8rem' }}
               >
-                {submitting ? 'Saving recall...' : '💾 Save Spaced Result'}
+                {submitting ? 'Saving recall...' : 'Save Spaced Result'}
               </button>
 
             </div>
@@ -341,7 +341,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
           <div className="flex-between">
             <div>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>🧠</span> Engine 6 — Spaced Practice Reviews
+                Engine 6 — Spaced Practice Reviews
               </h3>
               <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
                 Spacing and active recall prevent cognitive decay. Mix reviews to avoid pattern memorization.
@@ -355,7 +355,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
                 className="btn btn-primary"
                 style={{ padding: '6px 12px', fontSize: '0.75rem', background: 'var(--ink)', borderColor: 'var(--ink)', color: 'var(--on-ink)' }}
               >
-                🔀 Interleaved Practice
+                Interleaved Practice
               </button>
             </div>
           </div>
@@ -371,8 +371,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
                   justifyContent: 'space-between',
                   padding: '12px 16px',
                   background: 'var(--bg-sunk)',
-                  borderLeft: '3px solid var(--color-primary-light)',
-                }}
+                  }}
               >
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{c.conceptTitle}</span>
@@ -388,7 +387,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
                   className="btn btn-secondary"
                   style={{ padding: '6px 12px', fontSize: '0.75rem' }}
                 >
-                  ⚡ Recall
+                  Recall
                 </button>
               </div>
             ))}
@@ -410,7 +409,7 @@ export default function SpacedReviewQueue({ onReviewSaved }: SpacedReviewQueuePr
                   fontSize: '0.8rem',
                 }}
               >
-                ✨ Spaced memory queue is clear. All core concepts are fully retained!
+                Spaced memory queue is clear. All core concepts are fully retained!
               </div>
             )}
           </div>

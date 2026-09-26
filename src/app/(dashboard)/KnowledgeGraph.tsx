@@ -53,7 +53,7 @@ export default function KnowledgeGraph({ topics }: KnowledgeGraphProps) {
       type: 'core',
       x: 250,
       y: 175,
-      color: '#a855f7', // Glowing Purple
+      color: '--ink',
       size: 16,
     });
 
@@ -66,7 +66,7 @@ export default function KnowledgeGraph({ topics }: KnowledgeGraphProps) {
       const topicX = 250 + Math.cos(angle) * radius;
       const topicY = 175 + Math.sin(angle) * radius;
       
-      const topicColor = t.status === 'active' ? '#6366f1' : t.status === 'maintenance' ? '#10b981' : '#f59e0b';
+      const topicColor = t.status === 'active' ? '--ink' : t.status === 'maintenance' ? '--color-text-secondary' : '--border-strong';
       
       tempNodes.push({
         id: t.id,
@@ -99,7 +99,7 @@ export default function KnowledgeGraph({ topics }: KnowledgeGraphProps) {
           type: 'concept',
           x: conceptX,
           y: conceptY,
-          color: '#14b8a6', // Teal
+          color: !c.status || c.status === 'Unknown' ? '--k-unseen' : c.status === 'Exposed' || c.status === 'Understood' ? '--k-learning' : '--k-solid',
           size: 6,
           status: c.status,
         });
@@ -123,10 +123,15 @@ export default function KnowledgeGraph({ topics }: KnowledgeGraphProps) {
     let animationFrameId: number;
 
     const draw = () => {
-      // Clear canvas
+      // Node colours are theme token names; a canvas can't read CSS
+      // variables, so resolve them against the page each frame (this also
+      // follows a theme switch without remounting).
+      const css = getComputedStyle(document.documentElement);
+      const color = (token: string) => css.getPropertyValue(token).trim() || '#888';
+      const font = getComputedStyle(document.body).fontFamily;
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw glowing lines (Links)
       links.forEach((l) => {
         const sourceNode = nodes.find(n => n.id === l.source);
         const targetNode = nodes.find(n => n.id === l.target);
@@ -135,35 +140,28 @@ export default function KnowledgeGraph({ topics }: KnowledgeGraphProps) {
         ctx.beginPath();
         ctx.moveTo(sourceNode.x, sourceNode.y);
         ctx.lineTo(targetNode.x, targetNode.y);
-        
-        // Dynamic gradients for connections
-        const grad = ctx.createLinearGradient(sourceNode.x, sourceNode.y, targetNode.x, targetNode.y);
-        grad.addColorStop(0, sourceNode.color);
-        grad.addColorStop(1, targetNode.color);
-        
-        ctx.strokeStyle = grad;
+        ctx.strokeStyle = color('--border-color-hover');
         ctx.lineWidth = sourceNode.type === 'core' ? 1.5 : 1;
-        ctx.globalAlpha = 0.25;
+        ctx.globalAlpha = 1;
         ctx.stroke();
       });
 
-      // Draw Nodes
       nodes.forEach((n) => {
         ctx.globalAlpha = 1;
         ctx.beginPath();
         ctx.arc(n.x, n.y, n.size, 0, Math.PI * 2);
-        ctx.fillStyle = n.color;
-        
-        // Add subtle drop shadow glow
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = n.color;
-        ctx.fill();
-        ctx.shadowBlur = 0; // reset
+        if (n.color === '--k-unseen') {
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = color(n.color);
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = color(n.color);
+          ctx.fill();
+        }
 
-        // Draw small text labels next to core/topic nodes
         if (n.type !== 'concept') {
-          ctx.fillStyle = '#f3f4f6';
-          ctx.font = n.type === 'core' ? 'bold 10px sans-serif' : '500 8px sans-serif';
+          ctx.fillStyle = color('--color-text-primary');
+          ctx.font = n.type === 'core' ? `600 10px ${font}` : `500 8px ${font}`;
           ctx.textAlign = 'center';
           ctx.fillText(n.label, n.x, n.y - n.size - 4);
         }
@@ -228,14 +226,14 @@ export default function KnowledgeGraph({ topics }: KnowledgeGraphProps) {
     <div className="glass-panel" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div>
         <h3 style={{ fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span>🕸️</span> Personal Knowledge Web
+          Personal Knowledge Web
         </h3>
         <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
           Interactive map connecting active subjects to their Socratic sub-concepts. Click nodes to inspect.
         </p>
       </div>
 
-      <div style={{ position: 'relative', width: '100%', background: 'rgba(0,0,0,0.4)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', width: '100%', background: 'var(--bg-sunk)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
         <canvas
           ref={canvasRef}
           width={500}
@@ -252,18 +250,17 @@ export default function KnowledgeGraph({ topics }: KnowledgeGraphProps) {
             position: 'absolute',
             left: `${hoverPos.x + 12}px`,
             top: `${hoverPos.y - 12}px`,
-            background: 'rgba(12,12,20,0.96)',
-            border: `1px solid ${hoverNode.color}44`,
-            borderLeft: `3px solid ${hoverNode.color}`,
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-color)',
             padding: '6px 10px',
             borderRadius: 'var(--radius-sm)',
             fontSize: '0.75rem',
             pointerEvents: 'none',
             zIndex: 10,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            boxShadow: 'var(--shadow-pop)',
             whiteSpace: 'nowrap',
           }}>
-            <span style={{ fontWeight: 600, color: '#fff' }}>{hoverNode.label}</span>
+            <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{hoverNode.label}</span>
             {hoverNode.area && <span style={{ marginLeft: '6px', color: 'var(--color-text-muted)', fontSize: '0.68rem' }}>{hoverNode.area}</span>}
             {hoverNode.status && <span style={{ display: 'block', color: 'var(--color-secondary-light)', fontSize: '0.68rem', marginTop: '1px' }}>{hoverNode.status}</span>}
           </div>
@@ -276,20 +273,19 @@ export default function KnowledgeGraph({ topics }: KnowledgeGraphProps) {
             bottom: '12px',
             left: '12px',
             right: '12px',
-            background: 'rgba(18, 18, 24, 0.95)',
+            background: 'var(--bg-surface)',
             border: '1px solid var(--border-color)',
             padding: '10px 14px',
             borderRadius: 'var(--radius-sm)',
             fontSize: '0.8rem',
-            boxShadow: 'var(--shadow-glass)',
-            backdropFilter: 'blur(8px)',
+            boxShadow: 'var(--shadow-pop)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
           }}>
             <div>
-              <span style={{ fontSize: '0.65rem', fontWeight: 600, color: selectedNode.color, textTransform: 'uppercase', display: 'block' }}>
-                {selectedNode.type} node
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', display: 'block' }}>
+                {selectedNode.type === 'core' ? 'You' : selectedNode.type === 'topic' ? 'Topic' : 'Concept'}
               </span>
               <strong style={{ fontSize: '0.85rem' }}>{selectedNode.label}</strong>
               {selectedNode.status && (
@@ -316,14 +312,14 @@ export default function KnowledgeGraph({ topics }: KnowledgeGraphProps) {
       {/* Legend */}
       <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', padding: '4px 0' }}>
         {[
-          { color: '#a855f7', label: 'Core' },
-          { color: '#6366f1', label: 'Active' },
-          { color: '#f59e0b', label: 'Queued' },
-          { color: '#10b981', label: 'Maintained' },
-          { color: '#14b8a6', label: 'Concept' },
+          { color: 'var(--ink)', label: 'Now' },
+          { color: 'var(--border-strong)', label: 'Next' },
+          { color: 'var(--color-text-secondary)', label: 'Keeping fresh' },
+          { color: 'var(--k-solid)', label: 'Concept you know' },
+          { color: 'var(--k-learning)', label: 'Concept you’re learning' },
         ].map(({ color, label }) => (
           <span key={label} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, display: 'inline-block', boxShadow: `0 0 5px ${color}88`, flexShrink: 0 }} />
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
             {label}
           </span>
         ))}

@@ -66,7 +66,7 @@ function CaptureInner() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 px-4 py-8">
       <div className="flex-between">
-        <h1 className="text-xl font-bold">⚡ Capture</h1>
+        <h1 className="text-xl font-bold">Capture</h1>
         <Link href="/notes" className="text-[0.8rem] text-primary-light">Inbox ▸</Link>
       </div>
 

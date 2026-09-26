@@ -15,7 +15,6 @@ export default function NotFound() {
       color: 'var(--color-text-primary, var(--color-text-primary))',
       fontFamily: 'system-ui, sans-serif',
     }}>
-      <span style={{ fontSize: '3rem' }}>🔍</span>
       <h1 style={{ fontSize: '2rem', fontWeight: 700, margin: 0 }}>Page Not Found</h1>
       <p style={{ fontSize: '0.95rem', color: 'var(--color-text-secondary, var(--color-text-muted))', maxWidth: '400px', margin: 0 }}>
         The topic, note, or view you are looking for does not exist or may have been moved.

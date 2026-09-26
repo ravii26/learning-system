@@ -195,7 +195,6 @@ export default function ExplorePage() {
       {sessionState === 'setup' && (
         <>
           <form onSubmit={(e) => { e.preventDefault(); startSession(); }} className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div style={{ fontSize: '3rem', textAlign: 'center' }}>⏱️</div>
             
             <div className="form-group">
               <label className="form-label">What curiosity are you exploring?</label>
@@ -233,7 +232,7 @@ export default function ExplorePage() {
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ alignSelf: 'center', marginTop: '12px' }}>
-              ⚡ Start Exploration
+              Start Exploration
             </button>
           </form>
 
@@ -241,7 +240,7 @@ export default function ExplorePage() {
           {recentExplorations.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <h3 style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>🕐</span> Recent Explorations
+                Recent Explorations
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {recentExplorations.map(t => {
@@ -252,7 +251,6 @@ export default function ExplorePage() {
                   };
                   return (
                     <div key={t.id} className="review-preview-card">
-                      <span style={{ fontSize: '1rem' }}>🔬</span>
                       <span style={{ flexGrow: 1, fontSize: '0.85rem', fontWeight: 500 }}>{t.title}</span>
                       <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
                         {new Date(t.lastTouchedDate).toLocaleDateString()}
@@ -292,7 +290,7 @@ export default function ExplorePage() {
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
               {sessionState === 'running' ? (
                 <button onClick={handlePause} className="btn btn-secondary">
-                  ⏸️ Pause Timer
+                  Pause Timer
                 </button>
               ) : (
                 <button onClick={handleResume} className="btn btn-primary">
@@ -301,7 +299,7 @@ export default function ExplorePage() {
               )}
               
               <button onClick={handleFinishEarly} className="btn btn-danger">
-                🛑 Complete Early
+                Complete Early
               </button>
             </div>
           </div>
@@ -319,11 +317,11 @@ export default function ExplorePage() {
                     fontSize: '0.7rem',
                     fontWeight: 500,
                     borderRadius: '4px',
-                    background: notesMode === 'write' ? 'var(--color-primary)' : 'transparent',
+                    background: notesMode === 'write' ? 'var(--bg-surface)' : 'transparent',
                     color: notesMode === 'write' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   }}
                 >
-                  ✍️ Write
+                  Write
                 </button>
                 <button
                   type="button"
@@ -333,11 +331,11 @@ export default function ExplorePage() {
                     fontSize: '0.7rem',
                     fontWeight: 500,
                     borderRadius: '4px',
-                    background: notesMode === 'preview' ? 'var(--color-primary)' : 'transparent',
+                    background: notesMode === 'preview' ? 'var(--bg-surface)' : 'transparent',
                     color: notesMode === 'preview' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   }}
                 >
-                  👁️ Preview
+                  Preview
                 </button>
               </div>
             </div>
@@ -375,7 +373,6 @@ export default function ExplorePage() {
       {sessionState === 'evaluate' && (
         <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '3rem' }}>💡</div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginTop: '8px' }}>Session Concluded: What's the verdict?</h2>
             <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
               How do you evaluate <strong>"{topicTitle}"</strong> after this exploration?
@@ -398,7 +395,7 @@ export default function ExplorePage() {
                   color: outcome === 'interesting' ? 'var(--color-primary-light)' : 'var(--color-text-secondary)',
                 }}
               >
-                💡 <strong>Interesting</strong> — Send to Queue for structured study later
+                <strong>Interesting</strong> — Send to Queue for structured study later
               </button>
 
               <button
@@ -413,7 +410,7 @@ export default function ExplorePage() {
                   color: outcome === 'useful' ? 'var(--color-secondary-light)' : 'var(--color-text-secondary)',
                 }}
               >
-                🛠️ <strong>Useful</strong> — Send to Queue as a practical skill resource
+                <strong>Useful</strong> — Send to Queue as a practical skill resource
               </button>
 
               <button
@@ -428,7 +425,7 @@ export default function ExplorePage() {
                   color: outcome === 'important' ? 'var(--color-text-secondary)' : 'var(--color-text-secondary)',
                 }}
               >
-                🚀 <strong>Important</strong> — Queue high-priority and plan activation
+                <strong>Important</strong> — Queue high-priority and plan activation
               </button>
 
               <button
@@ -443,7 +440,7 @@ export default function ExplorePage() {
                   color: outcome === 'curiosity' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 }}
               >
-                📖 <strong>Just Curiosity</strong> — File in Reference only for future lookup
+                <strong>Just Curiosity</strong> — File in Reference only for future lookup
               </button>
 
               <button
@@ -458,13 +455,13 @@ export default function ExplorePage() {
                   color: outcome === 'useless' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
                 }}
               >
-                🗑️ <strong>Not Useful</strong> — Record as Dropped so I don't waste time on it again
+                <strong>Not Useful</strong> — Record as Dropped so I don't waste time on it again
               </button>
             </div>
           </div>
 
           <button onClick={handleSaveOutcome} className="btn btn-primary" disabled={saving}>
-            {saving ? 'Saving...' : '💾 Save Outcome & Exit'}
+            {saving ? 'Saving...' : 'Save Outcome & Exit'}
           </button>
         </div>
       )}
@@ -472,7 +469,6 @@ export default function ExplorePage() {
       {/* SAVED STATE */}
       {sessionState === 'saved' && (
         <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem', color: 'var(--color-success)' }}>💾</div>
           <div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '8px' }}>Exploration Logged</h2>
             <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>

@@ -88,7 +88,6 @@ export default function ReactivationModal({
         {/* Step Intro */}
         {step === 'intro' && (
           <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ fontSize: '3rem' }}>⚡</div>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Reactivation Session</h3>
             <span style={{ fontSize: '0.8rem', color: 'var(--color-warning)', fontWeight: 600 }}>TOPIC: {topicTitle}</span>
             <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
@@ -178,7 +177,7 @@ export default function ReactivationModal({
                 >
                   <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{tc.title}</span>
                   <span style={{ fontSize: '0.75rem', color: forgottenIds.includes(tc.id) ? 'var(--color-danger)' : 'var(--color-text-muted)' }}>
-                    {forgottenIds.includes(tc.id) ? '⚠️ Blurry / Forgotten' : '✅ Clear / Retained'}
+                    {forgottenIds.includes(tc.id) ? 'Blurry / Forgotten' : 'Clear / Retained'}
                   </span>
                 </div>
               ))}
@@ -222,7 +221,6 @@ export default function ReactivationModal({
         {/* Step Done */}
         {step === 'done' && (
           <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ fontSize: '3rem', color: 'var(--color-success)' }}>✅</div>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Reactivation Completed</h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
               Your brain has loaded the context for <strong>"{topicTitle}"</strong>. Spaced repetition dates for flagged items have been adjusted. You are ready to start studying!
@@ -234,7 +232,7 @@ export default function ReactivationModal({
               className="btn btn-primary"
               style={{ alignSelf: 'center', marginTop: '12px' }}
             >
-              {submitting ? 'Activating Card...' : '🚀 Resume Active Learning'}
+              {submitting ? 'Activating Card...' : 'Resume Active Learning'}
             </button>
           </div>
         )}

@@ -201,7 +201,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
       {/* Progress Header */}
       <div className="glass-panel" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>📚 Course Curriculum & AI Lessons</h3>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Course Curriculum & AI Lessons</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {onImportToSubtasks && modules.length > 0 && (
               <button
@@ -210,7 +210,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                 className="btn btn-secondary"
                 style={{ fontSize: '0.72rem', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
               >
-                {imported ? '✅ Modules Imported!' : '⚡ Import Modules to Checklist'}
+                {imported ? 'Modules Imported!' : 'Import Modules to Checklist'}
               </button>
             )}
             <span style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
@@ -236,7 +236,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
           </p>
         )}
         {completedCount === modules.length && modules.length > 0 && (
-          <p style={{ fontSize: '0.78rem', color: 'var(--color-success)', fontWeight: 600 }}>🎉 Course complete!</p>
+          <p style={{ fontSize: '0.78rem', color: 'var(--color-success)', fontWeight: 600 }}>Course complete!</p>
         )}
       </div>
 
@@ -244,7 +244,6 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {modules.length === 0 && (
           <div className="glass-panel" style={{ padding: '32px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
-            <span style={{ fontSize: '2.5rem' }}>📋</span>
             <div>
               <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>No curriculum modules yet</h4>
               <p style={{ fontSize: '0.84rem', color: 'var(--color-text-secondary)', maxWidth: '420px', marginTop: '6px', lineHeight: 1.5 }}>
@@ -259,7 +258,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                 className="btn btn-primary"
                 style={{ fontSize: '0.84rem', padding: '8px 18px' }}
               >
-                {generatingInitialCurriculum ? '✨ Generating Structured Modules...' : '🤖 Generate AI Curriculum for This Topic'}
+                {generatingInitialCurriculum ? 'Generating Structured Modules...' : 'Generate AI Curriculum for This Topic'}
               </button>
             )}
           </div>
@@ -329,7 +328,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                     style={{ fontSize: '0.7rem', padding: '4px 10px', whiteSpace: 'nowrap' }}
                     title="Practice this module using Socratic AI Tutor"
                   >
-                    🧠 Practice
+                    Practice
                   </button>
                 )}
 
@@ -338,7 +337,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                   onClick={() => setExpandedId(isExpanded ? null : mod.id)}
                   style={{ fontSize: '0.7rem', color: isExpanded ? 'var(--color-primary-light)' : 'var(--color-text-muted)', padding: '4px 10px', borderRadius: '4px', border: '1px solid var(--border-color)', background: isExpanded ? 'var(--fill-2)' : 'transparent', cursor: 'pointer', fontWeight: 600 }}
                 >
-                  {isExpanded ? '▲ Close Lesson' : '📖 View Lesson & Quiz'}
+                  {isExpanded ? '▲ Close Lesson' : 'View Lesson & Quiz'}
                 </button>
 
                 {/* Delete */}
@@ -364,14 +363,14 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                         className="btn btn-primary"
                         style={{ fontSize: '0.78rem', padding: '8px 16px', borderRadius: '9999px' }}
                       >
-                        ✨ Generate AI Interactive Lesson & Quiz
+                        Generate AI Interactive Lesson & Quiz
                       </button>
                     </div>
                   )}
 
                   {isGenerating && (
                     <div style={{ textAlign: 'center', padding: '20px', fontSize: '0.85rem', color: 'var(--color-primary-light)' }}>
-                      🧠 Generating custom lesson content & quiz for "{mod.title}"...
+                      Generating custom lesson content & quiz for "{mod.title}"...
                     </div>
                   )}
 
@@ -380,7 +379,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                       {lessonData.fallback && (
                         <div style={{ padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--warning-tint)', border: '1px solid var(--warning-line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                           <span style={{ fontSize: '0.78rem', color: 'var(--color-warning)' }}>
-                            ⚠️ Placeholder content — the AI provider was unavailable, so this is generic filler, not a real lesson. It wasn&apos;t saved.
+                            Placeholder content — the AI provider was unavailable, so this is generic filler, not a real lesson. It wasn&apos;t saved.
                           </span>
                           <button
                             onClick={() => handleGenerateLesson(mod, true)}
@@ -395,7 +394,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                       {/* Summary & Takeaways */}
                       <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--fill-2)', border: '1px solid var(--fill-4)' }}>
                         <p style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-primary-light)', marginBottom: '4px' }}>
-                          💡 Summary: {lessonData.summary}
+                          Summary: {lessonData.summary}
                         </p>
                         {Array.isArray(lessonData.keyTakeaways) && (
                           <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -410,7 +409,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
 
                       {/* Explanation Content */}
                       <div>
-                        <h4 style={{ fontSize: '0.88rem', fontWeight: 700, marginBottom: '6px' }}>📖 Lesson Content</h4>
+                        <h4 style={{ fontSize: '0.88rem', fontWeight: 700, marginBottom: '6px' }}>Lesson Content</h4>
                         <div style={{ fontSize: '0.82rem', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
                           {lessonData.explanation}
                         </div>
@@ -419,7 +418,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                       {/* Code / Example Block */}
                       {lessonData.codeOrExample && (
                         <div>
-                          <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>💻 Practical Example / Drill</h4>
+                          <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Practical Example / Drill</h4>
                           <pre style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-sunk)', border: '1px solid var(--border-color)', fontSize: '0.78rem', color: 'var(--color-text-primary)', overflowX: 'auto', fontFamily: 'monospace' }}>
                             {lessonData.codeOrExample}
                           </pre>
@@ -430,7 +429,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                       {Array.isArray(lessonData.quiz) && lessonData.quiz.length > 0 && (
                         <div style={{ borderTop: '1px border-dashed var(--border-color)', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                           <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--color-warning)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            📝 Interactive Self-Check Quiz ({lessonData.quiz.length} Questions)
+                            Interactive Self-Check Quiz ({lessonData.quiz.length} Questions)
                           </h4>
 
                           {lessonData.quiz.map((q: any, qIdx: number) => {
@@ -490,7 +489,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
 
                                 {isAnswered && (
                                   <div style={{ marginTop: '4px', padding: '6px 10px', borderRadius: '4px', background: isCorrect ? 'var(--success-tint)' : 'var(--danger-tint)', fontSize: '0.72rem', color: isCorrect ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                                    {isCorrect ? '✅ Correct! ' : '❌ Incorrect. '} {q.explanation}
+                                    {isCorrect ? 'Correct! ' : 'Incorrect. '} {q.explanation}
                                   </div>
                                 )}
                               </div>

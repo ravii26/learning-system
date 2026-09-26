@@ -233,8 +233,7 @@ export default function SocraticCoach({
   // Retrieval Guard overlay block
   if (explanationsRead >= 3) {
     return (
-      <div className="glass-panel" style={{ padding: '32px', borderLeft: '4px solid var(--color-danger)', background: 'var(--danger-tint)' }}>
-        <div style={{ fontSize: '3rem', textAlign: 'center', marginBottom: '16px' }}>🚨</div>
+      <div className="glass-panel" style={{ padding: '32px', background: 'var(--danger-tint)' }}>
         <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-danger)', textAlign: 'center', marginBottom: '8px' }}>
           Fake Progress Warning (Retrieval Guard)
         </h3>
@@ -244,7 +243,7 @@ export default function SocraticCoach({
 
         {stageError && (
           <div style={{ padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--danger-tint)', border: '1px solid var(--danger-line)', color: 'var(--color-danger)', fontSize: '0.8rem', marginBottom: '16px' }}>
-            ⚠️ {stageError}
+            {stageError}
           </div>
         )}
 
@@ -275,7 +274,7 @@ export default function SocraticCoach({
           className="btn btn-primary"
           style={{ width: '100%', marginTop: '12px' }}
         >
-          🔑 Submit Active Recall & Unlock Workspace
+          Submit Active Recall & Unlock Workspace
         </button>
       </div>
     );
@@ -289,7 +288,7 @@ export default function SocraticCoach({
         <div style={{ flexGrow: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.75rem', color: 'var(--color-primary-light)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              🧠 AI Socratic Coach ➔ Study Concept:
+              AI Socratic Coach ➔ Study Concept:
             </span>
             <span
               style={{
@@ -314,7 +313,7 @@ export default function SocraticCoach({
                 fontWeight: 600,
               }}
             >
-              {loadingAi ? '⏳ Generating AI Lesson...' : template.isAi ? '✨ Live LLM Tutor' : '💡 Prepared Lesson'}
+              {loadingAi ? 'Generating AI Lesson...' : template.isAi ? 'Live LLM Tutor' : 'Prepared Lesson'}
             </span>
           </div>
 
@@ -368,20 +367,20 @@ export default function SocraticCoach({
 
       {stageError && (
         <div style={{ padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--danger-tint)', border: '1px solid var(--danger-line)', color: 'var(--color-danger)', fontSize: '0.8rem' }}>
-          ⚠️ {stageError}
+          {stageError}
         </div>
       )}
 
       {/* Stage Progress + Instruction Header */}
       {(() => {
         const stages = [
-          { key: 'explain', step: 1, name: 'Explain', icon: '📖', instruction: 'Read this explanation carefully. Take your time.' },
-          { key: 'demonstrate', step: 2, name: 'Demonstrate', icon: '🔍', instruction: 'Study this real-world example to see the concept in action.' },
-          { key: 'connect', step: 3, name: 'Connect', icon: '🔗', instruction: 'Read how this connects to what you already know.' },
-          { key: 'question', step: 4, name: 'Question', icon: '🤔', instruction: 'Think about the question below. Formulate your answer mentally.' },
-          { key: 'retrieve', step: 5, name: 'Recall', icon: '✍️', instruction: 'Write what you remember from memory — without looking back.' },
-          { key: 'apply', step: 6, name: 'Apply', icon: '🛠️', instruction: 'Apply what you learned. Write your solution to the challenge below.' },
-          { key: 'correct', step: 7, name: 'Review', icon: '✅', instruction: 'Compare your answer with the ideal answer and assess your understanding.' },
+          { key: 'explain', step: 1, name: 'Explain', icon: '', instruction: 'Read this explanation carefully. Take your time.' },
+          { key: 'demonstrate', step: 2, name: 'Demonstrate', icon: '', instruction: 'Study this real-world example to see the concept in action.' },
+          { key: 'connect', step: 3, name: 'Connect', icon: '', instruction: 'Read how this connects to what you already know.' },
+          { key: 'question', step: 4, name: 'Question', icon: '', instruction: 'Think about the question below. Formulate your answer mentally.' },
+          { key: 'retrieve', step: 5, name: 'Recall', icon: '', instruction: 'Write what you remember from memory — without looking back.' },
+          { key: 'apply', step: 6, name: 'Apply', icon: '', instruction: 'Apply what you learned. Write your solution to the challenge below.' },
+          { key: 'correct', step: 7, name: 'Review', icon: '', instruction: 'Compare your answer with the ideal answer and assess your understanding.' },
         ];
         const current = stages.find(s => s.key === stage) || stages[0];
         return (
@@ -453,7 +452,7 @@ export default function SocraticCoach({
               alignItems: 'center',
               gap: '8px',
             }}>
-              <span>💡</span>
+              
               <span>{current.instruction}</span>
             </div>
           </div>
@@ -463,7 +462,7 @@ export default function SocraticCoach({
       {/* Stage Content Renderer */}
       {loadingAi ? (
         <div style={{ padding: '36px', textAlign: 'center', color: 'var(--color-primary-light)', fontSize: '0.88rem' }}>
-          ✨ Generating tailored Socratic tutoring module for "{displayConceptTitle}"...
+          Generating tailored Socratic tutoring module for "{displayConceptTitle}"...
         </div>
       ) : (
         <div style={{ minHeight: '180px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '16px' }}>
@@ -556,27 +555,27 @@ export default function SocraticCoach({
             {/* AI Evaluation feedback card */}
             {loadingEval ? (
               <div style={{ padding: '14px', borderRadius: 'var(--radius-sm)', background: 'var(--fill-2)', border: '1px solid var(--fill-4)', fontSize: '0.82rem', color: 'var(--color-primary-light)' }}>
-                ✨ Groq AI is analyzing your response and comparing with ideal model...
+                Groq AI is analyzing your response and comparing with ideal model...
               </div>
             ) : aiEval && (
               <div style={{ padding: '16px', borderRadius: 'var(--radius-sm)', background: 'var(--fill-1)', border: '1px solid var(--fill-4)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>🤖</span>
+                  
                   <strong style={{ fontSize: '0.85rem', color: 'var(--color-primary-light)' }}>Groq AI Socratic Evaluation</strong>
                 </div>
                 {aiEval.captured && (
                   <div style={{ fontSize: '0.8rem', color: 'var(--color-success)' }}>
-                    <strong>✅ What you captured:</strong> {aiEval.captured}
+                    <strong>What you captured:</strong> {aiEval.captured}
                   </div>
                 )}
                 {aiEval.missed && (
                   <div style={{ fontSize: '0.8rem', color: 'var(--color-warning)' }}>
-                    <strong>⚠️ What to improve:</strong> {aiEval.missed}
+                    <strong>What to improve:</strong> {aiEval.missed}
                   </div>
                 )}
                 {aiEval.tip && (
                   <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
-                    <strong>💡 Key Tip:</strong> "{aiEval.tip}"
+                    <strong>Key Tip:</strong> "{aiEval.tip}"
                   </div>
                 )}
               </div>
@@ -622,7 +621,7 @@ export default function SocraticCoach({
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  <span style={{ fontSize: '1rem', fontWeight: 700 }}>🎯 Nailed It</span>
+                  <span style={{ fontSize: '1rem', fontWeight: 700 }}>Nailed It</span>
                   <span style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)' }}>Understood the concept & solved the problem accurately</span>
                 </button>
 
@@ -645,7 +644,7 @@ export default function SocraticCoach({
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  <span style={{ fontSize: '1rem', fontWeight: 700 }}>⚠️ Partial Gap</span>
+                  <span style={{ fontSize: '1rem', fontWeight: 700 }}>Partial Gap</span>
                   <span style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)' }}>Got the general idea, but missed some key details</span>
                 </button>
 
@@ -668,7 +667,7 @@ export default function SocraticCoach({
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  <span style={{ fontSize: '1rem', fontWeight: 700 }}>❌ Struggled</span>
+                  <span style={{ fontSize: '1rem', fontWeight: 700 }}>Struggled</span>
                   <span style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)' }}>Found it confusing or had misunderstandings</span>
                 </button>
               </div>
@@ -722,7 +721,7 @@ export default function SocraticCoach({
                 className="btn btn-primary"
                 style={{ padding: '10px 24px', fontSize: '0.88rem' }}
               >
-                {submitting ? 'Saving Assessment...' : '💾 Save & Finish Concept →'}
+                {submitting ? 'Saving Assessment...' : 'Save & Finish Concept →'}
               </button>
             </div>
           </div>

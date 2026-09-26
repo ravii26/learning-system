@@ -55,13 +55,13 @@ const AREAS = ['All Areas', 'Tech', 'Business', 'Finance', 'Creative', 'Personal
 const STATUSES = ['inbox', 'queued', 'active', 'paused', 'maintenance', 'reference', 'dropped'];
 
 const EMPTY_STATE_HINTS: Record<string, { icon: string; text: string }> = {
-  inbox:       { icon: '💡', text: 'Capture a curiosity above' },
-  queued:      { icon: '📋', text: 'Move topics here to queue them up' },
-  active:      { icon: '⚡', text: 'Drag a topic here to start learning' },
-  paused:      { icon: '⏸️', text: 'Paused topics appear here' },
-  maintenance: { icon: '✅', text: 'Maintained topics appear here' },
-  reference:   { icon: '📖', text: 'Reference material lands here' },
-  dropped:     { icon: '🗑️', text: 'Dropped topics are archived here' },
+  inbox:       { icon: '', text: 'Capture a curiosity above' },
+  queued:      { icon: '', text: 'Move topics here to queue them up' },
+  active:      { icon: '', text: 'Drag a topic here to start learning' },
+  paused:      { icon: '', text: 'Paused topics appear here' },
+  maintenance: { icon: '', text: 'Maintained topics appear here' },
+  reference:   { icon: '', text: 'Reference material lands here' },
+  dropped:     { icon: '', text: 'Dropped topics are archived here' },
 };
 
 let toastIdCounter = 0;
@@ -172,7 +172,7 @@ export default function PlanPage() {
         setNewInboxTitle('');
         await fetchData();
         router.refresh();
-        showToast(`✅ "${capturedTitle}" added to Inbox`, 'success');
+        showToast(`"${capturedTitle}" added to Inbox`, 'success');
       } else {
         const data = await res.json();
         setCaptureError(data.error || 'Failed to capture topic');
@@ -290,7 +290,7 @@ export default function PlanPage() {
       setPendingActiveTopic(null);
       await fetchData();
       router.refresh();
-      showToast(`⚡ "${pendingActiveTopic.title}" is now active`, 'success');
+      showToast(`"${pendingActiveTopic.title}" is now active`, 'success');
     } catch (e: any) {
       console.error(e);
       showToast(e.message || 'Connection error during slot swap.', 'error');
@@ -345,7 +345,7 @@ export default function PlanPage() {
         setActivatingTopic(null);
         await fetchData();
         router.refresh();
-        showToast(`⚡ "${title}" is now active`, 'success');
+        showToast(`"${title}" is now active`, 'success');
       } else {
         const data = await res.json();
         setActivationError(data.error || 'Failed to activate topic');
@@ -435,9 +435,9 @@ export default function PlanPage() {
         {/* Header Board Controls */}
         <div className="flex-between">
           <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Plan</h1>
-            <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-              The full board: every topic, every status. Visit weekly to triage — for daily work, see Today.
+            <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Learn</h1>
+            <p className="m-0 mt-1.5 text-[1.05rem] text-fg-secondary">
+              Everything you’re learning. Two topics in Now, the rest waiting in Next or Inbox.
             </p>
           </div>
 
@@ -452,14 +452,14 @@ export default function PlanPage() {
                   fontSize: '0.78rem',
                   fontWeight: 600,
                   borderRadius: '4px',
-                  background: viewMode === 'list' ? 'var(--color-primary)' : 'transparent',
+                  background: viewMode === 'list' ? 'var(--bg-surface)' : 'transparent',
                   color: viewMode === 'list' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
                   border: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                 }}
               >
-                📋 List View
+                List
               </button>
               <button
                 type="button"
@@ -469,14 +469,14 @@ export default function PlanPage() {
                   fontSize: '0.78rem',
                   fontWeight: 600,
                   borderRadius: '4px',
-                  background: viewMode === 'board' ? 'var(--color-primary)' : 'transparent',
+                  background: viewMode === 'board' ? 'var(--bg-surface)' : 'transparent',
                   color: viewMode === 'board' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
                   border: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                 }}
               >
-                📊 Board View
+                Board
               </button>
             </div>
 
@@ -485,14 +485,14 @@ export default function PlanPage() {
               className="btn btn-secondary"
               style={{ display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid var(--fill-4)', color: 'var(--color-primary-light)' }}
             >
-              🤖 Generate AI Roadmap
+              Roadmap from a goal
             </button>
             <button
               onClick={() => setShowLearnNow(true)}
               className="btn btn-primary"
               style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--ink)', color: 'var(--on-ink)' }}
             >
-              ⚡ Learn Now
+              Pick for me
             </button>
           </div>
         </div>
@@ -520,9 +520,9 @@ export default function PlanPage() {
           const totalTodayMins = todayLogs.reduce((s, l) => s + l.durationMinutes, 0);
 
           return (
-            <div className="glass-panel" style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', borderLeft: '3px solid var(--color-success)' }}>
+            <div className="glass-panel" style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-success)' }}>
-                📅 Today: {todayLogs.length} session{todayLogs.length > 1 ? 's' : ''} ({totalTodayMins}m)
+                Today: {todayLogs.length} session{todayLogs.length > 1 ? 's' : ''} ({totalTodayMins}m)
               </span>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {todayLogs.map((l, idx) => (
@@ -550,7 +550,7 @@ export default function PlanPage() {
           <input
             type="text"
             className="form-input"
-            placeholder="💡 Capture interesting curiosity in Inbox (e.g. History of cinematography, how caches fail...)"
+            placeholder="Add something to your Inbox — e.g. how caches fail, the history of cinema"
             value={newInboxTitle}
             onChange={(e) => setNewInboxTitle(e.target.value)}
             disabled={capturing}
@@ -567,7 +567,7 @@ export default function PlanPage() {
           <input
             type="text"
             className="form-input"
-            placeholder="🔍 Search topics..."
+            placeholder="Search topics..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ fontSize: '0.85rem', padding: '8px 12px' }}
@@ -587,11 +587,10 @@ export default function PlanPage() {
           /* GROUPED LIST VIEW */
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Active Topics */}
-            <div className="glass-panel" style={{ padding: '20px', borderLeft: '4px solid var(--color-primary)' }}>
+            <div className="glass-panel" style={{ padding: '20px' }}>
               <div className="flex-between" style={{ marginBottom: '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '1.1rem' }}>⚡</span>
-                  <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Active Topics</h2>
+                  <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Now</h2>
                   <span style={{ fontSize: '0.72rem', background: 'var(--fill-3)', color: 'var(--color-primary-light)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
                     {filteredTopics.filter(t => t.status === 'active').length}/2 active
                   </span>
@@ -665,8 +664,7 @@ export default function PlanPage() {
             <div className="glass-panel" style={{ padding: '20px' }}>
               <div className="flex-between" style={{ marginBottom: '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '1.1rem' }}>📋</span>
-                  <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Queued for Next</h2>
+                  <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Next</h2>
                   <span style={{ fontSize: '0.72rem', background: 'var(--fill-3)', color: 'var(--color-text-secondary)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
                     {filteredTopics.filter(t => t.status === 'queued').length}
                   </span>
@@ -710,7 +708,7 @@ export default function PlanPage() {
                           className="btn btn-secondary"
                           style={{ padding: '5px 12px', fontSize: '0.75rem', color: 'var(--color-primary-light)' }}
                         >
-                          ⚡ Start Learning
+                          Start
                         </button>
                         <Link href={`/topics/${t.id}`} className="btn btn-secondary" style={{ padding: '5px 10px', fontSize: '0.75rem' }}>
                           View
@@ -727,8 +725,7 @@ export default function PlanPage() {
               <div className="glass-panel" style={{ padding: '20px' }}>
                 <div className="flex-between" style={{ marginBottom: '14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.1rem' }}>💡</span>
-                    <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Inbox Ideas</h2>
+                    <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Inbox</h2>
                     <span style={{ fontSize: '0.72rem', background: 'var(--fill-3)', color: 'var(--color-text-secondary)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
                       {filteredTopics.filter(t => t.status === 'inbox').length}
                     </span>
@@ -760,7 +757,7 @@ export default function PlanPage() {
                           className="btn btn-secondary"
                           style={{ padding: '4px 8px', fontSize: '0.72rem' }}
                         >
-                          📋 Queue
+                          Move to Next
                         </button>
                         <button
                           type="button"
@@ -768,7 +765,7 @@ export default function PlanPage() {
                           className="btn btn-secondary"
                           style={{ padding: '4px 8px', fontSize: '0.72rem', color: 'var(--color-primary-light)' }}
                         >
-                          ⚡ Start
+                          Start
                         </button>
                       </div>
                     </div>
@@ -784,7 +781,7 @@ export default function PlanPage() {
               return (
                 <details className="glass-panel" style={{ padding: '4px 16px' }}>
                   <summary style={{ cursor: 'pointer', padding: '12px 0', fontSize: '0.88rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>📁 Other Topics ({otherTopics.length})</span>
+                    <span>Other Topics ({otherTopics.length})</span>
                     <span style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>
                       Paused, Reference, Maintenance, Dropped
                     </span>
@@ -967,7 +964,7 @@ export default function PlanPage() {
 
                           {isStale && (
                             <span style={{ fontSize: '0.65rem', color: 'var(--color-danger)', fontWeight: 600, marginTop: '2px' }}>
-                              ⚠ Untouched {daysSinceTouch}d
+                              Untouched {daysSinceTouch}d
                             </span>
                           )}
 

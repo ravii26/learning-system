@@ -39,7 +39,6 @@ export class ErrorBoundary extends Component<Props, State> {
             borderRadius: 'var(--radius-md)',
           }}
         >
-          <span style={{ fontSize: '1.8rem' }}>⚠️</span>
           <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-danger)', marginTop: '6px' }}>
             {this.props.fallbackTitle || 'Something went wrong rendering this section'}
           </h4>

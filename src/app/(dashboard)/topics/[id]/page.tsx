@@ -827,7 +827,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
       <Drawer
         open={confusionsDrawerOpen}
         onClose={() => setConfusionsDrawerOpen(false)}
-        title="❓ Mistakes & Confusions Bank"
+        title="Mistakes & Confusions Bank"
         label="Mistakes and Confusions Bank"
       >
         <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
@@ -845,7 +845,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
       <Drawer
         open={resourcesDrawerOpen}
         onClose={() => setResourcesDrawerOpen(false)}
-        title="📁 Saved Resources & Links"
+        title="Saved Resources & Links"
         label="Resources and Bookmarks"
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -968,7 +968,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
       <Drawer
         open={settingsDrawerOpen}
         onClose={() => setSettingsDrawerOpen(false)}
-        title="⚙️ Topic Settings"
+        title="Topic Settings"
         label="Topic Settings"
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1044,7 +1044,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
               className="btn btn-secondary"
               style={{ color: 'var(--color-danger)', borderColor: 'var(--danger-line)', fontSize: '0.8rem', padding: '6px 14px' }}
             >
-              🗑️ Delete Topic
+              Delete Topic
             </button>
           </div>
         </div>

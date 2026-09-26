@@ -8,12 +8,12 @@ interface SessionTimelineProps {
 }
 
 const ACTIVITY_META: Record<ActivityType, { icon: string; label: string; color: string }> = {
-  read_watch:     { icon: '📖', label: 'Read / Watch',     color: 'var(--ink)' },
-  write_practice: { icon: '✍️', label: 'Write / Practice', color: 'var(--color-text-secondary)' },
-  speak_converse: { icon: '🗣️', label: 'Speak / Converse', color: 'var(--color-success)' },
-  drill_repeat:   { icon: '🎯', label: 'Drill / Repeat',   color: 'var(--color-warning)' },
-  course_module:  { icon: '📚', label: 'Course Module',    color: 'var(--color-text-secondary)' },
-  free_explore:   { icon: '🔬', label: 'Free Explore',     color: 'var(--color-danger)' },
+  read_watch:     { icon: '', label: 'Read / Watch',     color: 'var(--ink)' },
+  write_practice: { icon: '', label: 'Write / Practice', color: 'var(--color-text-secondary)' },
+  speak_converse: { icon: '', label: 'Speak / Converse', color: 'var(--color-success)' },
+  drill_repeat:   { icon: '', label: 'Drill / Repeat',   color: 'var(--color-warning)' },
+  course_module:  { icon: '', label: 'Course Module',    color: 'var(--color-text-secondary)' },
+  free_explore:   { icon: '', label: 'Free Explore',     color: 'var(--color-danger)' },
 };
 
 function relativeTime(iso: string): string {
@@ -71,7 +71,6 @@ export default function SessionTimeline({ sessionLogs }: SessionTimelineProps) {
   if (sessionLogs.length === 0) {
     return (
       <div className="glass-panel" style={{ padding: '40px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-        <span style={{ fontSize: '2.5rem' }}>📅</span>
         <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>No sessions logged yet</h3>
         <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', maxWidth: '300px' }}>
           When you finish a study session, hit the timer or click "Log a Session" to record what you did and what you learned.
@@ -85,16 +84,16 @@ export default function SessionTimeline({ sessionLogs }: SessionTimelineProps) {
       {/* Stats bar */}
       <div className="glass-panel" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
         <span style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
-          📊 <strong style={{ color: 'var(--color-text-primary)' }}>{sessionLogs.length}</strong> sessions
+          <strong style={{ color: 'var(--color-text-primary)' }}>{sessionLogs.length}</strong> sessions
         </span>
         <span style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
-          ⏱️ <strong style={{ color: 'var(--color-text-primary)' }}>
+          <strong style={{ color: 'var(--color-text-primary)' }}>
             {totalMins >= 60 ? `${Math.floor(totalMins / 60)}h ${totalMins % 60}m` : `${totalMins}m`}
           </strong> total
         </span>
         {streak > 0 && (
           <span style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
-            🔥 <strong style={{ color: 'var(--color-warning)' }}>{streak}-day</strong> streak
+            <strong style={{ color: 'var(--color-warning)' }}>{streak}-day</strong> streak
           </span>
         )}
         {topActivity && (
@@ -141,7 +140,6 @@ export default function SessionTimeline({ sessionLogs }: SessionTimelineProps) {
               {/* Insight */}
               {log.oneInsight && (
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.75rem' }}>💡</span>
                   <p style={{ fontSize: '0.8rem', color: 'var(--color-warning)', fontStyle: 'italic' }}>{log.oneInsight}</p>
                 </div>
               )}
@@ -149,11 +147,10 @@ export default function SessionTimeline({ sessionLogs }: SessionTimelineProps) {
               {/* What was hard */}
               {log.whatWasHard && (
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.75rem' }}>😤</span>
                   <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>{log.whatWasHard}</p>
                   {isRecurring && (
                     <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--color-danger)', background: 'var(--danger-tint)', padding: '1px 6px', borderRadius: '9999px', border: '1px solid var(--danger-line)', whiteSpace: 'nowrap' }}>
-                      ⚠️ Recurring ({struggleCounts.get(hardKey)}×)
+                      Recurring ({struggleCounts.get(hardKey)}×)
                     </span>
                   )}
                 </div>

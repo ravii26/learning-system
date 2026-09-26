@@ -1,5 +1,6 @@
 'use client';
 
+import { Icon } from '@/components/ui/Icon';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -132,7 +133,7 @@ export default function RichTextEditor({
         <ToolBtn title="Inline Code" active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>{`<>`}</ToolBtn>
         <ToolBtn title="Code Block" active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()}>⌨</ToolBtn>
         <Divider />
-        <ToolBtn title="Link" active={editor.isActive('link')} onClick={setLink}>🔗</ToolBtn>
+        <ToolBtn title="Link" active={editor.isActive('link')} onClick={setLink}><Icon name="link" size={15} /></ToolBtn>
 
         {showSaveStatus && (
           <span className="rte-save-status">

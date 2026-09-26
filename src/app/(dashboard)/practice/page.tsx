@@ -397,7 +397,7 @@ export default function PracticePage() {
       )}
 
       {topics.length === 0 && (
-        <EmptyState icon="🎙️" title="What counts as practice?">
+        <EmptyState icon="" title="What counts as practice?">
           Skills you get better at by doing reps: speaking, writing, explaining. For subjects with material to cover, use a Syllabus topic from the <Link href="/plan" className="text-primary-light">board</Link> instead.
         </EmptyState>
       )}

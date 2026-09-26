@@ -114,7 +114,7 @@ export default function TopicTimeDrawer({ open, onClose, topicId, modules, onCha
   const total = entries.reduce((s, e) => s + e.seconds, 0);
 
   return (
-    <Drawer open={open} onClose={onClose} title="⏱ Study time" label="Study time for this topic">
+    <Drawer open={open} onClose={onClose} title="Study time" label="Study time for this topic">
       <p className="text-[0.82rem] text-fg-secondary">
         Time is tracked automatically while you study here (tab open and you&apos;re active). Log anything you did away from the app — a book, a course, practice on paper.
       </p>

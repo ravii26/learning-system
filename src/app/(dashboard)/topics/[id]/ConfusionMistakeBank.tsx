@@ -145,7 +145,7 @@ export default function ConfusionMistakeBank({
             borderBottom: activeTab === 'confusions' && !testingMistakes ? '2px solid var(--color-primary)' : '2px solid transparent',
           }}
         >
-          ❓ Confusion Pad ({confusions.filter((c) => !c.resolved).length} unresolved)
+          Confusion Pad ({confusions.filter((c) => !c.resolved).length} unresolved)
         </button>
         <button
           type="button"
@@ -158,7 +158,7 @@ export default function ConfusionMistakeBank({
             borderBottom: activeTab === 'mistakes' || testingMistakes ? '2px solid var(--color-primary)' : '2px solid transparent',
           }}
         >
-          🚫 Mistake Bank ({mistakes.length} logged)
+          Mistake Bank ({mistakes.length} logged)
         </button>
       </div>
 
@@ -176,7 +176,7 @@ export default function ConfusionMistakeBank({
               style={{ fontSize: '0.85rem', padding: '8px 12px' }}
             />
             <button type="submit" className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-              ❓ Capture Confusion
+              Capture Confusion
             </button>
           </form>
 
@@ -259,7 +259,7 @@ export default function ConfusionMistakeBank({
               disabled={mistakes.length === 0}
               style={{ padding: '8px 16px', fontSize: '0.85rem' }}
             >
-              🔄 Test Mistakes ({mistakes.length} due)
+              Test Mistakes ({mistakes.length} due)
             </button>
             
             <button
@@ -267,7 +267,7 @@ export default function ConfusionMistakeBank({
               className="btn btn-secondary"
               style={{ padding: '8px 16px', fontSize: '0.85rem' }}
             >
-              {showAddMistake ? 'Cancel' : '🚫 Log Manual Mistake'}
+              {showAddMistake ? 'Cancel' : 'Log Manual Mistake'}
             </button>
           </div>
 
@@ -339,8 +339,7 @@ export default function ConfusionMistakeBank({
                   padding: '14px',
                   background: 'var(--danger-tint)',
                   border: '1px solid var(--danger-tint)',
-                  borderLeft: '4px solid var(--color-danger)',
-                }}
+                  }}
               >
                 <div className="flex-between" style={{ borderBottom: '1px solid var(--fill-2)', paddingBottom: '6px', marginBottom: '8px' }}>
                   <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-primary-light)' }}>
@@ -378,7 +377,7 @@ export default function ConfusionMistakeBank({
 
       {/* Mistake Test Panel */}
       {testingMistakes && mistakes[testIdx] && (
-        <div className="glass-panel" style={{ padding: '24px', borderLeft: '4px solid var(--color-primary)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div className="flex-between">
             <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
               Mistake {testIdx + 1} of {mistakes.length}
@@ -402,7 +401,7 @@ export default function ConfusionMistakeBank({
               className="btn btn-primary"
               style={{ padding: '8px 16px', fontSize: '0.85rem', alignSelf: 'flex-start' }}
             >
-              👁️ Reveal Avoidance Strategy
+              Reveal Avoidance Strategy
             </button>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -424,7 +423,7 @@ export default function ConfusionMistakeBank({
                   className="btn btn-primary"
                   style={{ padding: '8px 16px', fontSize: '0.85rem' }}
                 >
-                  ✅ I Recall Now
+                  I Recall Now
                 </button>
                 <button
                   onClick={() => {
@@ -438,7 +437,7 @@ export default function ConfusionMistakeBank({
                   className="btn btn-secondary"
                   style={{ padding: '8px 16px', fontSize: '0.85rem', color: 'var(--color-warning)' }}
                 >
-                  ❌ Re-review Later
+                  Re-review Later
                 </button>
               </div>
             </div>

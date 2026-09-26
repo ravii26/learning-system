@@ -220,7 +220,7 @@ export default function KnowledgeMap({
               className="btn btn-primary"
               style={{ padding: '6px 12px', fontSize: '0.7rem' }}
             >
-              🎓 Teach Me
+              Teach Me
             </button>
             <button
               onClick={() => handleDeleteConcept(c.id)}
@@ -244,7 +244,7 @@ export default function KnowledgeMap({
       <div className="flex-between" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
         <div>
           <h3 style={{ fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>🗺️</span> Knowledge Map Structure
+            Knowledge Map Structure
           </h3>
           <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
             Select a concept node to launch the AI Socratic Tutor workspace.
@@ -259,7 +259,7 @@ export default function KnowledgeMap({
               className="btn btn-secondary"
               style={{ padding: '6px 12px', fontSize: '0.75rem', color: 'var(--color-primary-light)' }}
             >
-              {isGeneratingMap ? '✨ Generating AI Map...' : '✨ Auto-Generate Concept Map'}
+              {isGeneratingMap ? 'Generating AI Map...' : 'Auto-Generate Concept Map'}
             </button>
           )}
           <button
@@ -352,7 +352,7 @@ export default function KnowledgeMap({
               fontSize: '0.85rem',
             }}
           >
-            <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>🗺️</span>
+            <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}></span>
             Your Knowledge Map is empty. Generate a pre-populated learning path or add your own subtopic concept nodes to structure this topic.
           </div>
         )}

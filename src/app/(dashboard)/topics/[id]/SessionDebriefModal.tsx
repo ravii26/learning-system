@@ -31,12 +31,12 @@ interface SessionDebriefModalProps {
 }
 
 const ACTIVITY_TYPES: { type: ActivityType; icon: string; label: string; color: string }[] = [
-  { type: 'read_watch',     icon: '📖', label: 'Read / Watch',      color: 'var(--ink)' },
-  { type: 'write_practice', icon: '✍️', label: 'Write / Practice',  color: 'var(--color-text-secondary)' },
-  { type: 'speak_converse', icon: '🗣️', label: 'Speak / Converse',  color: 'var(--color-success)' },
-  { type: 'drill_repeat',   icon: '🎯', label: 'Drill / Repeat',    color: 'var(--color-warning)' },
-  { type: 'course_module',  icon: '📚', label: 'Course Module',     color: 'var(--color-text-secondary)' },
-  { type: 'free_explore',   icon: '🔬', label: 'Free Explore',      color: 'var(--color-danger)' },
+  { type: 'read_watch',     icon: '', label: 'Read / Watch',      color: 'var(--ink)' },
+  { type: 'write_practice', icon: '', label: 'Write / Practice',  color: 'var(--color-text-secondary)' },
+  { type: 'speak_converse', icon: '', label: 'Speak / Converse',  color: 'var(--color-success)' },
+  { type: 'drill_repeat',   icon: '', label: 'Drill / Repeat',    color: 'var(--color-warning)' },
+  { type: 'course_module',  icon: '', label: 'Course Module',     color: 'var(--color-text-secondary)' },
+  { type: 'free_explore',   icon: '', label: 'Free Explore',      color: 'var(--color-danger)' },
 ];
 
 export default function SessionDebriefModal({
@@ -157,7 +157,7 @@ export default function SessionDebriefModal({
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">💡 What clicked today?</label>
+              <label className="form-label">What clicked today?</label>
               <textarea
                 className="form-input"
                 rows={2}
@@ -177,7 +177,7 @@ export default function SessionDebriefModal({
               </button>
             ) : (
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">😤 What was hard or still unclear?</label>
+                <label className="form-label">What was hard or still unclear?</label>
                 <textarea
                   className="form-input"
                   rows={2}
@@ -208,7 +208,7 @@ export default function SessionDebriefModal({
         {step === 3 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ padding: '12px 16px', borderRadius: 'var(--radius-sm)', background: 'var(--success-tint)', border: '1px solid var(--success-line)' }}>
-              <p style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 600, marginBottom: '4px' }}>✅ Great session logged!</p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 600, marginBottom: '4px' }}>Great session logged!</p>
               {oneInsight && <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>"{oneInsight}"</p>}
             </div>
 
@@ -226,7 +226,7 @@ export default function SessionDebriefModal({
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">⏱️ Session duration (minutes)</label>
+              <label className="form-label">Session duration (minutes)</label>
               <input
                 type="number"
                 className="form-input"
@@ -246,7 +246,7 @@ export default function SessionDebriefModal({
                 style={{ flex: 2 }}
                 disabled={saving}
               >
-                {saving ? 'Saving...' : '💾 Save Session'}
+                {saving ? 'Saving...' : 'Save Session'}
               </button>
             </div>
           </div>

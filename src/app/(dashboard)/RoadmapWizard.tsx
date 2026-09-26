@@ -10,12 +10,12 @@ interface RoadmapWizardProps {
 }
 
 const POPULAR_GOALS = [
-  { label: '🤖 Machine Learning', goal: 'Machine Learning' },
-  { label: '📊 Data Science', goal: 'Data Science' },
-  { label: '💰 Personal Finance', goal: 'Personal Finance' },
-  { label: '🗣️ English Fluency', goal: 'English Professional Communication' },
-  { label: '📱 Mobile App Dev', goal: 'React Native & Mobile App Development' },
-  { label: '🎸 Music Theory & Piano', goal: 'Music Theory & Piano Practice' },
+  { label: 'Machine Learning', goal: 'Machine Learning' },
+  { label: 'Data Science', goal: 'Data Science' },
+  { label: 'Personal Finance', goal: 'Personal Finance' },
+  { label: 'English Fluency', goal: 'English Professional Communication' },
+  { label: 'Mobile App Dev', goal: 'React Native & Mobile App Development' },
+  { label: 'Music Theory & Piano', goal: 'Music Theory & Piano Practice' },
 ];
 
 export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProps) {
@@ -141,7 +141,7 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
           <div>
             <span style={{ fontSize: '0.7rem', color: 'var(--color-primary-light)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
-              🤖 Groq AI Roadmap Generator
+              Groq AI Roadmap Generator
             </span>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '2px' }}>
               {step === 1 && 'What do you want to learn?'}
@@ -155,14 +155,14 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
 
         {error && (
           <div style={{ padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--danger-tint)', border: '1px solid var(--danger-line)', color: 'var(--color-danger)', fontSize: '0.8rem', marginBottom: '16px' }}>
-            ⚠️ {error}
+            {error}
           </div>
         )}
 
         {/* Suggestions when input is invalid or ambiguous */}
         {suggestions.length > 0 && step === 1 && (
           <div style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--fill-2)', border: '1px solid var(--fill-4)' }}>
-            <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-primary-light)', marginBottom: '8px' }}>💡 Did you mean one of these topics?</p>
+            <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-primary-light)', marginBottom: '8px' }}>Did you mean one of these topics?</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {suggestions.map((sug, i) => (
                 <button
@@ -311,7 +311,7 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
             <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
               <button type="button" onClick={() => setStep(1)} className="btn btn-secondary" style={{ flex: 1 }}>← Back</button>
               <button type="button" onClick={handleGenerate} className="btn btn-primary" style={{ flex: 2 }}>
-                ✨ Generate AI Roadmap
+                Generate AI Roadmap
               </button>
             </div>
           </div>
@@ -320,7 +320,6 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
         {/* Step 3: Loading Animation */}
         {step === 3 && (
           <div style={{ padding: '40px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-            <div style={{ fontSize: '3rem', animation: 'spin 2s linear infinite' }}>🧠</div>
             <h4 style={{ fontSize: '1rem', fontWeight: 700 }}>Architecting your personalized roadmap...</h4>
             <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', maxWidth: '360px' }}>
               Groq AI is analyzing your level and building a structured, step-by-step topic curriculum for <strong>"{goal}"</strong>.
@@ -333,7 +332,7 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--fill-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--fill-4)' }}>
               <span style={{ fontSize: '0.78rem', color: 'var(--color-primary-light)' }}>
-                🗓️ Estimated duration: <strong>~{estimatedWeeks} weeks</strong> at {weeklyHours}h/week
+                Estimated duration: <strong>~{estimatedWeeks} weeks</strong> at {weeklyHours}h/week
               </span>
               <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
                 {topics.length} topics generated
@@ -379,7 +378,7 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
                             color: t.mode === 'course' ? 'var(--color-text-secondary)' : t.mode === 'project' ? 'var(--color-warning)' : 'var(--color-primary-light)',
                             fontWeight: 600,
                           }}>
-                            {t.mode === 'course' ? '📚 Course' : t.mode === 'project' ? '🛠️ Project' : '🧭 Self-Directed'}
+                            {t.mode === 'course' ? 'Course' : t.mode === 'project' ? 'Project' : 'Self-Directed'}
                           </span>
                           {t.area && (
                             <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: '4px', background: 'var(--fill-2)', color: 'var(--color-text-muted)' }}>
@@ -437,7 +436,7 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
                           <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '12px', borderLeft: '2px solid var(--fill-4)' }}>
                             {t.curriculum!.map((mod, modIdx) => (
                               <div key={modIdx} style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)' }}>
-                                📌 {mod}
+                                {mod}
                               </div>
                             ))}
                           </div>
@@ -460,7 +459,7 @@ export default function RoadmapWizard({ onClose, onComplete }: RoadmapWizardProp
                 className="btn btn-primary"
                 style={{ flex: 2 }}
               >
-                {creating ? 'Creating Topics...' : `🚀 Create ${topics.length} Topics in Dashboard`}
+                {creating ? 'Creating Topics...' : `Create ${topics.length} Topics in Dashboard`}
               </button>
             </div>
           </div>
