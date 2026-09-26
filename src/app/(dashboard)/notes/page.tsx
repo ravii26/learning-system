@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useToast } from '@/components/ToastProvider';
 import { createCapture } from '@/lib/captureClient';
 import { computeAccretionStats } from '@/lib/accretionStats';
-import { Button, Card, StatPill, Sparkline, Tabs } from '@/components/ui';
+import { Button, Icon, Sparkline } from '@/components/ui';
+import ResurfacedNote from '@/components/ResurfacedNote';
 import { suggestionLabel, type CaptureSuggestion } from '@/lib/captureSuggest';
 
 /**
@@ -119,7 +120,7 @@ export default function NotesPage() {
 
       if (res.ok) {
         setCaptureText('');
-        toast.success('Captured to inbox');
+        toast.success('Captured — a suggested home is on its way');
         await fetchData();
       } else {
         toast.error('Failed to capture');
@@ -172,177 +173,207 @@ export default function NotesPage() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '760px' }}>
-        <div className="skeleton" style={{ height: '52px', borderRadius: '12px' }} />
-        <div className="skeleton" style={{ height: '200px', borderRadius: '12px' }} />
+      <div className="mx-auto grid max-w-[1120px] gap-12 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex flex-col gap-5">{[100, 56, 140, 140].map((h, i) => <div key={i} className="skeleton rounded-md" style={{ height: h }} />)}</div>
       </div>
     );
   }
 
+  const srcLabel = (c: CaptureRow) => {
+    if (!c.url) return 'Your thought';
+    try {
+      return new URL(c.url).hostname.replace(/^www\./, '');
+    } catch {
+      return 'Link';
+    }
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '760px' }}>
-      <div>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Notes</h1>
-        <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-          Capture anything in 3 seconds. Process the inbox weekly — into a note, a concept, a topic, or nowhere.
-        </p>
+    <div className="mx-auto grid max-w-[1120px] gap-12 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="flex min-w-0 flex-col gap-7">
+        <header className="flex flex-col gap-2">
+          <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Notebook</h1>
+          <p className="m-0 text-[1.05rem] text-fg-secondary">
+            For subjects with no syllabus. Capture anything; give each thing a home in one tap.
+          </p>
+        </header>
+
+        <form onSubmit={handleCapture} className="flex h-14 items-center gap-3 rounded-[14px] border border-dashed border-line-strong pl-5 pr-2">
+          <label htmlFor="notebook-capture" className="text-[0.95rem] font-semibold text-fg-secondary">Capture</label>
+          <input
+            id="notebook-capture"
+            type="text"
+            className="h-10 min-w-0 flex-1 border-none bg-transparent text-[0.95rem] text-fg outline-none"
+            placeholder="Paste a link, or jot a thought"
+            value={captureText}
+            onChange={(e) => setCaptureText(e.target.value)}
+            disabled={capturing}
+          />
+          {captureText.trim() && (
+            <Button type="submit" size="sm" disabled={capturing}>{capturing ? 'Saving…' : 'Save'}</Button>
+          )}
+        </form>
+
+        <div role="tablist" aria-label="Show" className="flex self-start rounded-xl bg-sunk p-1">
+          {([
+            ['inbox', `Inbox · ${captures.length}`],
+            ['notes', `Notes · ${notes.length}`],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={tab === key}
+              onClick={() => setTab(key)}
+              className={`h-10 rounded-[9px] px-4 text-[0.9rem] ${tab === key ? 'bg-surface font-semibold text-fg shadow-card' : 'font-medium text-fg-secondary hover:text-fg'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'inbox' && (
+          captures.length === 0 ? (
+            <div className="flex flex-col gap-2 py-6">
+              <p className="m-0 font-serif text-[1.8rem]">Inbox clear.</p>
+              <p className="m-0 text-[1rem] text-fg-secondary">Everything has a home. Press C anywhere to capture the next thing.</p>
+            </div>
+          ) : (
+            <ul className="m-0 flex list-none flex-col gap-3 p-0">
+              {captures.map((c) => {
+                const s = suggestions[c.id];
+                return (
+                  <li key={c.id} className="glass-panel flex flex-col gap-3.5 px-5 py-4">
+                    <div className="flex items-center gap-2 text-[0.82rem] text-fg-muted">
+                      <Icon name={c.url ? 'link' : 'notebook'} size={14} />
+                      <span>{srcLabel(c)} · {new Date(c.createdAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <p className="m-0 text-[1.05rem] leading-snug">{c.title || c.rawText || c.url}</p>
+                      {c.rawText && c.title && <p className="m-0 text-[0.9rem] text-fg-secondary">{c.rawText}</p>}
+                      {c.url && (
+                        <a href={c.url} target="_blank" rel="noopener noreferrer" className="truncate text-[0.82rem] text-fg-muted">{c.url}</a>
+                      )}
+                    </div>
+
+                    {s ? (
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <Button variant="primary" size="sm" disabled={processingId === c.id} onClick={() => handleProcess(c.id, s.action, s)}>
+                          <Icon name="check" size={14} strokeWidth={2.4} /> {suggestionLabel(s)}
+                        </Button>
+                        <span className="min-w-[120px] flex-1 text-[0.85rem] text-fg-muted">{s.reason}</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowOptions((p) => ({ ...p, [c.id]: !p[c.id] }))}
+                          aria-expanded={!!showOptions[c.id]}
+                          className="h-9 rounded-md px-2.5 text-[0.85rem] font-medium text-fg-secondary hover:bg-fill-2 hover:text-fg"
+                        >
+                          {showOptions[c.id] ? 'Hide options' : 'Somewhere else'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleProcess(c.id, 'archive')}
+                          disabled={processingId === c.id}
+                          aria-label="Archive this capture"
+                          className="flex h-9 w-9 items-center justify-center rounded-md text-fg-muted hover:bg-fill-2 hover:text-fg"
+                        >
+                          <Icon name="archive" size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      suggesting && <span className="text-[0.82rem] text-fg-muted">Finding a home…</span>
+                    )}
+
+                    {(!s || showOptions[c.id]) && (
+                      <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+                        <Button size="sm" onClick={() => handleProcess(c.id, 'note')} disabled={processingId === c.id}>Keep as a note</Button>
+                        <label htmlFor={`topic-${c.id}`} className="sr-only">Topic</label>
+                        <select
+                          id={`topic-${c.id}`}
+                          value={conceptTopicChoice[c.id] || ''}
+                          onChange={(e) => setConceptTopicChoice((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                          className="form-input h-9 w-auto py-0 text-[0.82rem]"
+                        >
+                          <option value="">Topic (optional for a note)…</option>
+                          {topics.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+                        </select>
+                        <Button size="sm" onClick={() => handleProcess(c.id, 'question')} disabled={processingId === c.id || !conceptTopicChoice[c.id]} title="Needs a topic">
+                          Open question
+                        </Button>
+                        <Button size="sm" onClick={() => handleProcess(c.id, 'topic')} disabled={processingId === c.id}>New topic</Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleProcess(c.id, 'archive')} disabled={processingId === c.id}>Archive</Button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )
+        )}
+
+        {tab === 'notes' && (
+          <div className="flex flex-col gap-4">
+            <Link href="/notes/new" className="btn btn-secondary self-start no-underline hover:no-underline">
+              <Icon name="plus" size={16} /> New note
+            </Link>
+            {notes.length === 0 ? (
+              <p className="m-0 text-[1rem] text-fg-secondary">No notes yet. Keep a capture as a note, or start one here.</p>
+            ) : (
+              <ul className="m-0 flex list-none flex-col p-0">
+                {notes.map((n) => (
+                  <li key={n.id}>
+                    <Link href={`/notes/${n.id}`} className="flex min-h-[60px] items-center justify-between gap-3 border-b border-line py-3 no-underline hover:no-underline">
+                      <span className="flex min-w-0 flex-col gap-1">
+                        <span className="text-[1rem] font-semibold text-fg">{n.title}</span>
+                        {n.tags.length > 0 && <span className="text-[0.8rem] text-fg-muted">{n.tags.map((t) => `#${t}`).join('  ')}</span>}
+                      </span>
+                      {n._count && n._count.incoming > 0 && (
+                        <span className="shrink-0 text-[0.82rem] text-fg-muted">{n._count.incoming} link{n._count.incoming === 1 ? '' : 's'} in</span>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
-      <form onSubmit={handleCapture} className="glass-panel" style={{ padding: '14px 18px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-        <input
-          type="text"
-          className="form-input"
-          placeholder="paste a URL, or jot a thought…"
-          value={captureText}
-          onChange={(e) => setCaptureText(e.target.value)}
-          disabled={capturing}
-          style={{ fontSize: '0.9rem', padding: '8px 12px', border: 'none', background: 'transparent' }}
-        />
-        {captureText.trim() && (
-          <button type="submit" disabled={capturing} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
-            {capturing ? 'Capturing…' : 'Capture ▸'}
-          </button>
-        )}
-      </form>
-
-      {/* Accretion dashboard — counts and growth, never a percentage */}
-      {notes.length > 0 && (
-        <Card className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-2">
-              <StatPill value={stats.noteCount} label={stats.noteCount === 1 ? 'note' : 'notes'} tone="primary" />
-              <StatPill value={stats.linkCount} label={stats.linkCount === 1 ? 'link' : 'links'} />
-              <StatPill value={captures.length} label="in inbox" tone={captures.length > 0 ? 'warning' : 'neutral'} />
+      <aside className="flex flex-col gap-9 lg:pt-2">
+        {notes.length > 0 && (
+          <section aria-labelledby="growth-h" className="flex flex-col gap-3">
+            <h2 id="growth-h" className="m-0 text-[0.95rem] font-semibold">Your notebook</h2>
+            <div className="flex items-baseline gap-2.5">
+              <span className="font-serif text-[2.2rem] leading-none">{stats.noteCount}</span>
+              <span className="text-[0.875rem] text-fg-muted">notes · {stats.linkCount} links · +{stats.addedThisWeek} this week</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Sparkline values={stats.weekly} label={`Notes added per week, last 8 weeks: ${stats.weekly.join(', ')}`} />
-              <span className="text-[0.72rem] text-fg-muted">+{stats.addedThisWeek} this week</span>
-            </div>
-          </div>
-          {(stats.densest || stats.thinnest) && (
-            <div className="flex flex-wrap gap-x-5 gap-y-1 text-[0.78rem] text-fg-secondary">
-              {stats.densest && <span>Densest: <strong className="text-fg">#{stats.densest.tag}</strong> ({stats.densest.count})</span>}
-              {stats.thinnest && <span>Thinnest: <strong className="text-fg">#{stats.thinnest.tag}</strong> ({stats.thinnest.count}) — explore here next</span>}
-            </div>
-          )}
-        </Card>
-      )}
-
-      <details className="glass-panel px-4 py-1">
-        <summary className="cursor-pointer py-2.5 text-[0.82rem] font-semibold text-fg-secondary">📱 Capture from anywhere — browser bookmarklet &amp; phone</summary>
-        <div className="flex flex-col gap-3 pb-3 text-[0.8rem] text-fg-secondary">
-          <div>
-            <strong className="text-fg">Browser:</strong> drag this to your bookmarks bar, then click it on any page to file that page in your inbox:{' '}
-            <a ref={bookmarkletRef} className="btn btn-secondary ml-1 px-2.5 py-1 text-[0.75rem]" onClick={(e) => e.preventDefault()}>⚡ Capture to Learning OS</a>
-          </div>
-          <div>
-            <strong className="text-fg">Phone (same Wi-Fi):</strong> open <code className="text-primary-light">{origin || 'http://<your-computer-ip>:3000'}/capture</code> and add it to your home screen — a one-box capture that uses your login.
-          </div>
-          <div>
-            <strong className="text-fg">Phone shortcut (no login):</strong> set <code>CAPTURE_TOKEN</code> in <code>.env</code>, then have iOS Shortcuts / Android HTTP Shortcuts send{' '}
-            <code>POST /api/capture-hook</code> with header <code>Authorization: Bearer &lt;token&gt;</code> and JSON <code>{'{"text": "...", "url": "..."}'}</code>.
-          </div>
-        </div>
-      </details>
-
-      <Tabs
-        active={tab}
-        onChange={setTab}
-        tabs={[
-          { key: 'inbox', label: `Inbox (${captures.length})` },
-          { key: 'notes', label: `Notes (${notes.length})` },
-        ]}
-      />
-
-      {tab === 'inbox' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {captures.length === 0 ? (
-            <div className="glass-panel" style={{ padding: '32px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-              Inbox is clear.
-            </div>
-          ) : (
-            captures.map((c) => (
-              <div key={c.id} className="glass-card" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div>
-                  <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{c.title || c.rawText?.slice(0, 100) || c.url}</span>
-                  {c.url && <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>{c.url}</div>}
-                  {c.rawText && c.title && <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{c.rawText}</div>}
-                  <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{new Date(c.createdAt).toLocaleDateString()}</span>
-                </div>
-                {suggestions[c.id] ? (
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      disabled={processingId === c.id}
-                      onClick={() => handleProcess(c.id, suggestions[c.id].action, suggestions[c.id])}
-                    >
-                      ✓ {suggestionLabel(suggestions[c.id])}
-                    </Button>
-                    <span className="flex-1 text-[0.75rem] text-fg-muted">{suggestions[c.id].reason}</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowOptions((p) => ({ ...p, [c.id]: !p[c.id] }))}
-                      aria-expanded={!!showOptions[c.id]}
-                      className="min-h-[32px] bg-transparent px-2 text-[0.75rem] font-medium text-fg-secondary"
-                    >
-                      {showOptions[c.id] ? 'Hide options' : 'Somewhere else'}
-                    </button>
-                  </div>
-                ) : (
-                  suggesting && <span className="text-[0.72rem] text-fg-muted">Finding a home…</span>
-                )}
-                {(!suggestions[c.id] || showOptions[c.id]) && (
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button onClick={() => handleProcess(c.id, 'note')} disabled={processingId === c.id} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.72rem' }}>→ Note</button>
-                  <select
-                    value={conceptTopicChoice[c.id] || ''}
-                    onChange={(e) => setConceptTopicChoice((prev) => ({ ...prev, [c.id]: e.target.value }))}
-                    className="form-input"
-                    style={{ width: 'auto', fontSize: '0.72rem', padding: '4px 8px', background: 'var(--bg-surface)' }}
-                  >
-                    <option value="">Topic (optional for note, needed for concept)…</option>
-                    {topics.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
-                  </select>
-                  <button onClick={() => handleProcess(c.id, 'concept')} disabled={processingId === c.id} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.72rem' }}>→ Concept</button>
-                  <button onClick={() => handleProcess(c.id, 'topic')} disabled={processingId === c.id} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.72rem' }}>→ Topic</button>
-                  <button onClick={() => handleProcess(c.id, 'archive')} disabled={processingId === c.id} style={{ padding: '4px 10px', fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>Archive</button>
-                </div>
-                )}
+            <Sparkline values={stats.weekly} width={240} height={32} color="var(--ink)" label={`Notes added per week, last 8 weeks: ${stats.weekly.join(', ')}`} />
+            {(stats.densest || stats.thinnest) && (
+              <div className="flex flex-col gap-1 text-[0.9rem] text-fg-secondary">
+                {stats.densest && <span>Most notes: <strong className="font-semibold text-fg">#{stats.densest.tag}</strong> ({stats.densest.count})</span>}
+                {stats.thinnest && <span>Thinnest: <strong className="font-semibold text-fg">#{stats.thinnest.tag}</strong> ({stats.thinnest.count}) — worth exploring next</span>}
               </div>
-            ))
-          )}
-        </div>
-      )}
+            )}
+          </section>
+        )}
 
-      {tab === 'notes' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <Link href="/notes/new" className="btn btn-primary" style={{ alignSelf: 'flex-start', padding: '6px 14px', fontSize: '0.8rem' }}>
-            + New Note
-          </Link>
-          {notes.length === 0 ? (
-            <div className="glass-panel" style={{ padding: '32px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-              No notes yet. Process an inbox item, or start one directly.
+        <details className="flex flex-col gap-2">
+          <summary className="cursor-pointer text-[0.95rem] font-semibold">Capture from anywhere</summary>
+          <div className="mt-3 flex flex-col gap-3 text-[0.875rem] leading-relaxed text-fg-secondary">
+            <div>
+              <strong className="text-fg">Browser:</strong> drag this to your bookmarks bar, then click it on any page to send it here:{' '}
+              <a ref={bookmarkletRef} className="btn btn-secondary mt-1 h-8 px-2.5 py-0 text-[0.8rem]" onClick={(e) => e.preventDefault()}>Capture to Learning OS</a>
             </div>
-          ) : (
-            notes.map((n) => (
-              <Link key={n.id} href={`/notes/${n.id}`} className="glass-card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                <div>
-                  <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{n.title}</span>
-                  {n.tags.length > 0 && (
-                    <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                      {n.tags.map((t) => <span key={t} style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '9999px', background: 'var(--fill-3)', color: 'var(--color-text-muted)' }}>#{t}</span>)}
-                    </div>
-                  )}
-                </div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                  {n._count && `${n._count.incoming} backlink${n._count.incoming === 1 ? '' : 's'}`}
-                </div>
-              </Link>
-            ))
-          )}
-        </div>
-      )}
+            <div>
+              <strong className="text-fg">Phone (same Wi-Fi):</strong> open <code className="text-fg">{origin || 'http://<your-computer-ip>:3000'}/capture</code> and add it to your home screen.
+            </div>
+            <div>
+              <strong className="text-fg">Phone shortcut:</strong> set <code>CAPTURE_TOKEN</code> in <code>.env</code>, then send <code>POST /api/capture-hook</code> with <code>Authorization: Bearer &lt;token&gt;</code> and JSON <code>{'{"text": "...", "url": "..."}'}</code>.
+            </div>
+          </div>
+        </details>
+
+        <ResurfacedNote />
+      </aside>
     </div>
   );
 }

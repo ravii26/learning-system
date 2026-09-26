@@ -24,7 +24,7 @@ export async function GET() {
     });
     const ids = topics.map((t) => t.id);
 
-    const [timeAll, time30, modules, attempts, cardsTotal, cardsDue, knowledge, problems] = await Promise.all([
+    const [timeAll, time30, modules, attempts, cardsTotal, cardsDue, knowledge, problems, reps] = await Promise.all([
       db.studyTimeEntry.groupBy({ by: ['topicId'], where: { userId, topicId: { in: ids } }, _sum: { seconds: true } }),
       db.studyTimeEntry.groupBy({ by: ['topicId'], where: { userId, topicId: { in: ids }, startedAt: { gte: since30 } }, _sum: { seconds: true } }),
       db.curriculumItem.groupBy({ by: ['topicId', 'completed'], where: { userId, topicId: { in: ids }, removed: false }, _count: { _all: true } }),
@@ -47,6 +47,7 @@ export async function GET() {
       }),
       loadTopicKnowledge(userId, ids, now),
       db.problemAttempt.groupBy({ by: ['topicId', 'outcome'], where: { userId, topicId: { in: ids } }, _count: { _all: true } }),
+      db.practiceRep.findMany({ where: { userId, topicId: { in: ids } }, select: { topicId: true, score: true }, orderBy: { occurredAt: 'asc' } }),
     ]);
 
     const sumBy = (rows: Array<{ topicId: string; _sum: { seconds: number | null } }>) =>
@@ -95,8 +96,17 @@ export async function GET() {
           stuck: problems.find((p) => p.topicId === t.id && p.outcome === 'stuck')?._count._all ?? 0,
         },
         knowledge: knowledge.get(t.id)
-          ? { unit: knowledge.get(t.id)!.unit, counts: knowledge.get(t.id)!.counts, states: knowledge.get(t.id)!.items.map((i) => i.state) }
+          ? {
+              unit: knowledge.get(t.id)!.unit,
+              counts: knowledge.get(t.id)!.counts,
+              states: knowledge.get(t.id)!.items.map((i) => i.state),
+              items: knowledge.get(t.id)!.items,
+            }
           : null,
+        practice: (() => {
+          const own = reps.filter((r) => r.topicId === t.id);
+          return { reps: own.length, recentScores: own.slice(-12).map((r) => r.score) };
+        })(),
       };
     });
 

@@ -185,10 +185,15 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           : [];
         setCurriculum(sortedCurriculum);
 
-        // Default active module to first incomplete or first module
+        // Default active module: the one linked to (?module=, e.g. "Restudy"
+        // from Where you stand), else the first unfinished, else the first.
         if (!activeModuleId && sortedCurriculum.length > 0) {
-          const firstIncomplete = sortedCurriculum.find((m: CourseModule) => !m.completed);
-          setActiveModuleId(firstIncomplete ? firstIncomplete.id : sortedCurriculum[0].id);
+          const linked = searchParams.get('module');
+          const target =
+            (linked && sortedCurriculum.find((m: CourseModule) => m.id === linked)) ||
+            sortedCurriculum.find((m: CourseModule) => !m.completed) ||
+            sortedCurriculum[0];
+          setActiveModuleId(target.id);
         }
       } else {
         setError('Topic not found');
