@@ -13,7 +13,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "vercel-build": "node scripts/migrate-deploy.js && next build"
   },
   "dependencies": {
     "@prisma/client": "^5.10.2",
@@ -44,5 +45,8 @@
     "tsx": "^4.23.15",
     "typescript": "^5.3.3",
     "vitest": "^2.1.9"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

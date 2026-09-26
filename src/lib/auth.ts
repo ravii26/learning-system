@@ -1,11 +1,19 @@
+import { timingSafeEqual } from 'crypto';
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
 import { SEED_USER_ID } from './currentUser';
 
 const isProd = process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE !== 'phase-production-build';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'learning-os-default-secret-key-change-in-prod';
-const APP_PASSWORD = process.env.APP_PASSWORD || 'learn';
+// The fallbacks are for local dev only. In production an unset secret would
+// mean a publicly known password and signing key, so refuse instead.
+function secret(name: 'JWT_SECRET' | 'APP_PASSWORD', devFallback: string): string {
+  const value = process.env[name];
+  if (value) return value;
+  if (isProd) throw new Error(`${name} must be set in production`);
+  return devFallback;
+}
+const jwtSecret = () => secret('JWT_SECRET', 'learning-os-default-secret-key-change-in-prod');
 const COOKIE_NAME = 'learning_os_session';
 
 interface SessionTokenPayload {
@@ -15,13 +23,13 @@ interface SessionTokenPayload {
 
 export function signSessionToken(userId: string = SEED_USER_ID): string {
   const payload: SessionTokenPayload = { auth: true, sub: userId };
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, jwtSecret(), { expiresIn: '7d' });
 }
 
 /** Decodes and verifies the token, returning the session payload or null. */
 export function decodeSessionToken(token: string): SessionTokenPayload | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as Partial<SessionTokenPayload>;
+    const decoded = jwt.verify(token, jwtSecret()) as Partial<SessionTokenPayload>;
     if (!decoded.auth) return null;
     // Legacy tokens signed before `sub` existed are still valid sessions —
     // fall back to the seed user rather than logging everyone out.
@@ -49,7 +57,10 @@ export function getSessionUserId(): string | null {
 }
 
 export function checkPassword(password: string): boolean {
-  return password === APP_PASSWORD;
+  const expected = Buffer.from(secret('APP_PASSWORD', 'learn'));
+  const given = Buffer.from(password);
+  // Constant-time compare so response timing doesn't leak the password.
+  return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
 export function setSessionCookie(token: string) {

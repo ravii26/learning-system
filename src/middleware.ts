@@ -5,7 +5,10 @@ import { verifySessionTokenEdge } from '@/lib/authEdge';
 const COOKIE_NAME = 'learning_os_session';
 const isProd = process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE !== 'phase-production-build';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'learning-os-default-secret-key-change-in-prod';
+// No dev fallback in production: an unset secret there must lock everyone
+// out, not accept tokens signed with a key that's public in this repo.
+const JWT_SECRET = process.env.JWT_SECRET
+  || (process.env.NODE_ENV === 'production' ? '' : 'learning-os-default-secret-key-change-in-prod');
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -26,7 +29,7 @@ export async function middleware(request: NextRequest) {
   // Check if session cookie exists and signature is valid
   const token = request.cookies.get(COOKIE_NAME)?.value;
 
-  if (!token || !(await verifySessionTokenEdge(token, JWT_SECRET))) {
+  if (!token || !JWT_SECRET || !(await verifySessionTokenEdge(token, JWT_SECRET))) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
