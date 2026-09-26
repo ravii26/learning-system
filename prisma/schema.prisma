@@ -82,6 +82,7 @@ model User {
   resourceRows     Resource[]
   moduleAttempts   ModuleAttempt[]
   studyTime        StudyTimeEntry[]
+  problemAttempts  ProblemAttempt[]
 }
 
 model Topic {
@@ -159,6 +160,7 @@ model Topic {
   resourceRows    Resource[]
   moduleAttempts  ModuleAttempt[]
   studyTime       StudyTimeEntry[]
+  problemAttempts ProblemAttempt[]
 }
 
 /// Evidence from the Study Room: one row per checked quiz or graded
@@ -830,4 +832,30 @@ model GeneratedLesson {
 model SystemSetting {
   key   String @id
   value String
+}
+
+// One practice problem you tried (a LeetCode question, a design prompt):
+// the evidence that you can solve things cold, not just recall them.
+model ProblemAttempt {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  moduleId   String? // CurriculumItem.legacyId — the pattern it practised
+  title      String
+  url        String?
+  difficulty String? // easy | medium | hard
+  outcome    String // cold | hint | stuck
+  minutes    Int?
+  notes      String? // the key idea, in your words; becomes a review card when you needed help
+
+  attemptedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, topicId, attemptedAt])
+  @@index([userId, topicId, moduleId])
 }

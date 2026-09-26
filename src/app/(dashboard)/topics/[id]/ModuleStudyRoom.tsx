@@ -5,6 +5,7 @@ import { CourseModule, ModuleEvidence } from './page';
 import { renderMarkdown } from '@/lib/markdown';
 import RichTextEditor from './RichTextEditor';
 import { KnowledgeMark } from '@/components/ui';
+import ProblemLog from './ProblemLog';
 
 interface ModuleStudyRoomProps {
   topicId: string;
@@ -13,6 +14,8 @@ interface ModuleStudyRoomProps {
   module: CourseModule;
   notes: string;
   onSaveNotes: (html: string) => Promise<void>;
+  /** Called after this module's own notes were saved, so the page keeps its copy fresh. */
+  onModuleNotesSaved?: (moduleId: string, html: string) => void;
   onToggleCompleted: (id: string) => Promise<void>;
   onAddBookmark?: (resource: { title: string; url: string; type: string; purpose: string }) => Promise<void>;
   /** Latest quiz score / challenge verdict / review cards for this module. */
@@ -38,6 +41,7 @@ export default function ModuleStudyRoom({
   module,
   notes,
   onSaveNotes,
+  onModuleNotesSaved,
   onToggleCompleted,
   onAddBookmark,
   evidence,
@@ -138,6 +142,19 @@ export default function ModuleStudyRoom({
       setEvaluation({ fallback: true, tip: 'Could not reach the AI mentor. Compare your answer with the model solution below.' });
     } finally {
       setEvaluating(false);
+    }
+  };
+
+  const saveModuleNotes = async (moduleId: string, html: string) => {
+    try {
+      const res = await fetch(`/api/topics/${topicId}/modules/${moduleId}/notes`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: html }),
+      });
+      if (res.ok) onModuleNotesSaved?.(moduleId, html);
+    } catch (err) {
+      console.error('Failed to save module notes:', err);
     }
   };
 
@@ -877,24 +894,35 @@ export default function ModuleStudyRoom({
             </div>
           )}
 
+          {/* ── PROBLEM LOG: can you solve it cold, not just recall it ─── */}
+          <ProblemLog topicId={topicId} moduleId={module.id} onChanged={onEvidenceChanged} />
+
           {/* ── INTEGRATED RICH-TEXT LESSON NOTES (Always Present) ──────── */}
-          <div className="glass-panel" style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1rem' }}>📝</span>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff' }}>My Lesson Notes & Takeaways</h3>
-              </div>
-              <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                Auto-saved to topic notebook
-              </span>
+          <div className="glass-panel flex flex-col gap-3 px-6 py-5">
+            <div className="flex items-baseline justify-between gap-3">
+              <h3 className="m-0 text-base font-bold text-fg">Your notes on this module</h3>
+              <span className="text-[0.72rem] text-fg-muted">Saved as you type · shown again with this module’s review cards</span>
             </div>
 
+            {/* Keyed by module: the editor captures its save callback when
+                it's created, so a save still pending after you switch
+                modules lands on the module you typed it in. */}
             <RichTextEditor
-              content={notes}
-              onChange={onSaveNotes}
-              placeholder={`Write down your key formulas, insights, or takeaways about ${module.title}...`}
+              key={module.id}
+              content={module.notes || ''}
+              onChange={(html) => saveModuleNotes(module.id, html)}
+              placeholder={`Explain ${module.title} back in your own words: the key idea, a formula, an example, where it breaks.`}
               minHeight={160}
             />
+
+            {notes && notes.replace(/<[^>]*>/g, '').trim() && (
+              <details className="text-[0.8rem] text-fg-secondary">
+                <summary className="cursor-pointer font-semibold">Topic notebook (notes from before per-module notes)</summary>
+                <div className="mt-2">
+                  <RichTextEditor content={notes} onChange={onSaveNotes} placeholder="" minHeight={100} />
+                </div>
+              </details>
+            )}
           </div>
         </>
       )}

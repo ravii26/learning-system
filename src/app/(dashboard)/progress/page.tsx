@@ -22,6 +22,7 @@ interface TopicProgress {
   cardsTotal: number;
   cardsDue: number;
   lastActivity: string | null;
+  problems: { cold: number; hint: number; stuck: number };
   knowledge: {
     unit: 'module' | 'idea';
     counts: Record<Knowledge, number>;
@@ -87,7 +88,7 @@ export default function ProgressPage() {
   }
 
   const withEvidence = topics.filter(
-    (t) => t.secondsAll > 0 || t.modulesDone > 0 || t.quizCount > 0 || t.cardsTotal > 0 || t.status === 'active'
+    (t) => t.secondsAll > 0 || t.modulesDone > 0 || t.quizCount > 0 || t.cardsTotal > 0 || t.problems.cold + t.problems.hint + t.problems.stuck > 0 || t.status === 'active'
   );
   const quiet = topics.length - withEvidence.length;
   const minutesPerDay = time?.daily.map((d) => Math.round(d.seconds / 60)) ?? [];
@@ -165,6 +166,12 @@ export default function ProgressPage() {
                         </span>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {t.problems.cold + t.problems.hint + t.problems.stuck > 0 && (
+                  <div className="text-[0.75rem] text-fg-secondary">
+                    Problems: <strong className="text-fg">{t.problems.cold}</strong> solved cold · {t.problems.hint} with a hint · {t.problems.stuck} stuck
                   </div>
                 )}
 

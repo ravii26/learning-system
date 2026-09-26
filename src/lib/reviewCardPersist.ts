@@ -17,7 +17,7 @@ export async function addReviewCards(
   db: DbClient,
   userId: string,
   topicId: string,
-  moduleId: string,
+  moduleId: string | null,
   drafts: ReviewCardDraft[],
   { dueInDays = 1, now = new Date() }: { dueInDays?: number; now?: Date } = {}
 ): Promise<{ added: number; skipped: number }> {

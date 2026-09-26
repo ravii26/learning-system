@@ -24,7 +24,7 @@ export async function GET() {
     });
     const ids = topics.map((t) => t.id);
 
-    const [timeAll, time30, modules, attempts, cardsTotal, cardsDue, knowledge] = await Promise.all([
+    const [timeAll, time30, modules, attempts, cardsTotal, cardsDue, knowledge, problems] = await Promise.all([
       db.studyTimeEntry.groupBy({ by: ['topicId'], where: { userId, topicId: { in: ids } }, _sum: { seconds: true } }),
       db.studyTimeEntry.groupBy({ by: ['topicId'], where: { userId, topicId: { in: ids }, startedAt: { gte: since30 } }, _sum: { seconds: true } }),
       db.curriculumItem.groupBy({ by: ['topicId', 'completed'], where: { userId, topicId: { in: ids }, removed: false }, _count: { _all: true } }),
@@ -46,6 +46,7 @@ export async function GET() {
         _count: { _all: true },
       }),
       loadTopicKnowledge(userId, ids, now),
+      db.problemAttempt.groupBy({ by: ['topicId', 'outcome'], where: { userId, topicId: { in: ids } }, _count: { _all: true } }),
     ]);
 
     const sumBy = (rows: Array<{ topicId: string; _sum: { seconds: number | null } }>) =>
@@ -88,6 +89,11 @@ export async function GET() {
         cardsTotal: cardTotals.get(t.id) ?? 0,
         cardsDue: cardDue.get(t.id) ?? 0,
         lastActivity,
+        problems: {
+          cold: problems.find((p) => p.topicId === t.id && p.outcome === 'cold')?._count._all ?? 0,
+          hint: problems.find((p) => p.topicId === t.id && p.outcome === 'hint')?._count._all ?? 0,
+          stuck: problems.find((p) => p.topicId === t.id && p.outcome === 'stuck')?._count._all ?? 0,
+        },
         knowledge: knowledge.get(t.id)
           ? { unit: knowledge.get(t.id)!.unit, counts: knowledge.get(t.id)!.counts, states: knowledge.get(t.id)!.items.map((i) => i.state) }
           : null,
