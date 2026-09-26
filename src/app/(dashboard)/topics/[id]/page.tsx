@@ -11,7 +11,8 @@ import ConfusionMistakeBank from './ConfusionMistakeBank';
 import RichTextEditor from './RichTextEditor';
 import SessionDebriefModal, { SessionLog } from './SessionDebriefModal';
 import CustomDialog, { CustomDialogConfig } from '@/components/CustomDialog';
-import { Drawer } from '@/components/ui';
+import { Drawer, KnowledgeMark } from '@/components/ui';
+import type { Knowledge } from '@/lib/moduleState';
 import { useToast } from '@/components/ToastProvider';
 import { useStudyTracker } from '@/lib/useStudyTracker';
 import { formatDuration } from '@/lib/timeSummary';
@@ -23,6 +24,9 @@ export interface ModuleEvidence {
   challenge?: { verdict: string | null; at: string };
   attempts: number;
   reviewCards: number;
+  /** How well you know it (lib/moduleState.ts), and why in one line. */
+  state?: Knowledge;
+  reason?: string;
 }
 
 export interface CourseModule {
@@ -818,6 +822,9 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                             {mod.order}. {mod.title}
                           </div>
                           <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                            {evidence[mod.id]?.state && (
+                              <KnowledgeMark state={evidence[mod.id].state!} reason={evidence[mod.id].reason} showLabel className="mr-1.5" />
+                            )}
                             ~{mod.estimatedMinutes} mins
                             {evidence[mod.id]?.quiz && (
                               <span className="ml-1.5 text-fg-secondary">· quiz {evidence[mod.id].quiz!.correct}/{evidence[mod.id].quiz!.total}</span>

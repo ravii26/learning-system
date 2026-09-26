@@ -31,6 +31,13 @@ const config: Config = {
         danger: 'var(--color-danger)',
         warning: 'var(--color-warning)',
         success: 'var(--color-success)',
+        k: {
+          solid: 'var(--k-solid)',
+          learning: 'var(--k-learning)',
+          fading: 'var(--k-fading)',
+          'fading-text': 'var(--k-fading-text)',
+          unseen: 'var(--k-unseen)',
+        },
       },
       borderRadius: {
         sm: 'var(--radius-sm)',

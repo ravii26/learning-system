@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ButtonLink, Card, CardLabel, EmptyState, Sparkline, StatPill } from '@/components/ui';
+import { ButtonLink, Card, CardLabel, EmptyState, KnowledgeMark, KNOWLEDGE_LABEL, Sparkline, StatPill } from '@/components/ui';
+import type { Knowledge } from '@/lib/moduleState';
 import { formatDuration } from '@/lib/timeSummary';
 
 interface TopicProgress {
@@ -21,7 +22,20 @@ interface TopicProgress {
   cardsTotal: number;
   cardsDue: number;
   lastActivity: string | null;
+  knowledge: {
+    unit: 'module' | 'idea';
+    counts: Record<Knowledge, number>;
+    states: Knowledge[];
+  } | null;
 }
+
+const STATE_ORDER: Knowledge[] = ['solid', 'learning', 'fading', 'unseen'];
+const CELL: Record<Knowledge, string> = {
+  solid: 'bg-k-solid',
+  learning: 'bg-k-learning',
+  fading: 'bg-k-fading',
+  unseen: 'shadow-[inset_0_0_0_1.5px_var(--k-unseen)]',
+};
 
 interface TimeMonth {
   totalSeconds: number;
@@ -131,6 +145,28 @@ export default function ProgressPage() {
                     <div className="text-[0.68rem] text-fg-muted">30 days · {formatDuration(t.secondsAll)} total</div>
                   </div>
                 </div>
+
+                {t.knowledge && t.knowledge.states.length > 0 && (
+                  <div className="flex flex-col gap-1.5">
+                    <div
+                      className="flex flex-wrap gap-1"
+                      role="img"
+                      aria-label={`${t.knowledge.unit === 'module' ? 'Modules' : 'Ideas'}: ${STATE_ORDER.filter((s) => t.knowledge!.counts[s]).map((s) => `${t.knowledge!.counts[s]} ${KNOWLEDGE_LABEL[s].toLowerCase()}`).join(', ')}`}
+                    >
+                      {t.knowledge.states.map((s, i) => (
+                        <span key={i} className={`h-3.5 w-3.5 rounded-[3px] ${CELL[s]}`} />
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-3 text-[0.72rem] text-fg-secondary">
+                      {STATE_ORDER.filter((s) => t.knowledge!.counts[s] > 0).map((s) => (
+                        <span key={s} className="inline-flex items-center gap-1.5">
+                          <KnowledgeMark state={s} />
+                          {t.knowledge!.counts[s]} {KNOWLEDGE_LABEL[s].toLowerCase()}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {t.modulesTotal > 0 && (
                   <div>

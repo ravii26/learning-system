@@ -6,4 +6,5 @@ export { Tabs } from './Tabs';
 export { EmptyState } from './EmptyState';
 export { StatPill } from './StatPill';
 export { Sparkline } from './Sparkline';
+export { KnowledgeMark, KNOWLEDGE_LABEL } from './KnowledgeMark';
 export { cn } from './cn';

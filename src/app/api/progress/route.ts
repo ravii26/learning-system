@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
+import { loadTopicKnowledge } from '@/lib/topicKnowledge';
 
 /**
  * One row per topic of the evidence the app has actually collected — time
@@ -23,7 +24,7 @@ export async function GET() {
     });
     const ids = topics.map((t) => t.id);
 
-    const [timeAll, time30, modules, attempts, cardsTotal, cardsDue] = await Promise.all([
+    const [timeAll, time30, modules, attempts, cardsTotal, cardsDue, knowledge] = await Promise.all([
       db.studyTimeEntry.groupBy({ by: ['topicId'], where: { userId, topicId: { in: ids } }, _sum: { seconds: true } }),
       db.studyTimeEntry.groupBy({ by: ['topicId'], where: { userId, topicId: { in: ids }, startedAt: { gte: since30 } }, _sum: { seconds: true } }),
       db.curriculumItem.groupBy({ by: ['topicId', 'completed'], where: { userId, topicId: { in: ids }, removed: false }, _count: { _all: true } }),
@@ -44,6 +45,7 @@ export async function GET() {
         },
         _count: { _all: true },
       }),
+      loadTopicKnowledge(userId, ids, now),
     ]);
 
     const sumBy = (rows: Array<{ topicId: string; _sum: { seconds: number | null } }>) =>
@@ -86,6 +88,9 @@ export async function GET() {
         cardsTotal: cardTotals.get(t.id) ?? 0,
         cardsDue: cardDue.get(t.id) ?? 0,
         lastActivity,
+        knowledge: knowledge.get(t.id)
+          ? { unit: knowledge.get(t.id)!.unit, counts: knowledge.get(t.id)!.counts, states: knowledge.get(t.id)!.items.map((i) => i.state) }
+          : null,
       };
     });
 

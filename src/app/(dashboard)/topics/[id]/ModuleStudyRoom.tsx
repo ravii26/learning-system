@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { CourseModule, ModuleEvidence } from './page';
 import { renderMarkdown } from '@/lib/markdown';
 import RichTextEditor from './RichTextEditor';
+import { KnowledgeMark } from '@/components/ui';
 
 interface ModuleStudyRoomProps {
   topicId: string;
@@ -202,8 +203,14 @@ export default function ModuleStudyRoom({
           <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#fff', marginTop: '2px', letterSpacing: '-0.01em' }}>
             {module.order}. {module.title}
           </h2>
-          {evidence && (evidence.quiz || evidence.challenge || evidence.reviewCards > 0) && (
+          {evidence && (evidence.state || evidence.quiz || evidence.challenge || evidence.reviewCards > 0) && (
             <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[0.74rem] text-fg-secondary">
+              {evidence.state && (
+                <span className="inline-flex items-center gap-1.5">
+                  <KnowledgeMark state={evidence.state} showLabel />
+                  {evidence.reason && <span>— {evidence.reason}</span>}
+                </span>
+              )}
               {evidence.quiz?.total ? (
                 <span>Last quiz <strong className="text-fg">{evidence.quiz.correct}/{evidence.quiz.total}</strong></span>
               ) : null}
