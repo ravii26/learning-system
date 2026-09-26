@@ -7,6 +7,7 @@ import { useToast } from '@/components/ToastProvider';
 // Reused as-is from the topic detail page — a generic TipTap wrapper with
 // no topic-specific coupling. Not moved/renamed, to avoid touching its
 // current importer (topics/[id]/page.tsx, mid-edit elsewhere).
+import { Icon } from '@/components/ui';
 import RichTextEditor from '../../topics/[id]/RichTextEditor';
 
 /**
@@ -137,104 +138,105 @@ export default function NoteDetailPage() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '760px' }}>
-        <div className="skeleton" style={{ height: '48px', borderRadius: '12px' }} />
-        <div className="skeleton" style={{ height: '240px', borderRadius: '12px' }} />
+      <div className="mx-auto flex max-w-[760px] flex-col gap-4">
+        {[56, 280].map((h) => <div key={h} className="skeleton rounded-md" style={{ height: h }} />)}
       </div>
     );
   }
 
   if (!isNew && !note) {
     return (
-      <div className="glass-panel" style={{ padding: '32px', textAlign: 'center', maxWidth: '760px' }}>
-        <p style={{ color: 'var(--color-text-muted)' }}>Note not found.</p>
-        <Link href="/notes" style={{ color: 'var(--color-primary-light)', fontSize: '0.85rem' }}>← Back to Notes</Link>
+      <div className="mx-auto flex max-w-[760px] flex-col items-start gap-3 py-10">
+        <p className="m-0 text-fg-secondary">This note doesn’t exist, or it was deleted.</p>
+        <Link href="/notes" className="btn btn-secondary">Back to Notebook</Link>
       </div>
     );
   }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '760px' }}>
-      <Link href="/notes" style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>← Back to Notes</Link>
+  const chip = 'rounded-full border border-line bg-surface px-3 py-1 text-[0.85rem] text-fg no-underline hover:border-line-hover hover:no-underline';
 
-      <div className="glass-panel" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+  return (
+    <div className="mx-auto flex max-w-[760px] flex-col gap-7">
+      <Link href="/notes" className="flex items-center gap-1.5 self-start text-[0.9rem] text-fg-secondary no-underline hover:text-fg hover:no-underline">
+        <Icon name="arrowLeft" size={16} /> Notebook
+      </Link>
+
+      <div className="flex flex-col gap-2">
+        <label htmlFor="note-title" className="sr-only">Title</label>
         <input
+          id="note-title"
           type="text"
-          className="form-input"
-          placeholder="Note title"
+          placeholder="Untitled note"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => !isNew && title.trim() && title !== note?.title && handleSave()}
-          style={{ fontSize: '1.1rem', fontWeight: 700, padding: '8px 10px', border: 'none', background: 'transparent' }}
+          className="w-full border-none bg-transparent p-0 font-serif text-[2.4rem] font-normal leading-tight text-fg outline-none placeholder:text-fg-muted"
         />
+        <label htmlFor="note-tags" className="sr-only">Tags</label>
         <input
+          id="note-tags"
           type="text"
-          className="form-input"
-          placeholder="tags, comma, separated"
+          placeholder="Tags, separated by commas"
           value={tagsInput}
           onChange={(e) => setTagsInput(e.target.value)}
           onBlur={() => !isNew && handleSave()}
-          style={{ fontSize: '0.78rem', padding: '6px 10px' }}
+          className="w-full border-none bg-transparent p-0 text-[0.95rem] text-fg-secondary outline-none placeholder:text-fg-muted"
         />
-
-        {isNew ? (
-          <>
-            <textarea
-              className="form-input"
-              placeholder="Write the note... use [[Title]] to link to another note"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              style={{ width: '100%', height: '200px', resize: 'vertical', fontFamily: 'inherit', fontSize: '0.9rem' }}
-            />
-            <button onClick={handleCreate} disabled={saving} className="btn btn-primary" style={{ alignSelf: 'flex-start' }}>
-              {saving ? 'Creating…' : 'Create Note'}
-            </button>
-          </>
-        ) : (
-          <>
-            <p style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>
-              Use <code>[[Title]]</code> to link to another note — parsed on save.
-            </p>
-            <RichTextEditor
-              content={body}
-              onChange={(html) => { setBody(html); handleSave(html); }}
-              placeholder="Write the note..."
-              minHeight={220}
-            />
-            <button onClick={handleDelete} style={{ alignSelf: 'flex-start', fontSize: '0.72rem', color: 'var(--color-danger)' }}>
-              Delete note
-            </button>
-          </>
-        )}
       </div>
 
+      {isNew ? (
+        <div className="flex flex-col gap-3">
+          <label htmlFor="note-body" className="sr-only">Note</label>
+          <textarea
+            id="note-body"
+            className="form-input min-h-[240px] resize-y font-serif text-[1.1rem] leading-relaxed"
+            placeholder="Write the note. Use [[Title]] to link to another note."
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+          />
+          <button onClick={handleCreate} disabled={saving} className="btn btn-primary h-11 self-start py-0">
+            {saving ? 'Saving…' : 'Save note'}
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <RichTextEditor
+            content={body}
+            onChange={(html) => { setBody(html); handleSave(html); }}
+            placeholder="Write the note…"
+            minHeight={260}
+          />
+          <p className="m-0 text-[0.85rem] text-fg-muted">
+            Type <code>[[Title]]</code> to link to another note. Links update when it saves.
+          </p>
+        </div>
+      )}
+
       {!isNew && note && (note.incoming.length > 0 || note.outgoing.length > 0) && (
-        <div className="glass-panel" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <section aria-label="Linked notes" className="flex flex-col gap-4 border-t border-line pt-6">
           {note.outgoing.length > 0 && (
-            <div>
-              <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>LINKS TO</span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
-                {note.outgoing.map((l) => l.to && (
-                  <Link key={l.id} href={`/notes/${l.to.id}`} style={{ fontSize: '0.78rem', padding: '3px 10px', borderRadius: '9999px', background: 'var(--fill-2)', color: 'var(--color-primary-light)', textDecoration: 'none' }}>
-                    {l.to.title}
-                  </Link>
-                ))}
+            <div className="flex flex-col gap-2">
+              <span className="text-[0.9rem] font-semibold text-fg-secondary">Links to</span>
+              <div className="flex flex-wrap gap-2">
+                {note.outgoing.map((l) => l.to && <Link key={l.id} href={`/notes/${l.to.id}`} className={chip}>{l.to.title}</Link>)}
               </div>
             </div>
           )}
           {note.incoming.length > 0 && (
-            <div>
-              <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>BACKLINKS — NOTES THAT LINK HERE</span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
-                {note.incoming.map((l) => l.from && (
-                  <Link key={l.id} href={`/notes/${l.from.id}`} style={{ fontSize: '0.78rem', padding: '3px 10px', borderRadius: '9999px', background: 'var(--fill-2)', color: 'var(--color-text-secondary)', textDecoration: 'none' }}>
-                    {l.from.title}
-                  </Link>
-                ))}
+            <div className="flex flex-col gap-2">
+              <span className="text-[0.9rem] font-semibold text-fg-secondary">Linked from</span>
+              <div className="flex flex-wrap gap-2">
+                {note.incoming.map((l) => l.from && <Link key={l.id} href={`/notes/${l.from.id}`} className={chip}>{l.from.title}</Link>)}
               </div>
             </div>
           )}
-        </div>
+        </section>
+      )}
+
+      {!isNew && (
+        <button onClick={handleDelete} className="self-start text-[0.875rem] font-medium text-danger underline-offset-4 hover:underline">
+          Delete note
+        </button>
       )}
     </div>
   );

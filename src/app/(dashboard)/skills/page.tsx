@@ -96,7 +96,6 @@ function SkillCard({ node, topicsBySkill, depth }: { node: SkillNode; topicsBySk
           display: 'flex',
           flexDirection: 'column',
           gap: '8px',
-          borderLeft: depth === 0 ? '3px solid var(--color-primary)' : '3px solid var(--border-color)',
           cursor: hasChildren || topics.length > 0 ? 'pointer' : 'default',
         }}
         onClick={() => (hasChildren || topics.length > 0) && setExpanded((v) => !v)}
@@ -138,7 +137,7 @@ function SkillCard({ node, topicsBySkill, depth }: { node: SkillNode; topicsBySk
 
         {expanded && topics.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px', paddingTop: '8px', borderTop: '1px solid var(--fill-2)' }}>
-            <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>EVIDENCE — TOPICS</span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Topics</span>
             {topics.map((t) => (
               <a
                 key={t.id}
@@ -234,13 +233,13 @@ export default function SkillsPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '760px' }}>
       <div className="flex-between">
         <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Where You Stand</h1>
-          <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-            Evidence-earned mastery, not a self-typed percentage. Drill into any skill to see what it's built on.
+          <h1 className="m-0 font-serif text-[2.4rem] font-normal leading-tight">Skill tree</h1>
+          <p className="m-0 mt-1.5 text-[1rem] text-fg-secondary">
+            Mastery rolled up by area and skill. For a plainer view, see <a href="/progress" className="underline underline-offset-2">Where you stand</a>.
           </p>
         </div>
         <button onClick={handleRecompute} disabled={recomputing} className="btn btn-secondary">
-          {recomputing ? 'Recomputing…' : '↻ Recompute'}
+          {recomputing ? 'Updating…' : 'Update'}
         </button>
       </div>
 

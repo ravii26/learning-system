@@ -45,7 +45,7 @@ interface Goal {
   readinessMet: number;
   readinessTotal: number;
   /** The criteria list itself (lib/goalReadinessRecompute.ts stores it as an array). */
-  readinessBreakdown: Array<{ topicId: string; label: string; met: boolean }> | null;
+  readinessBreakdown: Array<{ topicId: string; label: string; met: boolean; reason?: string }> | null;
 }
 
 interface TimeSummary {
@@ -388,7 +388,9 @@ export default function WhereYouStandPage() {
                   {unmet.length > 0 && (
                     <div className="flex flex-col gap-1 text-[0.9rem] text-fg-secondary">
                       <span className="font-semibold text-fg-muted">Still to prove</span>
-                      {unmet.slice(0, 4).map((c) => <span key={c.topicId}>{c.label}</span>)}
+                      {unmet.slice(0, 4).map((c) => (
+                        <span key={c.topicId}>{c.label}{c.reason && <span className="text-fg-muted"> — {c.reason}</span>}</span>
+                      ))}
                     </div>
                   )}
                 </Link>
