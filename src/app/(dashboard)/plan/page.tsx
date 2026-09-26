@@ -7,9 +7,7 @@ import { useRouter } from 'next/navigation';
 // Subcomponents Import
 import PrioritizationPortal from '../PrioritizationPortal';
 import LearnNowModal from '../LearnNowModal';
-import KnowledgeGraph from '../KnowledgeGraph';
 import RoadmapWizard from '../RoadmapWizard';
-import ErrorBoundary from '@/components/ErrorBoundary';
 import { Icon, KnowledgeStrip } from '@/components/ui';
 import type { Knowledge } from '@/lib/moduleState';
 
@@ -83,7 +81,7 @@ export default function PlanPage() {
   const [selectedArea, setSelectedArea] = useState('All Areas');
 
   // View Mode: 'list' (clean, intuitive default) vs 'board' (full Kanban)
-  const [viewMode, setViewMode] = useState<'list' | 'board' | 'map'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [knowledge, setKnowledge] = useState<Record<string, Knowledge[]>>({});
 
   // Show/hide empty columns toggle
@@ -493,7 +491,7 @@ export default function PlanPage() {
 
       <div className="flex flex-wrap items-center gap-2.5">
         <div role="tablist" aria-label="View" className="flex rounded-xl bg-sunk p-1">
-          {([['list', 'Topics'], ['board', 'Board'], ['map', 'Map']] as const).map(([key, label]) => (
+          {([['list', 'Topics'], ['board', 'Board']] as const).map(([key, label]) => (
             <button
               key={key}
               role="tab"
@@ -665,11 +663,6 @@ export default function PlanPage() {
         </div>
       )}
 
-      {viewMode === 'map' && (
-        <ErrorBoundary fallbackTitle="Unable to load the map">
-          <KnowledgeGraph topics={topics} />
-        </ErrorBoundary>
-      )}
 
       {/* Prioritization swap portal */}
       {showPrioritization && pendingActiveTopic && (
