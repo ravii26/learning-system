@@ -25,13 +25,12 @@ function isValidTransition(from: string, to: string): boolean {
     case 'inbox':
       return to === 'queued';
     case 'queued':
-      return to === 'active';
+      return to === 'inbox'; // "Back to Inbox" — un-committing costs nothing
     case 'active':
       return to === 'paused' || to === 'maintenance';
     case 'paused':
-      return to === 'active';
     case 'maintenance':
-      return to === 'active';
+      return to === 'queued'; // "Move to Next" from the resting/done group
     default:
       // Allow moving exploration items or uncategorized items to reference or queue
       if (to === 'reference' || to === 'queued') return true;

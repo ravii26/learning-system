@@ -71,6 +71,12 @@ export default function PlanPage() {
   const router = useRouter();
   const [topics, setTopics] = useState<Topic[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
+
+  // Bulk selection (list view) and the soft-delete trash
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [trash, setTrash] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Toast
@@ -152,9 +158,74 @@ export default function PlanPage() {
     }
   };
 
+  const fetchTrash = async () => {
+    try {
+      const res = await fetch('/api/topics?deleted=1');
+      if (res.ok) setTrash(await res.json());
+    } catch {
+      // Trash is secondary — a failed load just hides the section.
+    }
+  };
+
   useEffect(() => {
     fetchData();
+    fetchTrash();
   }, []);
+
+  const toggleSelected = (id: string) => {
+    setConfirmingDelete(false);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = (ids: string[]) => {
+    setConfirmingDelete(false);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const allOn = ids.every((id) => next.has(id));
+      ids.forEach((id) => (allOn ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelected(new Set());
+    setConfirmingDelete(false);
+  };
+
+  // One request per topic: the API has no batch endpoint, and a few dozen
+  // parallel calls is fine at single-user scale. Failures are counted, not
+  // thrown, so a partial success still refreshes and reports honestly.
+  const runBulk = async (ids: string[], call: (id: string) => Promise<Response>, verb: string) => {
+    setBulkBusy(true);
+    const results = await Promise.allSettled(ids.map(call));
+    const failed = results.filter((r) => r.status === 'rejected' || !r.value.ok).length;
+    const done = ids.length - failed;
+    setBulkBusy(false);
+    clearSelection();
+    await Promise.all([fetchData(), fetchTrash()]);
+    router.refresh();
+    if (done > 0) showToast(`${verb} ${done} topic${done === 1 ? '' : 's'}`, 'success');
+    if (failed > 0) showToast(`${failed} could not be updated`, 'error');
+  };
+
+  const handleBulkLetGo = () =>
+    runBulk(Array.from(selected), (id) => fetch(`/api/topics/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'dropped' }),
+    }), 'Let go of');
+
+  const handleBulkDelete = () => {
+    if (!confirmingDelete) { setConfirmingDelete(true); return; }
+    runBulk(Array.from(selected), (id) => fetch(`/api/topics/${id}`, { method: 'DELETE' }), 'Moved to Trash:');
+  };
+
+  const handleRestore = (id: string) =>
+    runBulk([id], (tid) => fetch(`/api/topics/${tid}/restore`, { method: 'POST' }), 'Restored');
 
   const handleQuickCapture = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -458,12 +529,21 @@ export default function PlanPage() {
     const nm = nextModuleOf(t);
     return (
       <li className="grid items-center gap-x-5 gap-y-2 border-b border-line py-3.5 last:border-b-0 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]">
+        <div className="flex min-w-0 items-start gap-3">
+          <input
+            type="checkbox"
+            aria-label={`Select ${t.title}`}
+            checked={selected.has(t.id)}
+            onChange={() => toggleSelected(t.id)}
+            className="mt-1.5 h-4 w-4 shrink-0 cursor-pointer accent-[var(--color-accent)]"
+          />
         <div className="flex min-w-0 flex-col">
           <Link href={`/topics/${t.id}`} className="truncate text-[1rem] font-semibold text-fg">{t.title}</Link>
           <span className="truncate text-[0.82rem] text-fg-muted">
             {t.area} · {KIND[t.mode ?? 'syllabus'] ?? 'Topic'}
             {nm ? ` · next: ${nm}` : t.nextAction ? ` · next: ${t.nextAction}` : ''}
           </span>
+        </div>
         </div>
         <div className="min-w-0">
           {states.length > 0 ? <KnowledgeStrip states={states} size="sm" /> : <span className="text-[0.82rem] text-fg-muted">Not started</span>}
@@ -550,7 +630,14 @@ export default function PlanPage() {
           </section>
 
           <section aria-labelledby="next-h" className="flex flex-col gap-2">
-            <h2 id="next-h" className="m-0 text-[1.2rem] font-semibold">Next <span className="font-normal text-fg-muted">{next.length}</span></h2>
+            <div className="flex items-baseline justify-between">
+              <h2 id="next-h" className="m-0 text-[1.2rem] font-semibold">Next <span className="font-normal text-fg-muted">{next.length}</span></h2>
+              {next.length > 1 && (
+                <button type="button" className={ghost} onClick={() => toggleAll(next.map((t) => t.id))}>
+                  {next.every((t) => selected.has(t.id)) ? 'Unselect all' : 'Select all'}
+                </button>
+              )}
+            </div>
             {next.length === 0 ? (
               <p className="m-0 text-[0.95rem] text-fg-muted">Nothing lined up. Move something up from your Inbox.</p>
             ) : (
@@ -568,7 +655,14 @@ export default function PlanPage() {
           </section>
 
           <section aria-labelledby="inbox-h" className="flex flex-col gap-3">
-            <h2 id="inbox-h" className="m-0 text-[1.2rem] font-semibold">Inbox <span className="font-normal text-fg-muted">{inbox.length}</span></h2>
+            <div className="flex items-baseline justify-between">
+              <h2 id="inbox-h" className="m-0 text-[1.2rem] font-semibold">Inbox <span className="font-normal text-fg-muted">{inbox.length}</span></h2>
+              {inbox.length > 1 && (
+                <button type="button" className={ghost} onClick={() => toggleAll(inbox.map((t) => t.id))}>
+                  {inbox.every((t) => selected.has(t.id)) ? 'Unselect all' : 'Select all'}
+                </button>
+              )}
+            </div>
             <form onSubmit={handleQuickCapture} className="flex gap-2">
               <label htmlFor="inbox-add" className="sr-only">Add to Inbox</label>
               <input
@@ -613,6 +707,42 @@ export default function PlanPage() {
               </ul>
             </details>
           )}
+
+          {trash.length > 0 && (
+            <details className="flex flex-col gap-2">
+              <summary className="cursor-pointer text-[1.05rem] font-semibold text-fg-secondary">Trash · {trash.length}</summary>
+              <p className="m-0 mt-2 text-[0.85rem] text-fg-muted">Deleted topics keep their notes and review history. Restore puts one back where it was.</p>
+              <ul className="m-0 mt-2 list-none p-0">
+                {trash.map((t) => (
+                  <li key={t.id} className="flex items-center justify-between gap-4 border-b border-line py-3 last:border-b-0">
+                    <span className="min-w-0 truncate text-[0.95rem] text-fg-secondary">{t.title}</span>
+                    <button type="button" className={ghost} disabled={bulkBusy} onClick={() => handleRestore(t.id)}>Restore</button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+
+      {viewMode === 'list' && selected.size > 0 && (
+        <div
+          role="toolbar"
+          aria-label="Bulk actions"
+          className="glass-panel fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 flex-wrap items-center gap-2 px-4 py-3 shadow-card"
+        >
+          <span className="pr-2 text-[0.9rem] font-semibold text-fg">{selected.size} selected</span>
+          <button type="button" className="btn btn-secondary h-9 py-0 text-[0.85rem]" disabled={bulkBusy} onClick={handleBulkLetGo}>Let go</button>
+          <button
+            type="button"
+            className={`btn h-9 py-0 text-[0.85rem] ${confirmingDelete ? 'btn-danger' : 'btn-secondary'}`}
+            style={confirmingDelete ? { background: 'var(--color-danger)', color: '#fff', borderColor: 'var(--color-danger)' } : undefined}
+            disabled={bulkBusy}
+            onClick={handleBulkDelete}
+          >
+            {bulkBusy ? 'Working…' : confirmingDelete ? `Confirm delete ${selected.size}` : 'Delete'}
+          </button>
+          <button type="button" className={ghost} disabled={bulkBusy} onClick={clearSelection}>Cancel</button>
         </div>
       )}
 
