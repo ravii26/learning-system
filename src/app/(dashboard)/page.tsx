@@ -210,12 +210,12 @@ export default function TodayPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto grid max-w-[1120px] gap-12 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div key="dashboard-loading" className="mx-auto grid max-w-[1120px] gap-12 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex flex-col gap-6">
-          {[96, 280, 96].map((h) => <div key={h} className="skeleton rounded-md" style={{ height: h }} />)}
+          {[96, 280, 96].map((h, i) => <div key={`skel-left-${i}`} className="skeleton rounded-md" style={{ height: h }} />)}
         </div>
         <div className="hidden flex-col gap-6 lg:flex">
-          {[200, 160].map((h) => <div key={h} className="skeleton rounded-md" style={{ height: h }} />)}
+          {[200, 160].map((h, i) => <div key={`skel-right-${i}`} className="skeleton rounded-md" style={{ height: h }} />)}
         </div>
       </div>
     );
@@ -260,7 +260,7 @@ export default function TodayPage() {
   const maxDay = Math.max(1, ...week.map((d) => d.seconds));
 
   return (
-    <div className="mx-auto grid max-w-[1120px] gap-12 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <div key="dashboard-loaded" className="mx-auto grid max-w-[1120px] gap-12 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="flex min-w-0 flex-col gap-7">
         <header className="flex flex-col gap-2">
           <div className="text-[0.9rem] text-fg-muted">
