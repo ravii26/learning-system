@@ -17,6 +17,7 @@ import { useToast } from '@/components/ToastProvider';
 import { useStudyTracker } from '@/lib/useStudyTracker';
 import { formatDuration } from '@/lib/timeSummary';
 import TopicTimeDrawer from './TopicTimeDrawer';
+import PlacementDrawer from './PlacementDrawer';
 
 /** Latest quiz/challenge result per module — from /api/topics/[id]/attempts. */
 export interface ModuleEvidence {
@@ -137,6 +138,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
   const tracker = useStudyTracker({ topicId: params.id, moduleId: activeModuleId, forceActive: timerActive });
   const [timeTotals, setTimeTotals] = useState({ todaySeconds: 0, allTimeSeconds: 0 });
   const [timeDrawerOpen, setTimeDrawerOpen] = useState(false);
+  const [placementOpen, setPlacementOpen] = useState(false);
   const fetchTimeTotals = useCallback(async () => {
     const tz = new Date().getTimezoneOffset();
     const res = await fetch(`/api/time/summary?topicId=${params.id}&days=1&tz=${tz}`).catch(() => null);
@@ -707,9 +709,16 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                 </span>
               </div>
               {curriculum.length > 0 && !editingSyllabus && (
-                <button type="button" onClick={startEditingSyllabus} className="btn btn-secondary px-2.5 py-1 text-[0.72rem]" title="Rename, re-time, reorder or remove modules">
-                  ✎ Edit
-                </button>
+                <span className="flex gap-1.5">
+                  {completedCount > 0 && completedCount < curriculum.length && (
+                    <button type="button" onClick={() => setPlacementOpen(true)} className="btn btn-secondary px-2.5 py-1 text-[0.72rem]" title="Quiz yourself on the modules you haven't finished and skip the ones you already know">
+                      Placement check
+                    </button>
+                  )}
+                  <button type="button" onClick={startEditingSyllabus} className="btn btn-secondary px-2.5 py-1 text-[0.72rem]" title="Rename, re-time, reorder or remove modules">
+                    ✎ Edit
+                  </button>
+                </span>
               )}
               {editingSyllabus && (
                 <span className="flex gap-1.5">
@@ -764,6 +773,16 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                 {draftModules.length === 0 && <p className="text-[0.78rem] text-fg-muted">All modules removed — Save to confirm, or Cancel.</p>}
               </div>
             ) : curriculum.length > 0 ? (
+              <>
+              {completedCount === 0 && curriculum.length >= 2 && (
+                <div className="flex flex-col gap-2 rounded-md border border-line bg-white/[0.03] px-3.5 py-3">
+                  <span className="text-[0.85rem] font-semibold text-fg">Already know some of this?</span>
+                  <span className="text-[0.78rem] text-fg-secondary">A few minutes of questions. Modules you get fully right start as known, so you don’t relearn them.</span>
+                  <button type="button" onClick={() => setPlacementOpen(true)} className="btn btn-secondary self-start px-3 py-1 text-[0.78rem]">
+                    Take the placement check
+                  </button>
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '520px', overflowY: 'auto', paddingRight: '4px' }}>
                 {curriculum.map((mod) => {
                   const isSelected = mod.id === activeModuleId;
@@ -847,6 +866,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                   );
                 })}
               </div>
+              </>
             ) : (
               <div style={{ padding: '24px 12px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
                 <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
@@ -1183,6 +1203,17 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           onClose={() => setShowDebrief(false)}
         />
       )}
+
+      <PlacementDrawer
+        open={placementOpen}
+        onClose={() => setPlacementOpen(false)}
+        topicId={params.id}
+        openModuleCount={curriculum.filter((m) => !m.completed).length}
+        onApplied={() => {
+          fetchTopic();
+          fetchEvidence();
+        }}
+      />
 
       <TopicTimeDrawer
         open={timeDrawerOpen}

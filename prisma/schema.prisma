@@ -83,6 +83,7 @@ model User {
   moduleAttempts   ModuleAttempt[]
   studyTime        StudyTimeEntry[]
   problemAttempts  ProblemAttempt[]
+  placementChecks  PlacementCheck[]
 }
 
 model Topic {
@@ -161,6 +162,7 @@ model Topic {
   moduleAttempts  ModuleAttempt[]
   studyTime       StudyTimeEntry[]
   problemAttempts ProblemAttempt[]
+  placementChecks PlacementCheck[]
 }
 
 /// Evidence from the Study Room: one row per checked quiz or graded
@@ -862,4 +864,23 @@ model ProblemAttempt {
 
   @@index([userId, topicId, attemptedAt])
   @@index([userId, topicId, moduleId])
+}
+
+// A placement quiz across a syllabus (lib/placement.ts). Kept server-side
+// so the correct answers never reach the browser before you submit.
+model PlacementCheck {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  questions   Json // PlacementQuestion[]
+  answers     Json? // { [questionIndex]: optionIndex }
+  results     Json? // ModulePlacementResult[]
+  submittedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, topicId, createdAt])
 }

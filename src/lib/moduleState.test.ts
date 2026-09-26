@@ -105,3 +105,23 @@ describe('countKnowledge', () => {
     expect(countKnowledge(['solid', 'solid', 'fading', 'unseen'])).toEqual({ unseen: 1, learning: 0, solid: 2, fading: 1 });
   });
 });
+
+describe('placement', () => {
+  const seeded: CardEvidence = { state: 'Review', reps: 1, stability: 7, lastReview: daysAgo(0) };
+
+  it('a placed-out module is solid and says so honestly', () => {
+    const r = moduleKnowledge({ completed: true, latestQuiz: { score: 1, placement: true }, cards: [seeded, seeded] }, NOW);
+    expect(r.state).toBe('solid');
+    expect(r.reason).toMatch(/placement check/);
+  });
+
+  it('after a real review it reads like any other solid module', () => {
+    const r = moduleKnowledge({ completed: true, latestQuiz: { score: 1, placement: true }, cards: [{ ...seeded, reps: 2 }, { ...seeded, reps: 2 }] }, NOW);
+    expect(r.reason).toMatch(/spaced intervals/);
+  });
+
+  it('fades if the confirming review is skipped for weeks', () => {
+    const skipped: CardEvidence = { ...seeded, lastReview: daysAgo(20) };
+    expect(moduleKnowledge({ completed: true, latestQuiz: { score: 1, placement: true }, cards: [skipped, skipped] }, NOW).state).toBe('fading');
+  });
+});

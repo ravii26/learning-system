@@ -36,7 +36,8 @@ export interface CardEvidence {
 export interface ModuleEvidenceInput {
   completed: boolean;
   studySeconds?: number;
-  latestQuiz?: { score: number | null } | null;
+  /** `placement`: the pass came from the placement check, not from studying the module. */
+  latestQuiz?: { score: number | null; placement?: boolean } | null;
   latestChallenge?: { verdict: string | null } | null;
   cards: CardEvidence[];
 }
@@ -117,6 +118,11 @@ export function moduleKnowledge(input: ModuleEvidenceInput, now: Date = new Date
   }
 
   if (retained.length / cards.length >= RETAINED_SHARE) {
+    // Placement seeds cards as recalled once; until a real review happens,
+    // say what the evidence actually is.
+    if (input.latestQuiz?.placement && cards.every((c) => c.reps <= 1)) {
+      return { state: 'solid', reason: 'Placed out by the placement check — a review soon confirms it' };
+    }
     return { state: 'solid', reason: passedCheck ? 'Passed the check and recalled it at spaced intervals' : 'Recalled at spaced intervals' };
   }
 

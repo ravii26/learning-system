@@ -34,7 +34,7 @@ export interface TopicKnowledge {
 export interface KnowledgeRows {
   topics: Array<{ id: string; mode: string }>;
   modules: Array<{ topicId: string; legacyId: string; title: string; order: number; completed: boolean }>;
-  attempts: Array<{ topicId: string; moduleId: string; kind: string; score: number | null; verdict: string | null; createdAt: Date }>;
+  attempts: Array<{ topicId: string; moduleId: string; kind: string; score: number | null; verdict: string | null; createdAt: Date; details?: unknown }>;
   cards: Array<CardEvidence & { id: string; topicId: string; title: string; sourceModuleId: string | null }>;
   time: Array<{ topicId: string; moduleId: string | null; seconds: number }>;
 }
@@ -42,10 +42,11 @@ export interface KnowledgeRows {
 export function assembleTopicKnowledge(rows: KnowledgeRows, now: Date = new Date()): Map<string, TopicKnowledge> {
   // Newest attempt first, so the first one seen per (module, kind) is the latest.
   const attempts = [...rows.attempts].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  const latest = new Map<string, { score: number | null; verdict: string | null }>();
+  const latest = new Map<string, { score: number | null; verdict: string | null; placement: boolean }>();
   for (const a of attempts) {
     const key = `${a.topicId}|${a.moduleId}|${a.kind}`;
-    if (!latest.has(key)) latest.set(key, { score: a.score, verdict: a.verdict });
+    const placement = !!a.details && typeof a.details === 'object' && (a.details as { source?: unknown }).source === 'placement';
+    if (!latest.has(key)) latest.set(key, { score: a.score, verdict: a.verdict, placement });
   }
 
   const seconds = new Map<string, number>();
@@ -105,7 +106,7 @@ export async function loadTopicKnowledge(userId: string, topicIds: string[], now
     }),
     db.moduleAttempt.findMany({
       where,
-      select: { topicId: true, moduleId: true, kind: true, score: true, verdict: true, createdAt: true },
+      select: { topicId: true, moduleId: true, kind: true, score: true, verdict: true, createdAt: true, details: true },
     }),
     // Concepts still at 'Unknown' are map entries, not review cards.
     db.concept.findMany({

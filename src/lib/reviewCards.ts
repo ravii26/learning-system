@@ -12,7 +12,7 @@ export interface ReviewCardDraft {
   title: string; // short label shown in lists
   prompt: string; // the question you answer from memory
   answer: string; // what you check yourself against
-  sourceKind: 'lesson_card' | 'quiz' | 'takeaway' | 'quiz_miss' | 'problem';
+  sourceKind: 'lesson_card' | 'quiz' | 'takeaway' | 'quiz_miss' | 'problem' | 'placement';
 }
 
 interface QuizQuestion {

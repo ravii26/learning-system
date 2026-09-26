@@ -19,7 +19,16 @@ export async function addReviewCards(
   topicId: string,
   moduleId: string | null,
   drafts: ReviewCardDraft[],
-  { dueInDays = 1, now = new Date() }: { dueInDays?: number; now?: Date } = {}
+  {
+    dueInDays = 1,
+    now = new Date(),
+    asKnown,
+  }: {
+    dueInDays?: number;
+    now?: Date;
+    /** Seed as already recalled once (placement check): shows as known now, due after `stabilityDays`. */
+    asKnown?: { stabilityDays: number };
+  } = {}
 ): Promise<{ added: number; skipped: number }> {
   if (drafts.length === 0) return { added: 0, skipped: 0 };
 
@@ -40,9 +49,22 @@ export async function addReviewCards(
         answer: d.answer,
         sourceModuleId: moduleId,
         sourceKind: d.sourceKind,
-        masteryLevel: 'Exposed', // the due-queue skips Unknown; you've just studied it
-        state: 'New',
-        nextReview: new Date(now.getTime() + dueInDays * DAY_MS),
+        ...(asKnown
+          ? {
+              masteryLevel: 'CanRecall' as const,
+              state: 'Review' as const,
+              reps: 1,
+              stability: asKnown.stabilityDays,
+              difficulty: 5,
+              lastReview: now,
+              scheduledDays: asKnown.stabilityDays,
+              nextReview: new Date(now.getTime() + asKnown.stabilityDays * DAY_MS),
+            }
+          : {
+              masteryLevel: 'Exposed' as const, // the due-queue skips Unknown; you've just studied it
+              state: 'New' as const,
+              nextReview: new Date(now.getTime() + dueInDays * DAY_MS),
+            }),
       },
     });
     added++;
