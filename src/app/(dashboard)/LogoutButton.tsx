@@ -9,6 +9,14 @@ export default function LogoutButton() {
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [account, setAccount] = useState<{ email: string | null; name: string | null } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/auth')
+      .then((r) => r.json())
+      .then((d) => setAccount(d.user ?? null))
+      .catch(() => {});
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -57,8 +65,8 @@ export default function LogoutButton() {
             borderBottom: '1px solid var(--border-color)',
             marginBottom: '4px',
           }}>
-            <p style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>Learning OS</p>
-            <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>Your personal workspace</p>
+            <p style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>{account?.name || 'Learning OS'}</p>
+            <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>{account?.email || 'Owner workspace — set up email login from the sign-in page'}</p>
           </div>
           <button
             className="avatar-dropdown-item danger"

@@ -57,6 +57,10 @@ enum CaptureStatus {
 model User {
   id        String   @id @default(uuid())
   email     String?  @unique
+  // scrypt hash (see src/lib/password.ts); null for the legacy seed user
+  // until it's claimed, and later for Google-only accounts.
+  passwordHash String?
+  name      String?
   createdAt DateTime @default(now())
 
   topics         Topic[]
