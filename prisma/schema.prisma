@@ -609,6 +609,10 @@ model CaptureItem {
   resultConceptId String?
   resultTopicId   String?
 
+  // Where the app suggests this capture should go (lib/captureSuggest.ts).
+  // Computed once and stored, so opening the inbox doesn't re-call the AI.
+  suggestion Json?
+
   createdAt DateTime @default(now())
 
   notes Note[]

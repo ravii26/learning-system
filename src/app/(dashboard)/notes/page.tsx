@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useToast } from '@/components/ToastProvider';
 import { createCapture } from '@/lib/captureClient';
 import { computeAccretionStats } from '@/lib/accretionStats';
-import { Card, StatPill, Sparkline, Tabs } from '@/components/ui';
+import { Button, Card, StatPill, Sparkline, Tabs } from '@/components/ui';
+import { suggestionLabel, type CaptureSuggestion } from '@/lib/captureSuggest';
 
 /**
  * The accretion-mode home: capture anything in 3 seconds, process the
@@ -51,6 +52,9 @@ export default function NotesPage() {
 
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [conceptTopicChoice, setConceptTopicChoice] = useState<Record<string, string>>({});
+  const [suggestions, setSuggestions] = useState<Record<string, CaptureSuggestion>>({});
+  const [suggesting, setSuggesting] = useState(false);
+  const [showOptions, setShowOptions] = useState<Record<string, boolean>>({});
 
   const stats = useMemo(() => computeAccretionStats(notes), [notes]);
 
@@ -86,6 +90,25 @@ export default function NotesPage() {
     fetchData();
   }, [fetchData]);
 
+  // A suggested home for each capture. Stored server-side, so this is only
+  // slow the first time a capture is seen.
+  const inboxKey = captures.map((c) => c.id).join(',');
+  useEffect(() => {
+    if (!inboxKey) return;
+    let cancelled = false;
+    setSuggesting(true);
+    fetch('/api/captures/suggest', { method: 'POST' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.suggestions) setSuggestions(data.suggestions);
+      })
+      .catch(() => {})
+      .finally(() => !cancelled && setSuggesting(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [inboxKey]);
+
   const handleCapture = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = captureText.trim();
@@ -108,20 +131,33 @@ export default function NotesPage() {
     }
   };
 
-  const handleProcess = async (captureId: string, action: 'note' | 'concept' | 'topic' | 'archive') => {
+  const handleProcess = async (
+    captureId: string,
+    action: 'note' | 'concept' | 'question' | 'topic' | 'archive',
+    fromSuggestion?: CaptureSuggestion
+  ) => {
     if (action === 'concept' && !conceptTopicChoice[captureId]) {
       toast.warning('Pick a topic to attach this concept to first');
       return;
     }
     setProcessingId(captureId);
     try {
+      const payload = fromSuggestion
+        ? { action, topicId: fromSuggestion.topicId ?? undefined, title: fromSuggestion.title, area: fromSuggestion.area ?? undefined }
+        : { action, topicId: conceptTopicChoice[captureId] };
       const res = await fetch(`/api/captures/${captureId}/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, topicId: conceptTopicChoice[captureId] }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
-        toast.success(action === 'archive' ? 'Archived' : `Turned into a ${action}`);
+        toast.success(
+          action === 'archive'
+            ? 'Archived'
+            : fromSuggestion
+              ? `Done: ${suggestionLabel(fromSuggestion)}`
+              : `Turned into a ${action}`
+        );
         await fetchData();
       } else {
         const data = await res.json().catch(() => ({}));
@@ -233,6 +269,30 @@ export default function NotesPage() {
                   {c.rawText && c.title && <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{c.rawText}</div>}
                   <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{new Date(c.createdAt).toLocaleDateString()}</span>
                 </div>
+                {suggestions[c.id] ? (
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={processingId === c.id}
+                      onClick={() => handleProcess(c.id, suggestions[c.id].action, suggestions[c.id])}
+                    >
+                      ✓ {suggestionLabel(suggestions[c.id])}
+                    </Button>
+                    <span className="flex-1 text-[0.75rem] text-fg-muted">{suggestions[c.id].reason}</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowOptions((p) => ({ ...p, [c.id]: !p[c.id] }))}
+                      aria-expanded={!!showOptions[c.id]}
+                      className="min-h-[32px] bg-transparent px-2 text-[0.75rem] font-medium text-fg-secondary"
+                    >
+                      {showOptions[c.id] ? 'Hide options' : 'Somewhere else'}
+                    </button>
+                  </div>
+                ) : (
+                  suggesting && <span className="text-[0.72rem] text-fg-muted">Finding a home…</span>
+                )}
+                {(!suggestions[c.id] || showOptions[c.id]) && (
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <button onClick={() => handleProcess(c.id, 'note')} disabled={processingId === c.id} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.72rem' }}>→ Note</button>
                   <select
@@ -248,6 +308,7 @@ export default function NotesPage() {
                   <button onClick={() => handleProcess(c.id, 'topic')} disabled={processingId === c.id} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.72rem' }}>→ Topic</button>
                   <button onClick={() => handleProcess(c.id, 'archive')} disabled={processingId === c.id} style={{ padding: '4px 10px', fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>Archive</button>
                 </div>
+                )}
               </div>
             ))
           )}

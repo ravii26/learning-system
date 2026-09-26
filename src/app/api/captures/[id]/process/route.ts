@@ -3,10 +3,13 @@ import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { ensureAreaSkillId } from '@/lib/areaSkill';
 import { syncTopicListsAndMirror } from '@/lib/topicListSync';
+import { mirrorConfusionsToJson } from '@/lib/confusionSync';
+import { randomUUID } from 'crypto';
 
 /**
  * The weekly triage ritual, one capture at a time: turn it into a Note, a
- * Concept (attached to an existing topic), a Topic, or archive it. See the
+ * Concept (attached to an existing topic), an open question on a topic, a
+ * Topic, or archive it. See the
  * project plan's Example C — this is the only place a CaptureItem's fate
  * gets decided; POST /api/captures never does.
  */
@@ -25,7 +28,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
 
     const body = await request.json();
-    const { action } = body as { action?: 'note' | 'concept' | 'topic' | 'archive' };
+    const { action } = body as { action?: 'note' | 'concept' | 'question' | 'topic' | 'archive' };
 
     const defaultTitle = capture.title || capture.rawText?.slice(0, 80) || 'Untitled';
 
@@ -74,6 +77,33 @@ export async function POST(request: Request, { params }: { params: { id: string 
         data: { status: 'processed', processedAt: new Date(), resultConceptId: concept.id },
       });
       return NextResponse.json({ capture: updated, concept });
+    }
+
+    if (action === 'question') {
+      // An open question on the topic (a Confusion row). Lesson generation
+      // reads a topic's unresolved questions, so the next lesson on it
+      // addresses this one.
+      const { topicId } = body as { topicId?: string };
+      if (!topicId) {
+        return NextResponse.json({ error: 'topicId is required for a question' }, { status: 400 });
+      }
+      const topic = await db.topic.findFirst({ where: { id: topicId, userId, deletedAt: null }, select: { id: true } });
+      if (!topic) {
+        return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
+      }
+      const text = (capture.rawText || capture.title || defaultTitle).trim();
+      const { confusion, updated } = await db.$transaction(async (tx) => {
+        // legacyId set up front: the topic page syncs confusions by it, and
+        // a row without one would be re-created as a duplicate on its next save.
+        const confusion = await tx.confusion.create({ data: { userId, topicId, text, legacyId: randomUUID().slice(0, 8) } });
+        await tx.topic.update({ where: { id: topicId }, data: { confusions: (await mirrorConfusionsToJson(tx, topicId)) as object[] } });
+        const captureRow = await tx.captureItem.update({
+          where: { id: capture.id },
+          data: { status: 'processed', processedAt: new Date(), resultTopicId: topicId },
+        });
+        return { confusion, updated: captureRow };
+      });
+      return NextResponse.json({ capture: updated, confusion });
     }
 
     if (action === 'topic') {
