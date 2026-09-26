@@ -12,7 +12,7 @@ import { Icon, type IconName } from '@/components/ui/Icon';
  */
 const LINKS: Array<{ name: string; href: string; icon: IconName; match: string[] }> = [
   { name: 'Today', href: '/', icon: 'today', match: ['/'] },
-  { name: 'Learn', href: '/plan', icon: 'learn', match: ['/plan', '/topics', '/goals', '/explore', '/practice'] },
+  { name: 'Learn', href: '/plan', icon: 'learn', match: ['/plan', '/learn', '/topics', '/goals', '/explore', '/practice'] },
   { name: 'Review', href: '/review', icon: 'review', match: ['/review'] },
   { name: 'Notebook', href: '/notes', icon: 'notebook', match: ['/notes'] },
   { name: 'You', href: '/progress', icon: 'you', match: ['/progress', '/skills'] },

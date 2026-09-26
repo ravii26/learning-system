@@ -77,7 +77,7 @@ export default async function DashboardLayout({
               )}
 
               <Link
-                href="/?new=1"
+                href="/learn/new"
                 className="flex h-11 items-center gap-2.5 rounded-[10px] border border-dashed border-line-strong px-3 text-[0.875rem] font-medium text-fg-secondary no-underline hover:border-fg hover:text-fg hover:no-underline"
               >
                 <Icon name="plus" size={16} />

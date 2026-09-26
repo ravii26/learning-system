@@ -7,10 +7,11 @@ import { useRouter } from 'next/navigation';
 // Subcomponents Import
 import PrioritizationPortal from '../PrioritizationPortal';
 import LearnNowModal from '../LearnNowModal';
-import SpacedReviewQueue from '../SpacedReviewQueue';
 import KnowledgeGraph from '../KnowledgeGraph';
 import RoadmapWizard from '../RoadmapWizard';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { Icon, KnowledgeStrip } from '@/components/ui';
+import type { Knowledge } from '@/lib/moduleState';
 
 interface Topic {
   id: string;
@@ -28,6 +29,8 @@ interface Topic {
   activeSlotType: string | null;
   knowledgeMap?: any;
   mistakes?: any[];
+  mode?: string;
+  curriculum?: Array<{ order: number; title: string; completed: boolean }> | null;
 }
 
 interface Stats {
@@ -80,7 +83,8 @@ export default function PlanPage() {
   const [selectedArea, setSelectedArea] = useState('All Areas');
 
   // View Mode: 'list' (clean, intuitive default) vs 'board' (full Kanban)
-  const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'board' | 'map'>('list');
+  const [knowledge, setKnowledge] = useState<Record<string, Knowledge[]>>({});
 
   // Show/hide empty columns toggle
   const [showEmptyColumns, setShowEmptyColumns] = useState(false);
@@ -124,11 +128,16 @@ export default function PlanPage() {
 
   const fetchData = async () => {
     try {
-      const [topicsRes, statsRes, spacedRes] = await Promise.all([
+      const [topicsRes, statsRes, spacedRes, progressRes] = await Promise.all([
         fetch('/api/topics'),
         fetch('/api/stats'),
-        fetch('/api/review/spaced')
+        fetch('/api/review/spaced'),
+        fetch('/api/progress'),
       ]);
+      if (progressRes.ok) {
+        const p = await progressRes.json();
+        setKnowledge(Object.fromEntries(p.topics.filter((t: any) => t.knowledge).map((t: any) => [t.id, t.knowledge.states])));
+      }
 
       if (topicsRes.ok && statsRes.ok && spacedRes.ok) {
         const topicsData = await topicsRes.json();
@@ -426,596 +435,241 @@ export default function PlanPage() {
     s => !alwaysShowStatuses.has(s) && !filteredTopics.some(t => t.status === s)
   ).length;
 
+  const STATUS_WORD: Record<string, string> = {
+    active: 'Now',
+    queued: 'Next',
+    inbox: 'Inbox',
+    paused: 'Resting',
+    maintenance: 'Keeping fresh',
+    reference: 'Reference',
+    dropped: 'Let go',
+  };
+  const KIND: Record<string, string> = { syllabus: 'Course', accretion: 'Ideas you collect', practice: 'Daily practice', reference: 'Reference' };
+  const nextModuleOf = (t: Topic) =>
+    [...(t.curriculum ?? [])].sort((a, b) => a.order - b.order).find((m) => !m.completed)?.title ?? null;
+  const daysAgo = (d: string) => Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
+  const byStatus = (s: string) => filteredTopics.filter((t) => t.status === s);
+  const now = byStatus('active');
+  const next = byStatus('queued');
+  const inbox = byStatus('inbox');
+  const others = filteredTopics.filter((t) => ['paused', 'maintenance', 'reference', 'dropped'].includes(t.status));
+  const ghost = 'h-9 rounded-lg px-3 text-[0.85rem] font-medium text-fg-secondary hover:bg-fill-2 hover:text-fg';
+
+  const Row = ({ t, actions }: { t: Topic; actions: React.ReactNode }) => {
+    const states = knowledge[t.id] ?? [];
+    const nm = nextModuleOf(t);
+    return (
+      <li className="grid items-center gap-x-5 gap-y-2 border-b border-line py-3.5 last:border-b-0 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]">
+        <div className="flex min-w-0 flex-col">
+          <Link href={`/topics/${t.id}`} className="truncate text-[1rem] font-semibold text-fg">{t.title}</Link>
+          <span className="truncate text-[0.82rem] text-fg-muted">
+            {t.area} · {KIND[t.mode ?? 'syllabus'] ?? 'Topic'}
+            {nm ? ` · next: ${nm}` : t.nextAction ? ` · next: ${t.nextAction}` : ''}
+          </span>
+        </div>
+        <div className="min-w-0">
+          {states.length > 0 ? <KnowledgeStrip states={states} size="sm" /> : <span className="text-[0.82rem] text-fg-muted">Not started</span>}
+        </div>
+        <div className="flex flex-wrap justify-end gap-1">{actions}</div>
+      </li>
+    );
+  };
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '7fr 3fr', gap: '32px', alignItems: 'start' }}>
-
-      {/* LEFT BOARD VIEW */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-        {/* Header Board Controls */}
-        <div className="flex-between">
-          <div>
-            <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Learn</h1>
-            <p className="m-0 mt-1.5 text-[1.05rem] text-fg-secondary">
-              Everything you’re learning. Two topics in Now, the rest waiting in Next or Inbox.
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            {/* View Mode Toggle: List vs Board */}
-            <div style={{ display: 'inline-flex', padding: '3px', background: 'var(--fill-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-              <button
-                type="button"
-                onClick={() => setViewMode('list')}
-                style={{
-                  padding: '5px 12px',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  borderRadius: '4px',
-                  background: viewMode === 'list' ? 'var(--bg-surface)' : 'transparent',
-                  color: viewMode === 'list' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                List
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('board')}
-                style={{
-                  padding: '5px 12px',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  borderRadius: '4px',
-                  background: viewMode === 'board' ? 'var(--bg-surface)' : 'transparent',
-                  color: viewMode === 'board' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                Board
-              </button>
-            </div>
-
-            <button
-              onClick={() => setShowRoadmapWizard(true)}
-              className="btn btn-secondary"
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid var(--fill-4)', color: 'var(--color-primary-light)' }}
-            >
-              Roadmap from a goal
-            </button>
-            <button
-              onClick={() => setShowLearnNow(true)}
-              className="btn btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--ink)', color: 'var(--on-ink)' }}
-            >
-              Pick for me
-            </button>
-          </div>
+    <div className="mx-auto flex max-w-[1120px] flex-col gap-9">
+      <header className="flex flex-wrap items-end justify-between gap-5">
+        <div className="flex flex-col gap-2">
+          <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Learn</h1>
+          <p className="m-0 text-[1.05rem] text-fg-secondary">Two topics in Now. Everything else waits in Next or your Inbox.</p>
         </div>
-
-        {/* Today's Sessions Strip */}
-        {(() => {
-          const todayStr = new Date().toDateString();
-          const todayLogs: Array<{ topicTitle: string; activityType: string; durationMinutes: number }> = [];
-          topics.forEach((t: any) => {
-            if (Array.isArray(t.sessionLogs)) {
-              t.sessionLogs.forEach((log: any) => {
-                if (new Date(log.timestamp).toDateString() === todayStr) {
-                  todayLogs.push({
-                    topicTitle: t.title,
-                    activityType: log.activityType,
-                    durationMinutes: log.durationMinutes,
-                  });
-                }
-              });
-            }
-          });
-
-          if (todayLogs.length === 0) return null;
-
-          const totalTodayMins = todayLogs.reduce((s, l) => s + l.durationMinutes, 0);
-
-          return (
-            <div className="glass-panel" style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-success)' }}>
-                Today: {todayLogs.length} session{todayLogs.length > 1 ? 's' : ''} ({totalTodayMins}m)
-              </span>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {todayLogs.map((l, idx) => (
-                  <span
-                    key={idx}
-                    style={{
-                      fontSize: '0.7rem',
-                      padding: '3px 8px',
-                      borderRadius: '9999px',
-                      background: 'var(--fill-2)',
-                      border: '1px solid var(--border-color)',
-                      color: 'var(--color-text-secondary)',
-                    }}
-                  >
-                    {l.topicTitle} · {l.durationMinutes}m
-                  </span>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Quick Capture Input Form */}
-        <form onSubmit={handleQuickCapture} className="glass-panel" style={{ padding: '16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <input
-            type="text"
-            className="form-input"
-            placeholder="Add something to your Inbox — e.g. how caches fail, the history of cinema"
-            value={newInboxTitle}
-            onChange={(e) => setNewInboxTitle(e.target.value)}
-            disabled={capturing}
-            style={{ fontSize: '0.9rem', padding: '10px 14px' }}
-          />
-          <button type="submit" disabled={capturing} className="btn btn-secondary" style={{ whiteSpace: 'nowrap' }}>
-            {capturing ? 'Capturing...' : '➕ Quick Capture'}
-          </button>
-        </form>
-        {captureError && <p style={{ color: 'var(--color-danger)', fontSize: '0.8rem' }}>{captureError}</p>}
-
-        {/* Search & Area Filter */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
-          <input
-            type="text"
-            className="form-input"
-            placeholder="Search topics..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ fontSize: '0.85rem', padding: '8px 12px' }}
-          />
-
-          <select
-            className="form-input"
-            value={selectedArea}
-            onChange={(e) => setSelectedArea(e.target.value)}
-            style={{ fontSize: '0.85rem', padding: '8px 12px', background: 'var(--bg-surface)' }}
-          >
-            {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setShowLearnNow(true)} className="btn btn-secondary h-11 py-0">Pick for me</button>
+          <button type="button" onClick={() => setShowRoadmapWizard(true)} className="btn btn-secondary h-11 py-0">Roadmap from a goal</button>
+          <Link href="/learn/new" className="btn btn-primary h-11 py-0 no-underline hover:no-underline">
+            <Icon name="plus" size={16} /> Learn something new
+          </Link>
         </div>
+      </header>
 
-        {viewMode === 'list' ? (
-          /* GROUPED LIST VIEW */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* Active Topics */}
-            <div className="glass-panel" style={{ padding: '20px' }}>
-              <div className="flex-between" style={{ marginBottom: '14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Now</h2>
-                  <span style={{ fontSize: '0.72rem', background: 'var(--fill-3)', color: 'var(--color-primary-light)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
-                    {filteredTopics.filter(t => t.status === 'active').length}/2 active
-                  </span>
-                </div>
-              </div>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div role="tablist" aria-label="View" className="flex rounded-xl bg-sunk p-1">
+          {([['list', 'Topics'], ['board', 'Board'], ['map', 'Map']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={viewMode === key}
+              onClick={() => setViewMode(key)}
+              className={`h-9 rounded-[9px] px-4 text-[0.875rem] ${viewMode === key ? 'bg-surface font-semibold text-fg shadow-card' : 'font-medium text-fg-secondary hover:text-fg'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className="flex-1" />
+        <label htmlFor="learn-search" className="sr-only">Search topics</label>
+        <input id="learn-search" className="form-input h-10 w-[220px] py-0 text-[0.9rem]" placeholder="Search topics" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <label htmlFor="learn-area" className="sr-only">Area</label>
+        <select id="learn-area" className="form-input h-10 w-auto py-0 text-[0.9rem]" value={selectedArea} onChange={(e) => setSelectedArea(e.target.value)}>
+          {AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+      </div>
 
-              {filteredTopics.filter(t => t.status === 'active').length === 0 ? (
-                <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', margin: 0 }}>
-                  No active topics. Pick one from Queued below or capture a new topic above.
-                </p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {filteredTopics.filter(t => t.status === 'active').map(t => (
-                    <div
-                      key={t.id}
-                      className="glass-card"
-                      style={{
-                        padding: '14px 18px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '16px',
-                        flexWrap: 'wrap',
-                        background: 'var(--fill-1)',
-                      }}
-                    >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '220px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <Link href={`/topics/${t.id}`} style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                            {t.title}
-                          </Link>
-                          <span className={`badge badge-${t.area.toLowerCase()}`} style={{ fontSize: '0.65rem' }}>{t.area}</span>
-                          {t.depthTarget && (
-                            <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', background: 'var(--fill-2)', padding: '2px 6px', borderRadius: '4px' }}>
-                              {t.depthTarget}
-                            </span>
-                          )}
-                        </div>
-                        {t.nextAction && (
-                          <div style={{ fontSize: '0.82rem', color: 'var(--color-primary-light)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span>→</span> <span>{t.nextAction}</span>
-                          </div>
-                        )}
-                        {t.why && (
-                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                            Why: {t.why}
-                          </div>
-                        )}
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        {t.progressPct > 0 && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
-                            <div style={{ width: '48px', height: '5px', background: 'var(--fill-3)', borderRadius: '3px', overflow: 'hidden' }}>
-                              <div style={{ width: `${t.progressPct}%`, height: '100%', background: 'var(--color-primary)' }} />
-                            </div>
-                            <span>{t.progressPct}%</span>
-                          </div>
-                        )}
-                        <Link href={`/topics/${t.id}`} className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '0.8rem' }}>
-                          Study ▸
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+      {viewMode === 'list' && (
+        <div className="flex flex-col gap-10">
+          <section aria-labelledby="now-h" className="flex flex-col gap-4">
+            <div className="flex items-baseline justify-between">
+              <h2 id="now-h" className="m-0 text-[1.2rem] font-semibold">Now <span className="font-normal text-fg-muted">{now.length} of 2</span></h2>
+              {stats && stats.staleActiveCount > 0 && <span className="text-[0.85rem] text-k-fading-text">{stats.staleActiveCount} untouched for a week+</span>}
             </div>
-
-            {/* Queued Topics */}
-            <div className="glass-panel" style={{ padding: '20px' }}>
-              <div className="flex-between" style={{ marginBottom: '14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Next</h2>
-                  <span style={{ fontSize: '0.72rem', background: 'var(--fill-3)', color: 'var(--color-text-secondary)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
-                    {filteredTopics.filter(t => t.status === 'queued').length}
-                  </span>
-                </div>
-              </div>
-
-              {filteredTopics.filter(t => t.status === 'queued').length === 0 ? (
-                <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>
-                  No topics queued. Ready-to-study topics appear here.
-                </p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {filteredTopics.filter(t => t.status === 'queued').map(t => (
-                    <div
-                      key={t.id}
-                      className="glass-card"
-                      style={{
-                        padding: '12px 16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, minWidth: '200px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Link href={`/topics/${t.id}`} style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                            {t.title}
-                          </Link>
-                          <span className={`badge badge-${t.area.toLowerCase()}`} style={{ fontSize: '0.62rem' }}>{t.area}</span>
-                        </div>
-                        {t.why && (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{t.why}</span>
-                        )}
+            {now.length === 0 ? (
+              <p className="m-0 rounded-xl bg-sunk px-5 py-4 text-[0.95rem] text-fg-secondary">Nothing in Now. Start something from Next below, or learn something new.</p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {now.map((t) => {
+                  const states = knowledge[t.id] ?? [];
+                  const nm = nextModuleOf(t);
+                  const idle = daysAgo(t.lastTouchedDate);
+                  return (
+                    <div key={t.id} className="glass-panel flex flex-col gap-4 p-6">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[0.82rem] text-fg-muted">
+                          {t.area} · {KIND[t.mode ?? 'syllabus'] ?? 'Topic'} · {idle === 0 ? 'touched today' : `${idle} day${idle === 1 ? '' : 's'} ago`}
+                        </span>
+                        <Link href={`/topics/${t.id}`} className="font-serif text-[1.6rem] font-medium leading-tight text-fg">{t.title}</Link>
                       </div>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleTransition(t, 'active')}
-                          className="btn btn-secondary"
-                          style={{ padding: '5px 12px', fontSize: '0.75rem', color: 'var(--color-primary-light)' }}
-                        >
-                          Start
-                        </button>
-                        <Link href={`/topics/${t.id}`} className="btn btn-secondary" style={{ padding: '5px 10px', fontSize: '0.75rem' }}>
-                          View
-                        </Link>
+                      {states.length > 0 && <KnowledgeStrip states={states} showSummary />}
+                      <span className="text-[0.95rem] text-fg-secondary">Next: {nm ?? t.nextAction ?? 'set a next step'}</span>
+                      <div className="flex gap-2">
+                        <Link href={`/topics/${t.id}`} className="btn btn-primary h-10 py-0 no-underline hover:no-underline">Continue</Link>
+                        <button type="button" className={ghost} onClick={() => handleTransition(t, 'paused')}>Rest it</button>
+                        <button type="button" className={ghost} onClick={() => handleTransition(t, 'maintenance')}>Done — keep fresh</button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Inbox Topics */}
-            {filteredTopics.filter(t => t.status === 'inbox').length > 0 && (
-              <div className="glass-panel" style={{ padding: '20px' }}>
-                <div className="flex-between" style={{ marginBottom: '14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Inbox</h2>
-                    <span style={{ fontSize: '0.72rem', background: 'var(--fill-3)', color: 'var(--color-text-secondary)', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
-                      {filteredTopics.filter(t => t.status === 'inbox').length}
-                    </span>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {filteredTopics.filter(t => t.status === 'inbox').map(t => (
-                    <div
-                      key={t.id}
-                      className="glass-card"
-                      style={{
-                        padding: '10px 14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Link href={`/topics/${t.id}`} style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                          {t.title}
-                        </Link>
-                        <span className={`badge badge-${t.area.toLowerCase()}`} style={{ fontSize: '0.6rem' }}>{t.area}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleTransition(t, 'queued')}
-                          className="btn btn-secondary"
-                          style={{ padding: '4px 8px', fontSize: '0.72rem' }}
-                        >
-                          Move to Next
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleTransition(t, 'active')}
-                          className="btn btn-secondary"
-                          style={{ padding: '4px 8px', fontSize: '0.72rem', color: 'var(--color-primary-light)' }}
-                        >
-                          Start
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             )}
+          </section>
 
-            {/* Other Topics (Collapsed by default) */}
-            {(() => {
-              const otherTopics = filteredTopics.filter(t => !['active', 'queued', 'inbox'].includes(t.status));
-              if (otherTopics.length === 0) return null;
+          <section aria-labelledby="next-h" className="flex flex-col gap-2">
+            <h2 id="next-h" className="m-0 text-[1.2rem] font-semibold">Next <span className="font-normal text-fg-muted">{next.length}</span></h2>
+            {next.length === 0 ? (
+              <p className="m-0 text-[0.95rem] text-fg-muted">Nothing lined up. Move something up from your Inbox.</p>
+            ) : (
+              <ul className="m-0 list-none p-0">
+                {next.map((t) => (
+                  <Row key={t.id} t={t} actions={
+                    <>
+                      <button type="button" className="btn btn-secondary h-9 py-0 text-[0.85rem]" onClick={() => handleTransition(t, 'active')}>Start</button>
+                      <button type="button" className={ghost} onClick={() => handleTransition(t, 'inbox')}>Back to Inbox</button>
+                    </>
+                  } />
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section aria-labelledby="inbox-h" className="flex flex-col gap-3">
+            <h2 id="inbox-h" className="m-0 text-[1.2rem] font-semibold">Inbox <span className="font-normal text-fg-muted">{inbox.length}</span></h2>
+            <form onSubmit={handleQuickCapture} className="flex gap-2">
+              <label htmlFor="inbox-add" className="sr-only">Add to Inbox</label>
+              <input
+                id="inbox-add"
+                className="form-input h-11 flex-1 py-0"
+                placeholder="Something you might want to learn — e.g. how caches fail"
+                value={newInboxTitle}
+                onChange={(e) => setNewInboxTitle(e.target.value)}
+                disabled={capturing}
+              />
+              <button type="submit" disabled={capturing || !newInboxTitle.trim()} className="btn btn-secondary h-11 py-0">{capturing ? 'Adding…' : 'Add'}</button>
+            </form>
+            {captureError && <p role="alert" className="m-0 text-[0.85rem] text-danger">{captureError}</p>}
+            {inbox.length > 0 && (
+              <ul className="m-0 list-none p-0">
+                {inbox.map((t) => (
+                  <Row key={t.id} t={t} actions={
+                    <>
+                      <button type="button" className="btn btn-secondary h-9 py-0 text-[0.85rem]" onClick={() => handleTransition(t, 'queued')}>Move to Next</button>
+                      <button type="button" className={ghost} onClick={() => handleTransition(t, 'active')}>Start</button>
+                      <button type="button" className={ghost} onClick={() => handleTransition(t, 'dropped')}>Let go</button>
+                    </>
+                  } />
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {others.length > 0 && (
+            <details className="flex flex-col gap-2">
+              <summary className="cursor-pointer text-[1.05rem] font-semibold text-fg-secondary">Resting, done and let go · {others.length}</summary>
+              <ul className="m-0 mt-2 list-none p-0">
+                {others.map((t) => (
+                  <Row key={t.id} t={t} actions={
+                    <>
+                      <span className="self-center pr-2 text-[0.82rem] text-fg-muted">{STATUS_WORD[t.status]}</span>
+                      {t.status !== 'dropped' && <button type="button" className="btn btn-secondary h-9 py-0 text-[0.85rem]" onClick={() => handleTransition(t, 'active')}>Resume</button>}
+                      <button type="button" className={ghost} onClick={() => handleTransition(t, 'queued')}>Move to Next</button>
+                    </>
+                  } />
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+
+      {viewMode === 'board' && (
+        <div className="flex flex-col gap-3">
+          <p className="m-0 text-[0.9rem] text-fg-muted">Drag a topic between columns to change where it is.</p>
+          <div className="grid gap-4 overflow-x-auto pb-2" style={{ gridTemplateColumns: `repeat(${columnsToShow.length}, minmax(220px, 1fr))` }}>
+            {columnsToShow.map((status) => {
+              const list = byStatus(status);
               return (
-                <details className="glass-panel" style={{ padding: '4px 16px' }}>
-                  <summary style={{ cursor: 'pointer', padding: '12px 0', fontSize: '0.88rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>Other Topics ({otherTopics.length})</span>
-                    <span style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>
-                      Paused, Reference, Maintenance, Dropped
-                    </span>
-                  </summary>
-                  <div style={{ paddingBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {otherTopics.map(t => (
-                      <div
-                        key={t.id}
-                        className="glass-card"
-                        style={{
-                          padding: '10px 14px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '12px',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Link href={`/topics/${t.id}`} style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-                            {t.title}
-                          </Link>
-                          <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', background: 'var(--fill-3)', color: 'var(--color-text-muted)' }}>
-                            {t.status}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleTransition(t, 'active')}
-                            className="btn btn-secondary"
-                            style={{ padding: '4px 8px', fontSize: '0.72rem' }}
-                          >
-                            ▶️ Activate
-                          </button>
-                          <Link href={`/topics/${t.id}`} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.72rem' }}>
-                            Open ▸
-                          </Link>
-                        </div>
-                      </div>
-                    ))}
+                <div
+                  key={status}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverColumn(status); }}
+                  onDragLeave={() => setDragOverColumn(null)}
+                  onDrop={(e) => handleDrop(e, status)}
+                  className={`flex min-h-[320px] flex-col gap-2.5 rounded-xl p-3 ${dragOverColumn === status ? 'column-drag-over' : 'bg-sunk'}`}
+                >
+                  <div className="flex items-baseline justify-between px-1">
+                    <span className="text-[0.95rem] font-semibold">{STATUS_WORD[status]}</span>
+                    <span className="text-[0.82rem] text-fg-muted">{list.length}{status === 'active' ? ' / 2' : ''}</span>
                   </div>
-                </details>
-              );
-            })()}
-          </div>
-        ) : (
-          /* FULL KANBAN BOARD VIEW */
-          <>
-            {/* Empty columns toggle */}
-        {hiddenEmptyCount > 0 && !showEmptyColumns && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-            <button
-              onClick={() => setShowEmptyColumns(true)}
-              style={{
-                fontSize: '0.75rem',
-                color: 'var(--color-text-muted)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px 10px',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border-color)',
-                background: 'transparent',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              + Show {hiddenEmptyCount} empty columns
-            </button>
-          </div>
-        )}
-        {showEmptyColumns && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-            <button
-              onClick={() => setShowEmptyColumns(false)}
-              style={{
-                fontSize: '0.75rem',
-                color: 'var(--color-text-muted)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px 10px',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border-color)',
-                background: 'transparent',
-                cursor: 'pointer',
-              }}
-            >
-              − Hide empty columns
-            </button>
-          </div>
-        )}
-
-        {/* Kanban Columns */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${columnsToShow.length}, 1fr)`,
-          gap: '12px',
-          overflowX: 'auto',
-          paddingBottom: '16px',
-        }}>
-          {columnsToShow.map((colStatus) => {
-            const colTopics = filteredTopics.filter(t => t.status === colStatus);
-            const isOver = dragOverColumn === colStatus;
-            const hint = EMPTY_STATE_HINTS[colStatus];
-
-            return (
-              <div
-                key={colStatus}
-                onDragOver={(e) => { e.preventDefault(); setDragOverColumn(colStatus); }}
-                onDragLeave={() => setDragOverColumn(null)}
-                onDrop={(e) => handleDrop(e, colStatus)}
-                style={{
-                  background: isOver ? 'var(--fill-1)' : 'var(--fill-1)',
-                  border: isOver ? '1px dashed var(--color-primary)' : '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-md)',
-                  minHeight: '450px',
-                  padding: '12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '10px',
-                  transition: 'all var(--transition-fast)',
-                }}
-              >
-                <div className="flex-between" style={{ borderBottom: '1px solid var(--fill-2)', paddingBottom: '8px' }}>
-                  <span style={{
-                    fontSize: '0.72rem',
-                    fontWeight: 600,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    color: colStatus === 'active' ? 'var(--color-primary-light)' : 'var(--color-text-secondary)',
-                  }}>
-                    {colStatus}
-                  </span>
-                  <span style={{
-                    fontSize: '0.68rem',
-                    color: 'var(--color-text-muted)',
-                    background: 'var(--fill-2)',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    fontWeight: 600,
-                  }}>
-                    {colTopics.length}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flexGrow: 1 }}>
-                  {colTopics.map((t) => {
-                    const lastTouched = t.lastTouchedDate ? new Date(t.lastTouchedDate) : null;
-                    const daysSinceTouch = lastTouched ? Math.floor((Date.now() - lastTouched.getTime()) / (1000 * 60 * 60 * 24)) : 0;
-                    const isStale = colStatus === 'active' && daysSinceTouch >= STALE_DAYS;
-                    const hasRealNextAction = t.nextAction && t.nextAction.trim().toLowerCase() !== 'nothing' && t.nextAction.trim() !== '';
-
+                  {list.length === 0 && <span className="px-1 text-[0.82rem] text-fg-muted">{EMPTY_STATE_HINTS[status]?.text}</span>}
+                  {list.map((t) => {
+                    const states = knowledge[t.id] ?? [];
                     return (
                       <div
                         key={t.id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, t.id)}
-                        className="glass-card"
-                        style={{
-                          padding: '10px 12px',
-                          cursor: 'grab',
-                          background: t.activeSlotType === 'primary' ? 'var(--fill-2)' : 'var(--bg-surface)',
-                          borderLeft: t.activeSlotType === 'primary'
-                            ? '3px solid var(--color-primary)'
-                            : t.activeSlotType === 'secondary'
-                            ? '3px solid var(--color-accent)'
-                            : '1px solid var(--border-color)',
-                        }}
+                        onDragEnd={() => setDraggingCardId(null)}
+                        className={`glass-card flex flex-col gap-2 p-3.5 ${draggingCardId === t.id ? 'card-dragging' : ''}`}
                       >
-                        <Link href={`/topics/${t.id}`} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.35 }}>{t.title}</span>
-                          <span className={`badge badge-${t.area.toLowerCase()}`} style={{ fontSize: '0.65rem', alignSelf: 'flex-start' }}>{t.area}</span>
-
-                          {colStatus === 'active' && hasRealNextAction && (
-                            <p style={{ fontSize: '0.72rem', color: 'var(--color-warning)', fontStyle: 'italic', marginTop: '2px', lineBreak: 'anywhere' }}>
-                              → {t.nextAction}
-                            </p>
-                          )}
-
-                          {isStale && (
-                            <span style={{ fontSize: '0.65rem', color: 'var(--color-danger)', fontWeight: 600, marginTop: '2px' }}>
-                              Untouched {daysSinceTouch}d
-                            </span>
-                          )}
-
-                          {/* Mini progress bar */}
-                          <div className="progress-bar-mini">
-                            <div
-                              className="progress-bar-mini-fill"
-                              style={{ width: `${Math.max(t.progressPct || 0, 2)}%` }}
-                            />
-                          </div>
-
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                            <span>{t.progressPct}%</span>
-                            <span style={{ opacity: 0.7 }}>{t.currentStage}</span>
-                          </div>
-                        </Link>
+                        <Link href={`/topics/${t.id}`} className="text-[0.95rem] font-semibold text-fg">{t.title}</Link>
+                        <span className="text-[0.78rem] text-fg-muted">{t.area}</span>
+                        {states.length > 0 && <KnowledgeStrip states={states} size="sm" />}
                       </div>
                     );
                   })}
-
-                  {/* Empty state hint */}
-                  {colTopics.length === 0 && hint && (
-                    <div className="empty-state">
-                      <span className="empty-state-icon">{hint.icon}</span>
-                      <span>{hint.text}</span>
-                    </div>
-                  )}
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+          {hiddenEmptyCount > 0 && (
+            <button type="button" className={`${ghost} self-start`} onClick={() => setShowEmptyColumns((v) => !v)}>
+              {showEmptyColumns ? 'Hide empty columns' : `Show ${hiddenEmptyCount} empty column${hiddenEmptyCount === 1 ? '' : 's'}`}
+            </button>
+          )}
         </div>
-        </>
       )}
 
-      </div>
-
-      {/* RIGHT SIDE DETAILS PANEL */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-        {/* Spaced Review Queue Widget */}
-        <ErrorBoundary fallbackTitle="Unable to load Spaced Repetition Queue">
-          <SpacedReviewQueue onReviewSaved={fetchData} />
-        </ErrorBoundary>
-
-        {/* Visual Personal Knowledge Graph Network */}
-        <ErrorBoundary fallbackTitle="Unable to load Knowledge Graph">
+      {viewMode === 'map' && (
+        <ErrorBoundary fallbackTitle="Unable to load the map">
           <KnowledgeGraph topics={topics} />
         </ErrorBoundary>
-
-      </div>
+      )}
 
       {/* Prioritization swap portal */}
       {showPrioritization && pendingActiveTopic && (
