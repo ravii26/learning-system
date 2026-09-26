@@ -8,14 +8,22 @@
  */
 import type { PrismaClient, Prisma } from '@prisma/client';
 import { computeGoalReadiness, type ReadinessResult } from './goalReadiness';
+import { loadTopicKnowledge } from './topicKnowledge';
 
 export type DbClient = PrismaClient | Prisma.TransactionClient;
 
 export async function recomputeGoalReadiness(db: DbClient, userId: string, goalId: string): Promise<ReadinessResult> {
   const links = await db.goalLink.findMany({
     where: { userId, goalId, topicId: { not: null } },
-    select: { required: true, topic: { select: { id: true, title: true, status: true, progressPct: true } } },
+    select: { required: true, topic: { select: { id: true, title: true, status: true, progressPct: true, depthTarget: true } } },
   });
+
+  const ids = links.filter((l) => l.topic).map((l) => l.topic!.id);
+  const [knowledge, cold] = await Promise.all([
+    loadTopicKnowledge(userId, ids),
+    db.problemAttempt.groupBy({ by: ['topicId'], where: { userId, topicId: { in: ids }, outcome: 'cold' }, _count: { _all: true } }),
+  ]);
+  const coldBy = new Map(cold.map((c) => [c.topicId, c._count._all]));
 
   const topics = links
     .filter((l) => l.topic)
@@ -25,6 +33,10 @@ export async function recomputeGoalReadiness(db: DbClient, userId: string, goalI
       status: l.topic!.status,
       progressPct: l.topic!.progressPct,
       required: l.required,
+      depthTarget: l.topic!.depthTarget,
+      evidence: knowledge.get(l.topic!.id)
+        ? { unit: knowledge.get(l.topic!.id)!.unit, counts: knowledge.get(l.topic!.id)!.counts, problemsCold: coldBy.get(l.topic!.id) ?? 0 }
+        : null,
     }));
 
   const result = computeGoalReadiness(topics);

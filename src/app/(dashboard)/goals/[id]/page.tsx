@@ -33,6 +33,7 @@ interface ReadinessCriterion {
   topicId: string;
   label: string;
   met: boolean;
+  reason?: string;
 }
 
 interface GoalDetail {
@@ -167,7 +168,8 @@ export default function GoalDetailPage() {
                 <span className="text-[0.9rem] font-semibold text-fg-muted">Still to prove</span>
                 {unmet.map((c) => (
                   <Link key={c.topicId} href={`/topics/${c.topicId}`} className="flex min-h-[40px] items-center justify-between gap-3 border-b border-line text-[0.95rem] text-fg no-underline last:border-b-0 hover:no-underline">
-                    {c.label} <Icon name="chevronRight" size={16} className="text-fg-muted" />
+                    <span className="flex flex-col py-1.5">{c.label}{c.reason && <span className="text-[0.82rem] text-fg-muted">{c.reason}</span>}</span>
+                    <Icon name="chevronRight" size={16} className="text-fg-muted" />
                   </Link>
                 ))}
               </div>
