@@ -40,7 +40,7 @@ export function shapeFor(c: Competency, intake: Intake): Shape {
   return 'course';
 }
 
-const DOING = /\b(run|build|ship|launch|make|create|deploy|write|publish|grow|sell|start|get)\b/i;
+const DOING = /\b(run|build|ship|launch|make|create|deploy|write|publish|grow|sell|start|get|analy[sz]e|design|solve|present|deliver|complete|finish|develop|implement|produce|record|teach)\b/i;
 
 /**
  * When the learner's own finish line is about doing something ("run a

@@ -150,7 +150,8 @@ export async function persistProgram(tx: Tx, { userId, draft, adjustments }: Per
       for (const r of item.resources) {
         await tx.resource.updateMany({
           where: { topicId: topic.id, url: r.url },
-          data: { source: r.source, catalogKey: r.catalogKey, quality: r.quality, pricing: r.pricing, role: r.role, linkStatus: r.source === 'catalog' ? 'ok' : 'unchecked' },
+          // catalogue: checked when curated; search: checked on approval; ai: a search link, not a resource page.
+          data: { source: r.source, catalogKey: r.catalogKey, quality: r.quality, pricing: r.pricing, role: r.role, linkStatus: r.source === 'ai' ? 'unchecked' : 'ok', linkCheckedAt: r.source === 'search' ? new Date() : null },
         });
       }
       await tx.activityLog.create({ data: { userId, topicId: topic.id, fieldChanged: 'status', oldValue: null, newValue: status } });

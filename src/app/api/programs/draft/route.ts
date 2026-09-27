@@ -9,6 +9,7 @@ import { buildAdaptMessages, parseAdjustments, EMPTY_ADJUSTMENTS, type Adjustmen
 import { buildMapDraftMessages, parseMapDraft } from '@/lib/program/mapDraft';
 import { composeDraft } from '@/lib/program/generate';
 import { factualWhy } from '@/lib/program/why';
+import { enrichResources } from '@/lib/resources/enrich';
 
 /**
  * Builds a draft program. Nothing is saved.
@@ -64,7 +65,17 @@ export async function POST(request: Request) {
       }
     }
 
+    // Books and live search (custom fields and book goals). Needs the item ids of
+    // the plan with emphasis applied, so compose once, enrich, then compose again.
+    let notes: string[] = [];
+    if (mapQuality !== 'curated' || intake.bookTitle) {
+      const first = composeDraft({ map, field, mapQuality, intake, adjustments });
+      const enriched = await enrichResources(first, adjustments);
+      adjustments = enriched.adjustments;
+      notes = enriched.notes;
+    }
     const draft = composeDraft({ map, field, mapQuality, intake, adjustments });
+    draft.warnings.push(...notes);
     return NextResponse.json({ stage: 'draft', draft, adjustments, aiUsed });
   } catch (e) {
     console.error('Failed to draft program:', e);

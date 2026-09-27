@@ -7,6 +7,7 @@ import { composeDraft, sanitizeClientAdjustments } from '@/lib/program/generate'
 import { persistProgram } from '@/lib/program/persist';
 import { recomputeGoalReadiness } from '@/lib/goalReadinessRecompute';
 import { checkinDueAt } from '@/lib/program/checkinServer';
+import { reverifyFound } from '@/lib/resources/enrich';
 
 /** Your active programs, with whether a weekly check-in is due or waiting — for the Today card. */
 export async function GET() {
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
 
     const base = { map: resolved.map, field: resolved.field, mapQuality: resolved.mapQuality, intake: parsed.intake };
     const adjustments = sanitizeClientAdjustments(body.adjustments, base);
+    adjustments.foundResources = await reverifyFound(adjustments.foundResources ?? []);
     const removedItemIds = Array.isArray(body.removedItemIds)
       ? body.removedItemIds.filter((x): x is string => typeof x === 'string').slice(0, 50)
       : [];

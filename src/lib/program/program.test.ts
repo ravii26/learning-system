@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { getMap, competenciesForTarget, requiredEvidence, type CompetencyMap } from '@/data/competencies';
 import { buildSkeleton, estimateHours, scopeCompetencies } from './skeleton';
-import { parseAdjustments } from './adapt';
+import { parseAdjustments, EMPTY_ADJUSTMENTS } from './adapt';
 import { composeDraft, sanitizeClientAdjustments } from './generate';
 import { parseMapDraft, sanitizeMap } from './mapDraft';
 import { parseIntake, inferTarget } from './intake';
@@ -130,7 +130,7 @@ describe('AI adjustments are clamped to the skeleton', () => {
 
   it('rejects a "mastery" claim and unreadable replies', () => {
     expect(parseAdjustments(JSON.stringify({ whyThisPlan: 'After this plan you will have mastered system design completely, guaranteed.' }), d).whyThisPlan).toBeNull();
-    expect(parseAdjustments('not json', d)).toEqual({ emphasis: {}, phaseTitles: {}, focus: {}, whyThisPlan: null, namedResources: [] });
+    expect(parseAdjustments('not json', d)).toEqual(EMPTY_ADJUSTMENTS);
   });
 
   it('ignores named resources on curated maps (the catalogue decides)', () => {
@@ -296,5 +296,17 @@ describe('custom-field fixes found in e2e', () => {
     expect(parseAdjustments(JSON.stringify({ emphasis: all }), d).emphasis).toEqual({});
     const one = parseAdjustments(JSON.stringify({ emphasis: { 'sd-caching': 1.5 } }), d).emphasis;
     expect(one['sd-caching']).toBeGreaterThan(1);
+  });
+});
+
+describe('doing-words in "done"', () => {
+  it('"analyse one real company" pulls in the analysis project', () => {
+    const map = sanitizeMap({ title: 'Investing', competencies: [
+      { key: 'a', title: 'Value basics', kind: 'concept', importance: 'core', from: 'aware' },
+      { key: 'b', title: 'Statements', kind: 'concept', importance: 'core', from: 'aware' },
+      { key: 'c', title: 'Real Company Analysis', kind: 'build', importance: 'core', from: 'build' },
+    ] }, 'investing').map!;
+    const d = skeleton(intake({ goal: 'value investing', target: 'use', bookTitle: 'The Intelligent Investor', doneMeans: 'analyse one real company and decide if it is undervalued' }), map);
+    expect(items(d).find((i) => i.shape === 'project')?.competencyKeys).toEqual(['c']);
   });
 });

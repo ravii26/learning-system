@@ -3,6 +3,8 @@ import { buildSkeleton, namedToDraft } from './skeleton';
 import { EMPTY_ADJUSTMENTS, parseAdjustments, type Adjustments } from './adapt';
 import { factualWhy } from './why';
 import type { Intake, ProgramDraft } from './types';
+import type { FoundResource } from './adapt';
+import { titlesMatch } from '@/lib/resources/openLibrary';
 
 export interface ComposeInput {
   map: CompetencyMap;
@@ -29,9 +31,20 @@ export function composeDraft(input: ComposeInput): ProgramDraft {
     focus: adj.focus,
   });
 
+  const allItems = () => draft.phases.flatMap((p) => p.items);
+  for (const f of adj.foundResources ?? []) {
+    const item = allItems().find((it) => it.id === f.itemId);
+    if (!item || item.resources.some((x) => x.url === f.url)) continue;
+    // A verified find replaces the search-link version of the same title.
+    item.resources = item.resources.filter((x) => !(x.source === 'ai' && titlesMatch(x.title, f.title)));
+    item.resources.push({
+      catalogKey: null, title: f.title, url: f.url, source: 'search', quality: 'unreviewed',
+      pricing: 'unknown', role: item.resources.length ? 'supplementary' : 'primary', type: f.type,
+    });
+  }
   for (const r of adj.namedResources) {
     const item = draft.phases.flatMap((p) => p.items).find((it) => it.id === r.itemId);
-    if (item && !item.resources.some((x) => x.title === r.title)) {
+    if (item && !item.resources.some((x) => x.title === r.title || titlesMatch(x.title, r.title))) {
       item.resources.push(namedToDraft(r.title, r.type, item.resources.length ? 'supplementary' : 'primary'));
     }
   }
@@ -59,5 +72,17 @@ export function composeDraft(input: ComposeInput): ProgramDraft {
 export function sanitizeClientAdjustments(raw: unknown, input: Omit<ComposeInput, 'adjustments'>): Adjustments {
   if (!raw || typeof raw !== 'object') return EMPTY_ADJUSTMENTS;
   const skeleton = buildSkeleton(input.map, input.intake, { field: input.field, mapQuality: input.mapQuality });
-  return parseAdjustments(JSON.stringify(raw), skeleton);
+  const adj = parseAdjustments(JSON.stringify(raw), skeleton);
+  // Found links only keep their shape here; the approve route re-checks every URL.
+  // Item ids come from the plan *with* emphasis — the one the draft screen showed.
+  const withEmphasis = buildSkeleton(input.map, input.intake, { field: input.field, mapQuality: input.mapQuality, emphasis: adj.emphasis });
+  const itemIds = new Set(withEmphasis.phases.flatMap((p) => p.items.map((it) => it.id)));
+  const found = (raw as { foundResources?: unknown }).foundResources;
+  adj.foundResources = (Array.isArray(found) ? found : [])
+    .filter((f: any): f is FoundResource =>
+      f && itemIds.has(f.itemId) && typeof f.title === 'string' && typeof f.url === 'string' && /^https:\/\//.test(f.url)
+      && ['BOOK', 'COURSE', 'VIDEO', 'ARTICLE'].includes(f.type) && ['openlibrary', 'web', 'youtube'].includes(f.via))
+    .slice(0, 30)
+    .map((f) => ({ itemId: f.itemId, title: f.title.slice(0, 160), url: f.url.slice(0, 500), type: f.type, via: f.via }));
+  return adj;
 }

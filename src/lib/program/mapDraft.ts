@@ -94,6 +94,11 @@ export function sanitizeMap(j: any, fallbackTitle: string): { map: CompetencyMap
       .filter((p) => order.has(p) && order.get(p)! < order.get(c.key)!);
   }
   if (comps.length && !comps.some((c) => c.importance === 'core')) comps[0].importance = 'core';
+  // A drafted "build" competency is something you make. Say so in its title,
+  // so it becomes a Project (with an artifact as proof) and the learner sees it.
+  for (const c of comps) {
+    if (c.kind === 'build' && !/project/i.test(c.title)) c.title = `${c.title} (project)`.slice(0, 90);
+  }
 
   const map: CompetencyMap = {
     key: 'custom',

@@ -16,9 +16,19 @@ export interface Adjustments {
   focus: Record<string, string>;
   whyThisPlan: string | null;
   namedResources: Array<{ itemId: string; title: string; type: 'BOOK' | 'COURSE' | 'VIDEO' | 'ARTICLE' }>;
+  /** Real links found by the resource pipeline (never by the AI); re-verified on approval. */
+  foundResources?: FoundResource[];
 }
 
-export const EMPTY_ADJUSTMENTS: Adjustments = { emphasis: {}, phaseTitles: {}, focus: {}, whyThisPlan: null, namedResources: [] };
+export interface FoundResource {
+  itemId: string;
+  title: string;
+  url: string;
+  type: 'BOOK' | 'COURSE' | 'VIDEO' | 'ARTICLE';
+  via: 'openlibrary' | 'web' | 'youtube';
+}
+
+export const EMPTY_ADJUSTMENTS: Adjustments = { emphasis: {}, phaseTitles: {}, focus: {}, whyThisPlan: null, namedResources: [], foundResources: [] };
 export const EMPHASIS_MIN = 0.5;
 export const EMPHASIS_MAX = 1.5;
 

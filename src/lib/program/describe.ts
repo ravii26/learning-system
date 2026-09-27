@@ -30,5 +30,6 @@ export function resourceBadges(r: DraftResource): string[] {
   else if (r.pricing === 'freemium') out.push('Free tier');
   else if (r.pricing === 'paid') out.push('Paid');
   if (r.source === 'ai') out.push('Search link');
+  if (r.source === 'search') out.push('Found & link-checked');
   return out;
 }

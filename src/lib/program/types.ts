@@ -26,7 +26,7 @@ export interface DraftResource {
   catalogKey: string | null;    // set for catalogue picks
   title: string;
   url: string;
-  source: 'catalog' | 'ai';
+  source: 'catalog' | 'ai' | 'search';           // search = found live (Open Library / web / YouTube) and link-checked
   quality: 'curated' | 'unreviewed';
   pricing: Pricing;
   role: ResourceRole;
