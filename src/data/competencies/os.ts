@@ -1,0 +1,32 @@
+import type { CompetencyMap } from './types';
+
+export const os: CompetencyMap = {
+  key: 'os',
+  title: 'Operating Systems',
+  aliases: ['os', 'operating system', 'operating systems', 'linux internals', 'kernel'],
+  description: 'How an operating system runs programs, shares the CPU and memory, and stores data.',
+  competencies: [
+    { key: 'os-processes', title: 'Processes and system calls', group: 'Virtualisation', kind: 'concept', importance: 'core', from: 'aware',
+      summary: 'Explain what a process is, user versus kernel mode, and system calls like fork/exec.' },
+    { key: 'os-threads', title: 'Threads', group: 'Virtualisation', kind: 'concept', importance: 'core', from: 'aware', prerequisites: ['os-processes'],
+      summary: 'Compare threads and processes, and know what threads share.' },
+    { key: 'os-scheduling', title: 'CPU scheduling', group: 'Virtualisation', kind: 'concept', importance: 'core', from: 'use', prerequisites: ['os-processes'],
+      summary: 'Compare FIFO, round-robin, priority and multi-level feedback scheduling.' },
+    { key: 'os-memory', title: 'Address spaces and virtual memory', group: 'Memory', kind: 'concept', importance: 'core', from: 'use',
+      summary: 'Explain virtual addresses, paging and the TLB.' },
+    { key: 'os-page-replacement', title: 'Page faults and replacement', group: 'Memory', kind: 'concept', importance: 'supporting', from: 'build', prerequisites: ['os-memory'],
+      summary: 'Explain page faults, swapping and LRU-style replacement.' },
+    { key: 'os-concurrency', title: 'Locks and race conditions', group: 'Concurrency', kind: 'concept', importance: 'core', from: 'use', prerequisites: ['os-threads'],
+      summary: 'Find race conditions and protect critical sections with locks.' },
+    { key: 'os-sync-primitives', title: 'Semaphores and condition variables', group: 'Concurrency', kind: 'algorithm', importance: 'core', from: 'build', prerequisites: ['os-concurrency'],
+      summary: 'Solve producer-consumer and similar problems with condition variables and semaphores.' },
+    { key: 'os-deadlock', title: 'Deadlock', group: 'Concurrency', kind: 'concept', importance: 'core', from: 'use', prerequisites: ['os-concurrency'],
+      summary: 'State the deadlock conditions and how to prevent or avoid them.' },
+    { key: 'os-file-systems', title: 'Files and file systems', group: 'Persistence', kind: 'concept', importance: 'supporting', from: 'use',
+      summary: 'Explain inodes, directories and how a file system lays out data.' },
+    { key: 'os-io', title: 'I/O devices and disks', group: 'Persistence', kind: 'concept', importance: 'optional', from: 'build',
+      summary: 'Know how the OS talks to devices, interrupts and DMA, and disk versus SSD behaviour.' },
+    { key: 'os-journaling', title: 'Crash consistency and journaling', group: 'Persistence', kind: 'concept', importance: 'optional', from: 'interview', prerequisites: ['os-file-systems'],
+      summary: 'Explain how journaling keeps a file system consistent after a crash.' },
+  ],
+};
