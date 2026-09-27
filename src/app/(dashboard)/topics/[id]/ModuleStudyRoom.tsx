@@ -366,11 +366,15 @@ export default function ModuleStudyRoom({
                             aria-pressed={chosen}
                             disabled={quizSubmitted}
                             onClick={() => setQuizSelections((prev) => ({ ...prev, [qIdx]: optIdx }))}
-                            className={`flex min-h-[52px] items-center gap-3.5 rounded-xl border-[1.5px] px-4 py-2.5 text-left text-[1rem] disabled:cursor-default ${
-                              right ? 'border-k-solid bg-surface' : wrong ? 'border-danger bg-surface' : chosen ? 'border-ink bg-surface' : 'border-line bg-surface hover:border-line-hover'
+                            // The chosen option must read as chosen at a glance: a thin
+                            // border change alone was invisible on the dark theme.
+                            className={`flex min-h-[52px] items-center gap-3.5 rounded-xl border-2 px-4 py-2.5 text-left text-[1rem] transition-colors disabled:cursor-default ${
+                              right ? 'border-k-solid bg-fill-2' : wrong ? 'border-danger bg-fill-2' : chosen ? 'border-ink bg-fill-2 font-semibold' : 'border-line bg-surface hover:border-line-hover'
                             }`}
                           >
-                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sunk text-[0.8rem] font-semibold">
+                            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[0.8rem] font-semibold ${
+                              chosen && !quizSubmitted ? 'bg-ink text-on-ink' : right ? 'bg-k-solid text-on-ink' : wrong ? 'bg-danger text-on-ink' : 'bg-sunk'
+                            }`}>
                               {String.fromCharCode(65 + optIdx)}
                             </span>
                             <span className="flex-1">{opt}</span>
