@@ -75,6 +75,7 @@ export async function persistProgram(tx: Tx, { userId, draft, adjustments }: Per
       whyThisPlan: draft.whyThisPlan,
       hoursPerWeek: draft.hoursPerWeek,
       totalWeeks: draft.totalWeeks,
+      adjustments: { emphasis: adjustments.emphasis, focus: {} } as Prisma.InputJsonValue,
     },
   });
 

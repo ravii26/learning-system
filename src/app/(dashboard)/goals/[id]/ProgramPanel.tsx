@@ -7,6 +7,7 @@ import type { EvidenceStatus } from '@/lib/program/evidence';
 import { describeRequirement, SHAPE_LABEL } from '@/lib/program/describe';
 import { TARGET_LABEL } from '@/lib/program/why';
 import type { Shape } from '@/lib/program/types';
+import CheckinCard from './CheckinCard';
 
 /**
  * A goal's learning program: phases, their items (each an ordinary topic),
@@ -26,7 +27,7 @@ function Chip({ status }: { status: EvidenceStatus }) {
   return <span className={`shrink-0 rounded-md px-2 py-0.5 text-[0.75rem] font-semibold ${STATUS[status].cls}`}>{STATUS[status].label}</span>;
 }
 
-export default function ProgramPanel({ view }: { view: ProgramView }) {
+export default function ProgramPanel({ view, goalId, onPlanChanged }: { view: ProgramView; goalId: string; onPlanChanged: () => void }) {
   const { program, items, checkpoints, matrix, history } = view;
   const phases = Array.from(new Set(items.map((i) => i.phase))).sort((a, b) => a - b);
   const core = matrix.filter((r) => r.importance === 'core');
@@ -35,6 +36,7 @@ export default function ProgramPanel({ view }: { view: ProgramView }) {
 
   return (
     <div className="flex flex-col gap-8">
+      <CheckinCard goalId={goalId} onPlanChanged={onPlanChanged} />
       <section aria-labelledby="stand-h" className="glass-panel flex flex-col gap-4 p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="stand-h" className="m-0 text-[1.15rem] font-semibold">Where you stand</h2>
@@ -122,10 +124,17 @@ export default function ProgramPanel({ view }: { view: ProgramView }) {
           <summary className="cursor-pointer text-[1rem] font-semibold text-fg-secondary">Plan history · {history.length} version{history.length === 1 ? '' : 's'}</summary>
           <ol className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
             {history.slice().reverse().map((h) => (
-              <li key={h.version} className="text-[0.9rem]">
-                <span className="font-semibold">v{h.version}</span>
-                <span className="text-fg-muted"> · {new Date(h.createdAt).toLocaleDateString()}</span>
-                <span className="text-fg-secondary"> · {h.reason}</span>
+              <li key={h.version} className="flex flex-col gap-0.5 text-[0.9rem]">
+                <span>
+                  <span className="font-semibold">v{h.version}</span>
+                  <span className="text-fg-muted"> · {new Date(h.createdAt).toLocaleDateString()}</span>
+                </span>
+                <span className="text-fg-secondary">{h.reason}</span>
+                {Array.isArray(h.changes) && (
+                  <ul className="m-0 list-disc pl-5 text-[0.85rem] text-fg-muted">
+                    {(h.changes as Array<{ label?: string }>).map((c, i) => c.label && <li key={i}>{c.label}</li>)}
+                  </ul>
+                )}
               </li>
             ))}
           </ol>

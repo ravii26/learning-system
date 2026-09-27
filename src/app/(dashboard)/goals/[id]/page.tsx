@@ -159,7 +159,7 @@ export default function GoalDetailPage() {
         </div>
       </header>
 
-      {program ? <ProgramPanel view={program} /> : (<>
+      {program ? <ProgramPanel view={program} goalId={params.id} onPlanChanged={fetchGoal} /> : (<>
       <section aria-labelledby="ready-h" className="glass-panel flex flex-col gap-4 p-7">
         <h2 id="ready-h" className="m-0 text-[1.15rem] font-semibold">How ready you are</h2>
         {goal.readiness.total > 0 ? (

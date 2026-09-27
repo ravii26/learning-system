@@ -970,6 +970,9 @@ model Program {
   whyThisPlan   String
   hoursPerWeek  Int
   totalWeeks    Int
+  // The bounded AI adjustments this version uses (emphasis, focus notes);
+  // a re-plan changes these rather than the structure, so topics carry over.
+  adjustments   Json?
 
   createdAt DateTime @default(now())
 
