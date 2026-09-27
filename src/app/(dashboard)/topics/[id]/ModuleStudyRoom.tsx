@@ -222,14 +222,14 @@ export default function ModuleStudyRoom({
   const sourceKind = (t: string | undefined) =>
     t === 'video' ? 'Video' : t === 'book' ? 'Book' : t === 'course' ? 'Course' : t === 'paper' ? 'Paper' : t === 'docs' ? 'Docs' : 'Article';
 
-  const finishButton = (
+  const finishButton = (quiet: boolean) => (
     <button
       type="button"
       onClick={() => onToggleCompleted(module.id)}
       aria-pressed={module.completed}
-      className={`btn h-10 py-0 text-[0.9rem] ${module.completed ? 'btn-secondary' : 'btn-primary'}`}
+      className={`btn py-0 ${quiet ? 'h-9 text-[0.85rem]' : 'h-11 px-5 text-[0.95rem]'} ${module.completed || quiet ? 'btn-secondary' : 'btn-primary'}`}
     >
-      {module.completed ? <><Icon name="check" size={16} strokeWidth={2.4} /> Finished · undo</> : 'Mark this module finished'}
+      {module.completed ? <><Icon name="check" size={16} strokeWidth={2.4} /> Finished</> : quiet ? 'Mark finished' : 'Mark this module finished'}
     </button>
   );
   const hasModuleNotes = !!module.notes && module.notes.replace(/<[^>]*>/g, '').trim().length > 0;
@@ -240,49 +240,47 @@ export default function ModuleStudyRoom({
   ].filter(Boolean).join(' · ') || 'Nothing yet';
 
   return (
-    <div className="flex min-w-0 max-w-[760px] flex-col gap-10">
+    <div className="mx-auto flex w-full min-w-0 max-w-[720px] flex-col gap-10">
       <article className="flex min-w-0 flex-col gap-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div role="tablist" aria-label="Steps in this module" className="flex flex-wrap gap-1.5">
-            {STEPS.map((step, i) => {
-              const on = activeTab === step.key;
-              return (
-                <button
-                  key={step.key}
-                  role="tab"
-                  aria-selected={on}
-                  onClick={() => setActiveTab(step.key)}
-                  className={`flex h-9 items-center gap-2 rounded-full pl-1.5 pr-3.5 text-[0.875rem] font-semibold ${on ? 'bg-ink text-on-ink' : 'text-fg-secondary hover:bg-fill-2 hover:text-fg'}`}
-                >
-                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[0.75rem] ${on ? 'bg-on-ink text-ink' : 'bg-sunk text-fg-secondary'}`}>{i + 1}</span>
-                  {step.label}
-                </button>
-              );
-            })}
-          </div>
-          {activeTab === 'guide' && !loadingLesson && (
-            <button type="button" onClick={() => setActiveTab(checkTab)} className="text-[0.875rem] font-medium text-fg-secondary underline-offset-4 hover:text-fg hover:underline">
-              Already know this? Skip to the check
-            </button>
-          )}
-        </div>
-
-        <header className="flex flex-col gap-3">
+        {/* One heading, one line of context, then the steps. */}
+        <header className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-[0.9rem] text-fg-muted">Module {module.order} · about {module.estimatedMinutes} min</div>
-            {finishButton}
-          </div>
-          <h2 className="m-0 font-serif text-[2.75rem] font-medium leading-[1.08] tracking-[-0.02em]">{module.title}</h2>
-          {evidence?.state && (
-            <div className="flex flex-wrap items-center gap-2 text-[0.875rem] text-fg-secondary">
-              <KnowledgeMark state={evidence.state} showLabel />
-              {evidence.reason && <span>— {evidence.reason}</span>}
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.875rem] text-fg-muted">
+              <span>Module {module.order}</span>
+              <span aria-hidden="true">·</span>
+              <span>about {module.estimatedMinutes} min</span>
+              {evidence?.state && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <KnowledgeMark state={evidence.state} showLabel />
+                </>
+              )}
             </div>
-          )}
+            {finishButton(true)}
+          </div>
+          <h2 className="m-0 font-serif text-[2.4rem] font-medium leading-[1.1] tracking-[-0.02em]">{module.title}</h2>
           {lesson?.summary && !loadingLesson && (
-            <p className="m-0 font-serif text-[1.35rem] italic leading-relaxed text-fg-secondary">{lesson.summary}</p>
+            <p className="m-0 text-[1.1rem] leading-relaxed text-fg-secondary">{lesson.summary}</p>
           )}
         </header>
+
+        <div role="tablist" aria-label="Steps in this module" className="-mb-2 flex flex-wrap gap-x-6 border-b border-line">
+          {STEPS.map((step, i) => {
+            const on = activeTab === step.key;
+            return (
+              <button
+                key={step.key}
+                role="tab"
+                aria-selected={on}
+                onClick={() => setActiveTab(step.key)}
+                className={`-mb-px flex h-11 shrink-0 items-center gap-2 border-b-2 text-[0.92rem] ${on ? 'border-ink font-semibold text-fg' : 'border-transparent font-medium text-fg-muted hover:text-fg'}`}
+              >
+                <span className="tabular-nums text-fg-muted">{i + 1}</span>
+                {step.label}
+              </button>
+            );
+          })}
+        </div>
 
         {loadingLesson ? (
           <div className="flex flex-col gap-4" aria-busy="true">
@@ -620,7 +618,7 @@ export default function ModuleStudyRoom({
           </div>
         </Accordion>
 
-        {!module.completed && <div className="pt-2">{finishButton}</div>}
+        {!module.completed && <div className="flex justify-center pt-2">{finishButton(false)}</div>}
       </section>
     </div>
   );
