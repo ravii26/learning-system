@@ -205,3 +205,28 @@ describe('intake', () => {
     expect(r.ok && r.intake).toMatchObject({ goal: 'learn sql', hoursPerWeek: 6, budget: 'free_only', formats: ['read'], deadlineWeeks: undefined, target: 'use' });
   });
 });
+
+describe('phase balancing', () => {
+  it('keeps phases reasonably even after a deadline cut (no 1-topic 2-week phases next to a 13-week one)', () => {
+    const d = skeleton(intake({ deadlineWeeks: 16, placement: { strong: [], weak: ['sd-databases', 'sd-partitioning'] } }));
+    const weeks = d.phases.map((p) => p.weeks);
+    const avg = weeks.reduce((a, b) => a + b, 0) / weeks.length;
+    for (const w of weeks) {
+      expect(w).toBeGreaterThanOrEqual(Math.floor(avg * 0.4));
+      expect(w).toBeLessThanOrEqual(Math.ceil(avg * 2.2));
+    }
+    expect(new Set(d.phases.map((p) => p.title)).size).toBe(d.phases.length); // split halves are named apart
+  });
+
+  it('balancing never breaks prerequisite order', () => {
+    for (const target of ['use', 'build', 'interview'] as const) {
+      for (const hours of [3, 7, 15]) {
+        const d = skeleton(intake({ target, hoursPerWeek: hours, deadlineWeeks: 10 }));
+        const phaseOf = new Map(items(d).flatMap((it) => it.competencyKeys.map((k) => [k, it.phase] as const)));
+        for (const c of sd.competencies) for (const p of c.prerequisites ?? []) {
+          if (phaseOf.has(p) && phaseOf.has(c.key)) expect(phaseOf.get(p)!).toBeLessThanOrEqual(phaseOf.get(c.key)!);
+        }
+      }
+    }
+  });
+});

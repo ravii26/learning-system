@@ -63,7 +63,7 @@ export function scopeCompetencies(
     if (dropped.length) warnings.push(`To fit ${intake.deadlineWeeks} weeks, left out: ${dropped.map((c) => c.title).join(', ')}.`);
     if (weeks(comps) > intake.deadlineWeeks) {
       const need = Math.ceil(hours(comps) / intake.deadlineWeeks);
-      warnings.push(`The core topics alone need about ${need} h/week to finish in ${intake.deadlineWeeks} weeks (you have ${intake.hoursPerWeek}). The plan runs ${weeks(comps)} weeks instead.`);
+      warnings.push(`The core topics alone need about ${need} h/week to finish in ${intake.deadlineWeeks} weeks (you have ${intake.hoursPerWeek}), so the plan runs past your deadline.`);
     }
   }
   return { comps, dropped, warnings };
@@ -87,14 +87,53 @@ export function groupIntoPhases(comps: Competency[], hoursOf: (c: Competency) =>
   phases = phases.filter((p) => p && p.length);
 
   const size = (p: Competency[]) => p.reduce((s, c) => s + hoursOf(c), 0);
+  const mergeAt = (i: number) => phases.splice(i, 2, [...phases[i], ...phases[i + 1]]);
   while (phases.length > MAX_PHASES) {
     let best = 0;
     for (let i = 1; i < phases.length - 1; i++) {
       if (size(phases[i]) + size(phases[i + 1]) < size(phases[best]) + size(phases[best + 1])) best = i;
     }
-    phases.splice(best, 2, [...phases[best], ...phases[best + 1]]);
+    mergeAt(best);
   }
-  return phases;
+  return balancePhases(phases, size);
+}
+
+/**
+ * Evens out phase lengths: a phase under half the average joins its smaller
+ * neighbour; a phase over 1.75x the average splits in two at its midpoint.
+ * Both keep competency order, so prerequisites stay before dependants
+ * (merging only moves a block next to an adjacent one; splitting a
+ * prerequisite-ordered list leaves dependants in the later half).
+ */
+export function balancePhases(phases: Competency[][], size: (p: Competency[]) => number): Competency[][] {
+  const out = phases.map((p) => [...p]);
+  for (let guard = 0; guard < 20; guard++) {
+    const avg = out.reduce((s, p) => s + size(p), 0) / out.length;
+    const small = out.findIndex((p) => size(p) < avg * 0.5);
+    if (out.length > 2 && small !== -1) {
+      const left = small > 0 ? size(out[small - 1]) : Infinity;
+      const right = small < out.length - 1 ? size(out[small + 1]) : Infinity;
+      const i = left <= right ? small - 1 : small;
+      out.splice(i, 2, [...out[i], ...out[i + 1]]);
+      continue;
+    }
+    const big = out.findIndex((p) => p.length >= 2 && size(p) > avg * 1.75);
+    if (out.length < MAX_PHASES && big !== -1) {
+      const p = out[big];
+      const half = size(p) / 2;
+      let acc = 0;
+      let cut = 1;
+      for (; cut < p.length; cut++) {
+        acc += size([p[cut - 1]]);
+        if (acc >= half) break;
+      }
+      cut = Math.min(cut, p.length - 1); // one huge competency: never leave an empty half
+      out.splice(big, 1, p.slice(0, cut), p.slice(cut));
+      continue;
+    }
+    break;
+  }
+  return out;
 }
 
 const searchUrl = (title: string) => `https://www.google.com/search?q=${encodeURIComponent(title)}`;
@@ -194,6 +233,19 @@ export function buildSkeleton(map: CompetencyMap, intake: Intake, opts: Skeleton
       },
     };
   });
+
+  // A split phase keeps its group name: tell the halves apart.
+  const titleCount = new Map<string, number>();
+  for (const p of phases) titleCount.set(p.title, (titleCount.get(p.title) ?? 0) + 1);
+  const seenTitle = new Map<string, number>();
+  for (const p of phases) {
+    if ((titleCount.get(p.title) ?? 0) < 2 || opts.phaseTitles?.[p.phase]) continue;
+    const n = (seenTitle.get(p.title) ?? 0) + 1;
+    seenTitle.set(p.title, n);
+    const base = p.title;
+    p.title = `${base} (part ${n})`;
+    for (const it of p.items) it.title = it.title.replace(base, p.title);
+  }
 
   const itemsByComp = new Map<string, string[]>();
   for (const p of phases) for (const it of p.items) for (const k of it.competencyKeys) itemsByComp.set(k, [...(itemsByComp.get(k) ?? []), it.id]);
