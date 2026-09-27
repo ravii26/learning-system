@@ -67,7 +67,7 @@ describe('matchMap', () => {
 
 describe('requiredEvidence', () => {
   it('raises the bar with the target level', () => {
-    expect(requiredEvidence('algorithm', 'aware')).toEqual([{ kind: 'quiz', minScore: 0.7 }]);
+    expect(requiredEvidence('algorithm', 'aware')).toEqual([{ kind: 'recall', minCards: 2 }]); // aware → Explore topic: review cards, no quiz
     const interview = requiredEvidence('algorithm', 'interview');
     expect(interview).toContainEqual({ kind: 'problems_cold', count: 6 });
     expect(interview).toContainEqual({ kind: 'explain' });
@@ -76,7 +76,7 @@ describe('requiredEvidence', () => {
   it('asks each kind of competency for its natural proof', () => {
     expect(requiredEvidence('build', 'build')).toContainEqual({ kind: 'project' });
     expect(requiredEvidence('design', 'build')).toContainEqual({ kind: 'problems_cold', count: 1 });
-    expect(requiredEvidence('skill', 'use')).toContainEqual({ kind: 'practice', minReps: 3 });
+    expect(requiredEvidence('skill', 'use')).toEqual([{ kind: 'practice', minReps: 3 }]); // practice topics have no quiz or modules
     expect(requiredEvidence('concept', 'use').map((r) => r.kind)).not.toContain('problems_cold');
   });
 });

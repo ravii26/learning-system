@@ -69,12 +69,16 @@ export const IMPORTANCE_WEIGHT: Record<Importance, number> = { core: 3, supporti
  */
 export function requiredEvidence(kind: CompetencyKind, target: TargetLevel): EvidenceRequirement[] {
   const r = rank(target);
-  const out: EvidenceRequirement[] = [{ kind: 'quiz', minScore: r === 0 ? 0.7 : 0.8 }];
-  if (r >= 1) out.push({ kind: 'recall', minCards: 3 });
-  if (kind === 'algorithm' && r >= 1) out.push({ kind: 'problems_cold', count: [0, 2, 4, 6][r] });
+  // Every requirement must be something the item's shape can actually
+  // produce. Skills become Practice topics (reps, no quizzes); "know about
+  // it" goals become Explore topics (ideas turned into review cards).
+  if (kind === 'skill') return [{ kind: 'practice', minReps: [1, 3, 5, 8][r] }];
+  if (r === 0) return [{ kind: 'recall', minCards: 2 }];
+  const out: EvidenceRequirement[] = [{ kind: 'quiz', minScore: 0.8 }];
+  out.push({ kind: 'recall', minCards: 3 });
+  if (kind === 'algorithm') out.push({ kind: 'problems_cold', count: [0, 2, 4, 6][r] });
   if (kind === 'design' && r >= 2) out.push({ kind: 'problems_cold', count: r === 2 ? 1 : 2 });
   if (kind === 'build' && r >= 2) out.push({ kind: 'project' });
-  if (kind === 'skill') out.push({ kind: 'practice', minReps: [1, 3, 5, 8][r] });
   if (r >= 3 || (r >= 2 && (kind === 'concept' || kind === 'design'))) out.push({ kind: 'explain' });
   return out;
 }

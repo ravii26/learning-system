@@ -24,6 +24,14 @@ export const EMPHASIS_MAX = 1.5;
 
 const clip = (s: string, n: number) => s.replace(/\s+/g, ' ').trim().slice(0, n);
 
+/**
+ * Claims we can't check: percentages, and week/hour counts (the AI sees the
+ * skeleton before its own emphasis changes the length, so any number it
+ * states can contradict the header). Text containing them is dropped; the
+ * factual why is used instead.
+ */
+const UNBACKED = /\d+\s*%|\bpercent\b|\b\d+[\s-]*(weeks?|hours?|months?)\b|\bh\/week\b/i;
+
 export function buildAdaptMessages(skeleton: ProgramDraft, factualWhy: string): AIMessage[] {
   const i = skeleton.intake;
   const comps = skeleton.coverage.map((c) => {
@@ -56,12 +64,29 @@ Return JSON only:
   "whyThisPlan": "<3-5 sentences, second person, explaining the plan's shape from the facts above. No hype. Never claim mastery.>"${custom ? `,
   "namedResources": [ { "itemId": "<item id>", "title": "<exact title of a real, well-known book or course>", "type": "BOOK|COURSE|VIDEO|ARTICLE" } ]` : ''}
 }
-Only raise emphasis where the learner's goal, "done" definition or placement gives a reason; only use keys and ids listed above.${custom ? ' Name at most 2 resources per item, only ones you are sure exist; no URLs.' : ''}`;
+Only raise emphasis where the learner's goal, "done" definition or placement gives a reason; only use keys and ids listed above.
+Do not state numbers of weeks or hours (the screen shows them), and do not quote statistics or percentages.${custom ? ' This field has no reviewed resource list, so namedResources is required: 1 or 2 per item, only well-known books, courses or official guides you are certain exist, exact titles, no URLs.' : ''}`;
 
   return [
     { role: 'system', content: 'You adapt a fixed, expert-reviewed learning plan to one learner. You never add topics or invent links. Return valid JSON only.' },
     { role: 'user', content: user },
   ];
+}
+
+/**
+ * Emphasis is relative: the AI may move time between competencies, not add
+ * it. Rescales so the mean over all competencies in scope is 1 (unlisted
+ * ones count as 1), then re-clamps. "Everything 1.5" becomes "everything 1".
+ */
+export function normalizeEmphasis(emphasis: Record<string, number>, allKeys: string[]): Record<string, number> {
+  if (!allKeys.length || !Object.keys(emphasis).length) return emphasis;
+  const mean = allKeys.reduce((s, k) => s + (emphasis[k] ?? 1), 0) / allKeys.length;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(emphasis)) {
+    const n = Math.round(Math.min(EMPHASIS_MAX, Math.max(EMPHASIS_MIN, v / mean)) * 100) / 100;
+    if (n !== 1) out[k] = n;
+  }
+  return out;
 }
 
 /** Parses and clamps the AI's reply against the skeleton. Anything unknown is dropped. */
@@ -83,14 +108,16 @@ export function parseAdjustments(raw: string, skeleton: ProgramDraft): Adjustmen
     const n = Number(v);
     if (compKeys.has(k) && Number.isFinite(n)) out.emphasis[k] = Math.min(EMPHASIS_MAX, Math.max(EMPHASIS_MIN, n));
   }
+  out.emphasis = normalizeEmphasis(out.emphasis, Array.from(compKeys));
   for (const [k, v] of Object.entries(j.phaseTitles ?? {})) {
     const n = Number(k);
     if (phaseNums.has(n) && typeof v === 'string' && v.trim()) out.phaseTitles[n] = clip(v, 60);
   }
   for (const [k, v] of Object.entries(j.focus ?? {})) {
-    if (itemIds.has(k) && typeof v === 'string' && v.trim()) out.focus[k] = clip(v, 200);
+    if (itemIds.has(k) && typeof v === 'string' && v.trim() && !UNBACKED.test(v)) out.focus[k] = clip(v, 200);
   }
-  if (typeof j.whyThisPlan === 'string' && j.whyThisPlan.trim().length >= 40 && !/\bmaster(ed|y)?\b/i.test(j.whyThisPlan)) {
+  if (typeof j.whyThisPlan === 'string' && j.whyThisPlan.trim().length >= 40
+    && !/\bmaster(ed|y)?\b/i.test(j.whyThisPlan) && !UNBACKED.test(j.whyThisPlan)) {
     out.whyThisPlan = clip(j.whyThisPlan, 900);
   }
   if (skeleton.mapQuality !== 'curated' && Array.isArray(j.namedResources)) {

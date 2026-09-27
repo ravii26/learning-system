@@ -13,6 +13,8 @@ import type { CoverageRow, DraftItem, DraftPhase, DraftResource, Intake, Program
  */
 
 export const MAX_PHASES = 5;
+/** Longer than this and a phase stops feeling like progress. */
+export const MAX_PHASE_WEEKS = 6;
 
 const BASE_HOURS: Record<Competency['kind'], number> = { concept: 3, algorithm: 6, design: 5, build: 8, skill: 5 };
 const TARGET_MULT: Record<TargetLevel, number> = { aware: 0.5, use: 1, build: 1.5, interview: 2 };
@@ -38,6 +40,27 @@ export function shapeFor(c: Competency, intake: Intake): Shape {
   return 'course';
 }
 
+const DOING = /\b(run|build|ship|launch|make|create|deploy|write|publish|grow|sell|start|get)\b/i;
+
+/**
+ * When the learner's own finish line is about doing something ("run a
+ * campaign that gets 100 users", "ship an app"), the map's project that does
+ * it belongs in the plan even if the map lists it for a higher target —
+ * along with everything it depends on.
+ */
+export function withGoalProjects(map: CompetencyMap, intake: Intake, inScope: Competency[]): Competency[] {
+  if (intake.target === 'aware' || !intake.doneMeans || !DOING.test(intake.doneMeans)) return inScope;
+  const byKey = new Map(map.competencies.map((c) => [c.key, c]));
+  const keys = new Set(inScope.map((c) => c.key));
+  const add = (c: Competency) => {
+    if (keys.has(c.key)) return;
+    keys.add(c.key);
+    for (const p of c.prerequisites ?? []) if (byKey.has(p)) add(byKey.get(p)!);
+  };
+  for (const c of map.competencies) if (shapeFor(c, intake) === 'project') add(c);
+  return map.competencies.filter((c) => keys.has(c.key));
+}
+
 /**
  * Chooses what's in scope. With a deadline that doesn't fit, drops optional
  * competencies first, then supporting ones nothing kept depends on. Never
@@ -46,7 +69,7 @@ export function shapeFor(c: Competency, intake: Intake): Shape {
 export function scopeCompetencies(
   map: CompetencyMap, intake: Intake, emphasis: Record<string, number> = {},
 ): { comps: Competency[]; dropped: Competency[]; warnings: string[] } {
-  let comps = orderByPrerequisites(competenciesForTarget(map, intake.target));
+  let comps = orderByPrerequisites(withGoalProjects(map, intake, competenciesForTarget(map, intake.target)));
   const dropped: Competency[] = [];
   const warnings: string[] = [];
   const hours = (list: Competency[]) => list.reduce((s, c) => s + estimateHours(c, intake, emphasis[c.key] ?? 1), 0);
@@ -74,7 +97,7 @@ export function scopeCompetencies(
  * a competency before something it depends on, then merges the smallest
  * neighbours until there are at most MAX_PHASES.
  */
-export function groupIntoPhases(comps: Competency[], hoursOf: (c: Competency) => number): Competency[][] {
+export function groupIntoPhases(comps: Competency[], hoursOf: (c: Competency) => number, maxPhaseHours = Infinity): Competency[][] {
   const groupIndex = new Map<string, number>();
   for (const c of comps) if (!groupIndex.has(c.group)) groupIndex.set(c.group, groupIndex.size);
   const phaseOf = new Map<string, number>();
@@ -95,7 +118,7 @@ export function groupIntoPhases(comps: Competency[], hoursOf: (c: Competency) =>
     }
     mergeAt(best);
   }
-  return balancePhases(phases, size);
+  return balancePhases(phases, size, maxPhaseHours);
 }
 
 /**
@@ -105,7 +128,7 @@ export function groupIntoPhases(comps: Competency[], hoursOf: (c: Competency) =>
  * (merging only moves a block next to an adjacent one; splitting a
  * prerequisite-ordered list leaves dependants in the later half).
  */
-export function balancePhases(phases: Competency[][], size: (p: Competency[]) => number): Competency[][] {
+export function balancePhases(phases: Competency[][], size: (p: Competency[]) => number, maxPhaseHours = Infinity): Competency[][] {
   const out = phases.map((p) => [...p]);
   for (let guard = 0; guard < 20; guard++) {
     const avg = out.reduce((s, p) => s + size(p), 0) / out.length;
@@ -114,10 +137,13 @@ export function balancePhases(phases: Competency[][], size: (p: Competency[]) =>
       const left = small > 0 ? size(out[small - 1]) : Infinity;
       const right = small < out.length - 1 ? size(out[small + 1]) : Infinity;
       const i = left <= right ? small - 1 : small;
-      out.splice(i, 2, [...out[i], ...out[i + 1]]);
-      continue;
+      // Don't merge into something that would then be too long to feel like progress.
+      if (size(out[i]) + size(out[i + 1]) <= maxPhaseHours) {
+        out.splice(i, 2, [...out[i], ...out[i + 1]]);
+        continue;
+      }
     }
-    const big = out.findIndex((p) => p.length >= 2 && size(p) > avg * 1.75);
+    const big = out.findIndex((p) => p.length >= 2 && (size(p) > avg * 1.75 || size(p) > maxPhaseHours));
     if (out.length < MAX_PHASES && big !== -1) {
       const p = out[big];
       const half = size(p) / 2;
@@ -197,7 +223,7 @@ export function buildSkeleton(map: CompetencyMap, intake: Intake, opts: Skeleton
   const curated = opts.mapQuality === 'curated';
   const hoursOf = (c: Competency) => estimateHours(c, intake, emphasis[c.key] ?? 1);
   const { comps, warnings } = scopeCompetencies(map, intake, emphasis);
-  const groups = groupIntoPhases(comps, hoursOf);
+  const groups = groupIntoPhases(comps, hoursOf, intake.hoursPerWeek * MAX_PHASE_WEEKS);
 
   const phases: DraftPhase[] = groups.map((pcomps, i) => {
     const phase = i + 1;

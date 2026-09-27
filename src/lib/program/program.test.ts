@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getMap, competenciesForTarget, type CompetencyMap } from '@/data/competencies';
+import { getMap, competenciesForTarget, requiredEvidence, type CompetencyMap } from '@/data/competencies';
 import { buildSkeleton, estimateHours, scopeCompetencies } from './skeleton';
 import { parseAdjustments } from './adapt';
 import { composeDraft, sanitizeClientAdjustments } from './generate';
@@ -140,7 +140,8 @@ describe('AI adjustments are clamped to the skeleton', () => {
 
   it('a tampered client payload can only nudge emphasis within bounds', () => {
     const adj = sanitizeClientAdjustments({ emphasis: { 'sd-caching': 1000 }, addItems: [{ shape: 'course' }] }, { map: sd, field: sd.key, mapQuality: 'curated', intake: intake() });
-    expect(adj.emphasis['sd-caching']).toBe(1.5);
+    expect(adj.emphasis['sd-caching']).toBeGreaterThan(1);
+    expect(adj.emphasis['sd-caching']).toBeLessThanOrEqual(1.5); // clamped, then normalised (emphasis is relative)
   });
 });
 
@@ -228,5 +229,72 @@ describe('phase balancing', () => {
         }
       }
     }
+  });
+});
+
+describe('unbacked claims in AI text', () => {
+  const d = skeleton();
+  it('drops a why or focus note that states numbers of weeks or statistics', () => {
+    const adj = parseAdjustments(JSON.stringify({
+      whyThisPlan: 'This 53-week plan front-loads fundamentals so later phases build on something solid, which is how most people succeed.',
+      focus: { 'p1-course': 'These patterns appear in 60% of interview questions.', 'p2-course': 'Draw the data flow before choosing a database.' },
+    }), d);
+    expect(adj.whyThisPlan).toBeNull();
+    expect(adj.focus).toEqual({ 'p2-course': 'Draw the data flow before choosing a database.' });
+  });
+});
+
+describe('every checkpoint requirement is achievable by its item', () => {
+  it('practice items ask only for reps; explore items only for review cards', () => {
+    for (const target of ['aware', 'use', 'build', 'interview'] as const) {
+      const d = skeleton(intake({ target }));
+      for (const it of items(d)) {
+        for (const k of it.competencyKeys) {
+          const kind = sd.competencies.find((c) => c.key === k)!.kind;
+          const reqs = requiredEvidence(kind, target).map((r) => r.kind);
+          if (it.shape === 'practice') expect(reqs).toEqual(['practice']);
+          if (it.shape === 'exploration') expect(reqs).toEqual(['recall']);
+        }
+      }
+    }
+  });
+});
+
+describe('custom-field fixes found in e2e', () => {
+  const oneGroupMap: CompetencyMap = {
+    key: 'custom', title: 'Marketing', aliases: [], description: '',
+    competencies: [
+      { key: 'research', title: 'Market research', group: 'Foundations', kind: 'concept', importance: 'core', from: 'aware', summary: 's' },
+      { key: 'audience', title: 'Audience', group: 'Foundations', kind: 'concept', importance: 'core', from: 'aware', prerequisites: ['research'], summary: 's' },
+      { key: 'content', title: 'Content', group: 'Foundations', kind: 'skill', importance: 'core', from: 'use', prerequisites: ['audience'], summary: 's' },
+      { key: 'channels', title: 'Channels', group: 'Foundations', kind: 'concept', importance: 'core', from: 'use', summary: 's' },
+      { key: 'planning', title: 'Campaign planning', group: 'Foundations', kind: 'concept', importance: 'core', from: 'use', summary: 's' },
+      { key: 'analytics', title: 'Analytics', group: 'Foundations', kind: 'concept', importance: 'core', from: 'build', prerequisites: ['planning'], summary: 's' },
+      { key: 'campaign', title: 'Run a first campaign project', group: 'Foundations', kind: 'build', importance: 'core', from: 'build', prerequisites: ['analytics'], summary: 's' },
+    ],
+  };
+
+  it('pulls in the project (and its prerequisites) when "done" describes doing something', () => {
+    const d = skeleton(intake({ goal: 'learn marketing', target: 'use', hoursPerWeek: 4, doneMeans: 'run a small campaign that gets my first 100 users' }), oneGroupMap);
+    const keys = items(d).flatMap((i) => i.competencyKeys);
+    expect(keys).toContain('campaign');
+    expect(keys).toContain('analytics'); // build-level prerequisite came along
+    expect(items(d).some((i) => i.shape === 'project')).toBe(true);
+    const without = skeleton(intake({ goal: 'learn marketing', target: 'use', hoursPerWeek: 4, doneMeans: 'understand how marketing works' }), oneGroupMap);
+    expect(items(without).flatMap((i) => i.competencyKeys)).not.toContain('campaign');
+  });
+
+  it('splits a single long group so no phase runs past ~6 weeks', () => {
+    const d = skeleton(intake({ goal: 'learn marketing', target: 'build', hoursPerWeek: 2 }), oneGroupMap);
+    expect(d.phases.length).toBeGreaterThan(1);
+    for (const p of d.phases) if (p.items.flatMap((i) => i.competencyKeys).length > 1) expect(p.weeks).toBeLessThanOrEqual(7);
+  });
+
+  it('emphasis is relative: raising everything changes nothing', () => {
+    const d = skeleton();
+    const all = Object.fromEntries(d.coverage.map((c) => [c.key, 1.5]));
+    expect(parseAdjustments(JSON.stringify({ emphasis: all }), d).emphasis).toEqual({});
+    const one = parseAdjustments(JSON.stringify({ emphasis: { 'sd-caching': 1.5 } }), d).emphasis;
+    expect(one['sd-caching']).toBeGreaterThan(1);
   });
 });
