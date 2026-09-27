@@ -618,7 +618,7 @@ export default function ModuleStudyRoom({
           </div>
         </Accordion>
 
-        {!module.completed && <div className="flex justify-center pt-2">{finishButton(false)}</div>}
+        {!module.completed && <div className="flex justify-start pt-2">{finishButton(false)}</div>}
       </section>
     </div>
   );
