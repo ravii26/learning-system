@@ -23,8 +23,10 @@ export function Accordion({
     <details open={defaultOpen} className="group rounded-xl border border-line [&_summary::-webkit-details-marker]:hidden">
       <summary className="flex min-h-[52px] cursor-pointer list-none items-center gap-3 px-4 py-3 hover:bg-fill-1">
         <Icon name="chevronRight" size={16} className="shrink-0 text-fg-muted transition-transform group-open:rotate-90" />
-        <span className="text-[0.95rem] font-semibold">{title}</span>
-        {hint && <span className="ml-auto truncate text-[0.85rem] text-fg-muted">{hint}</span>}
+        <span className="flex min-w-0 flex-col">
+          <span className="text-[0.95rem] font-semibold">{title}</span>
+          {hint && <span className="truncate text-[0.8rem] text-fg-muted">{hint}</span>}
+        </span>
       </summary>
       <div className="border-t border-line px-4 py-4">{children}</div>
     </details>

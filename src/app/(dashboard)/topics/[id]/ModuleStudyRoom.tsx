@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { CourseModule, ModuleEvidence } from './page';
 import { renderMarkdown } from '@/lib/markdown';
 import RichTextEditor from './RichTextEditor';
@@ -232,12 +233,88 @@ export default function ModuleStudyRoom({
       {module.completed ? <><Icon name="check" size={16} strokeWidth={2.4} /> Finished</> : quiet ? 'Mark finished' : 'Mark this module finished'}
     </button>
   );
+  // The left column's slot (see topics/[id]/page.tsx). Looked up after mount.
+  const [sidePanel, setSidePanel] = useState<HTMLElement | null>(null);
+  useEffect(() => setSidePanel(document.getElementById('module-side-panel')), []);
   const hasModuleNotes = !!module.notes && module.notes.replace(/<[^>]*>/g, '').trim().length > 0;
   const progressHint = [
     evidence?.quiz?.total ? `Quiz ${evidence.quiz.correct}/${evidence.quiz.total}` : null,
     evidence?.reviewCards ? `${evidence.reviewCards} in review` : null,
     isVerdict(evidence?.challenge?.verdict) ? `Explained: ${VERDICT_STYLE[evidence!.challenge!.verdict as Verdict].label.toLowerCase()}` : null,
   ].filter(Boolean).join(' · ') || 'Nothing yet';
+
+  const sideContent = (
+    <>
+      {/* Secondary: collapsed by default so the lesson stays the focus. The
+          headers carry a one-line summary, so nothing important is hidden. */}
+      <section aria-label="Your work on this module" className="flex flex-col gap-2">
+        <Accordion title="Your notes" hint={hasModuleNotes ? 'Saved' : 'Explain it in your own words'} defaultOpen={hasModuleNotes}>
+          <div className="flex flex-col gap-2.5">
+            <span className="text-[0.8rem] text-fg-muted">Saved as you type · shown again with this module’s review cards</span>
+            {/* Keyed by module: the editor captures its save callback when it's
+                created, so a save still pending after you switch modules lands
+                on the module you typed it in. */}
+            <RichTextEditor
+              key={module.id}
+              content={module.notes || ''}
+              onChange={(html) => saveModuleNotes(module.id, html)}
+              placeholder={`Explain ${module.title} back in your own words.`}
+              minHeight={150}
+            />
+            {notes && notes.replace(/<[^>]*>/g, '').trim() && (
+              <details className="text-[0.85rem] text-fg-secondary">
+                <summary className="cursor-pointer font-semibold">Older topic-wide notes</summary>
+                <div className="mt-2">
+                  <RichTextEditor content={notes} onChange={onSaveNotes} placeholder="" minHeight={100} />
+                </div>
+              </details>
+            )}
+          </div>
+        </Accordion>
+
+        <Accordion title="Your progress on this module" hint={progressHint}>
+          <div className="flex flex-col gap-6">
+            <dl className="m-0 grid grid-cols-2 gap-x-3 gap-y-3.5 text-[0.9rem]">
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-fg-muted">Last quiz</dt>
+                <dd className="m-0 font-semibold">{evidence?.quiz?.total ? `${evidence.quiz.correct} of ${evidence.quiz.total}` : '—'}</dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-fg-muted">Explain-it</dt>
+                <dd className="m-0 font-semibold" style={{ color: isVerdict(evidence?.challenge?.verdict) ? VERDICT_STYLE[evidence!.challenge!.verdict as Verdict].color : undefined }}>
+                  {isVerdict(evidence?.challenge?.verdict) ? VERDICT_STYLE[evidence!.challenge!.verdict as Verdict].label : '—'}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-fg-muted">In review</dt>
+                <dd className="m-0 font-semibold">{evidence?.reviewCards ? `${evidence.reviewCards} card${evidence.reviewCards === 1 ? '' : 's'}` : '—'}</dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-fg-muted">Where it stands</dt>
+                <dd className="m-0 font-semibold">{evidence?.state ? <KnowledgeMark state={evidence.state} showLabel /> : '—'}</dd>
+              </div>
+            </dl>
+            <ProblemLog topicId={topicId} moduleId={module.id} onChanged={onEvidenceChanged} />
+          </div>
+        </Accordion>
+
+        <Accordion title="Lesson options">
+          <div className="flex flex-col items-start gap-2">
+            <span className="text-[0.85rem] text-fg-muted">Didn’t click? Get the same module explained again with fresh examples.</span>
+            <button
+              type="button"
+              onClick={() => { setGenerating(true); loadLesson(true); }}
+              disabled={loadingLesson || generating}
+              className="btn btn-secondary h-9 py-0 text-[0.85rem]"
+            >
+              {generating ? 'Rewriting…' : 'Rewrite this lesson'}
+            </button>
+          </div>
+        </Accordion>
+
+      </section>
+    </>
+  );
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-[720px] flex-col gap-10">
@@ -264,7 +341,7 @@ export default function ModuleStudyRoom({
           )}
         </header>
 
-        <div role="tablist" aria-label="Steps in this module" className="-mb-2 flex flex-wrap gap-x-6 border-b border-line">
+        <div role="tablist" aria-label="Steps in this module" className="flex flex-wrap gap-1.5">
           {STEPS.map((step, i) => {
             const on = activeTab === step.key;
             return (
@@ -273,9 +350,9 @@ export default function ModuleStudyRoom({
                 role="tab"
                 aria-selected={on}
                 onClick={() => setActiveTab(step.key)}
-                className={`-mb-px flex h-11 shrink-0 items-center gap-2 border-b-2 text-[0.92rem] ${on ? 'border-ink font-semibold text-fg' : 'border-transparent font-medium text-fg-muted hover:text-fg'}`}
+                className={`flex h-9 items-center gap-2 rounded-full pl-1.5 pr-3.5 text-[0.875rem] font-semibold ${on ? 'bg-ink text-on-ink' : 'text-fg-secondary hover:bg-fill-2 hover:text-fg'}`}
               >
-                <span className="tabular-nums text-fg-muted">{i + 1}</span>
+                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[0.75rem] ${on ? 'bg-on-ink text-ink' : 'bg-sunk text-fg-secondary'}`}>{i + 1}</span>
                 {step.label}
               </button>
             );
@@ -551,75 +628,10 @@ export default function ModuleStudyRoom({
         )}
       </article>
 
-      {/* Secondary: collapsed by default so the lesson stays the focus. The
-          headers carry a one-line summary, so nothing important is hidden. */}
-      <section aria-label="Your work on this module" className="flex flex-col gap-3">
-        <Accordion title="Your notes" hint={hasModuleNotes ? 'Saved' : 'Explain it in your own words'} defaultOpen={hasModuleNotes}>
-          <div className="flex flex-col gap-2.5">
-            <span className="text-[0.8rem] text-fg-muted">Saved as you type · shown again with this module’s review cards</span>
-            {/* Keyed by module: the editor captures its save callback when it's
-                created, so a save still pending after you switch modules lands
-                on the module you typed it in. */}
-            <RichTextEditor
-              key={module.id}
-              content={module.notes || ''}
-              onChange={(html) => saveModuleNotes(module.id, html)}
-              placeholder={`Explain ${module.title} back in your own words.`}
-              minHeight={150}
-            />
-            {notes && notes.replace(/<[^>]*>/g, '').trim() && (
-              <details className="text-[0.85rem] text-fg-secondary">
-                <summary className="cursor-pointer font-semibold">Older topic-wide notes</summary>
-                <div className="mt-2">
-                  <RichTextEditor content={notes} onChange={onSaveNotes} placeholder="" minHeight={100} />
-                </div>
-              </details>
-            )}
-          </div>
-        </Accordion>
-
-        <Accordion title="Your progress on this module" hint={progressHint}>
-          <div className="flex flex-col gap-6">
-            <dl className="m-0 grid grid-cols-2 gap-x-3 gap-y-3.5 text-[0.9rem] sm:grid-cols-4">
-              <div className="flex flex-col gap-0.5">
-                <dt className="text-fg-muted">Last quiz</dt>
-                <dd className="m-0 font-semibold">{evidence?.quiz?.total ? `${evidence.quiz.correct} of ${evidence.quiz.total}` : '—'}</dd>
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <dt className="text-fg-muted">Explain-it</dt>
-                <dd className="m-0 font-semibold" style={{ color: isVerdict(evidence?.challenge?.verdict) ? VERDICT_STYLE[evidence!.challenge!.verdict as Verdict].color : undefined }}>
-                  {isVerdict(evidence?.challenge?.verdict) ? VERDICT_STYLE[evidence!.challenge!.verdict as Verdict].label : '—'}
-                </dd>
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <dt className="text-fg-muted">In review</dt>
-                <dd className="m-0 font-semibold">{evidence?.reviewCards ? `${evidence.reviewCards} card${evidence.reviewCards === 1 ? '' : 's'}` : '—'}</dd>
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <dt className="text-fg-muted">Where it stands</dt>
-                <dd className="m-0 font-semibold">{evidence?.state ? <KnowledgeMark state={evidence.state} showLabel /> : '—'}</dd>
-              </div>
-            </dl>
-            <ProblemLog topicId={topicId} moduleId={module.id} onChanged={onEvidenceChanged} />
-          </div>
-        </Accordion>
-
-        <Accordion title="Lesson options">
-          <div className="flex flex-col items-start gap-2">
-            <span className="text-[0.85rem] text-fg-muted">Didn’t click? Get the same module explained again with fresh examples.</span>
-            <button
-              type="button"
-              onClick={() => { setGenerating(true); loadLesson(true); }}
-              disabled={loadingLesson || generating}
-              className="btn btn-secondary h-9 py-0 text-[0.85rem]"
-            >
-              {generating ? 'Rewriting…' : 'Rewrite this lesson'}
-            </button>
-          </div>
-        </Accordion>
-
-        {!module.completed && <div className="flex justify-start pt-2">{finishButton(false)}</div>}
-      </section>
+      {/* Notes, progress and options live in the page's left column under the
+          module list; before that column mounts (first paint) they render here. */}
+      {sidePanel ? createPortal(sideContent, sidePanel) : sideContent}
+      {!module.completed && <div className="flex justify-start">{finishButton(false)}</div>}
     </div>
   );
 }

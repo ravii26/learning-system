@@ -629,7 +629,10 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
       )}
 
       <div className="grid items-start gap-12 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <nav aria-label="Modules" className="flex flex-col gap-4 rounded-2xl border border-line p-3 lg:sticky lg:top-6">
+        {/* Left column: modules, then this module's notes / progress / options
+            (ModuleStudyRoom renders those into #module-side-panel). */}
+        <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
+        <nav aria-label="Modules" className="flex flex-col gap-4 rounded-2xl border border-line p-3">
           <div className="flex flex-col gap-3 px-1">
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-[0.95rem] font-semibold">
@@ -786,6 +789,8 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
             </form>
           )}
         </nav>
+        <div id="module-side-panel" className="flex flex-col gap-2" />
+        </div>
 
         <div className="flex min-w-0 flex-col gap-6">
           {activeModule ? (
