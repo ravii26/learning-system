@@ -14,7 +14,8 @@ vi.mock('@/lib/db', () => {
   const topic = {
     findFirst: async ({ where }: any) => {
       if (where.copiedFromId) return created.find((c) => c.userId === where.userId && c.copiedFromId === where.copiedFromId) ?? null;
-      return bobTopics.find((t) => t.id === where.id && (where.shared === undefined || t.shared === where.shared)) ?? null;
+      // No shared goals in this fixture, so only the shared: true branch of the OR can match.
+      return bobTopics.find((t) => t.id === where.id && t.shared) ?? null;
     },
     create: async ({ data }: any) => {
       const row = { id: `copy-${created.length + 1}`, ...data };

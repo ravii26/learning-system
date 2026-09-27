@@ -22,7 +22,8 @@ export async function GET(_request: Request, { params }: { params: { userId: str
     const [friend, topics, goals, theirMinutes, yourMinutes, yourCopies, yourGoalCopies] = await Promise.all([
       db.user.findUnique({ where: { id: friendId }, select: { name: true, email: true } }),
       db.topic.findMany({
-        where: { userId: friendId, shared: true, deletedAt: null },
+        // Topics shared on their own, plus every topic in a shared goal.
+        where: { userId: friendId, deletedAt: null, OR: [{ shared: true }, { goalLinks: { some: { goal: { shared: true } } } }] },
         select: {
           id: true, title: true, area: true, status: true, mode: true, depthTarget: true,
           progressPct: true, lastTouchedDate: true,
@@ -81,11 +82,10 @@ export async function GET(_request: Request, { params }: { params: { userId: str
       goals: goals.map(({ links, ...g }) => ({
         ...g,
         yourCopyId: goalCopyOf.get(g.id) ?? null,
-        // A goal can be shared while some of its topics aren't: name them,
-        // but only link the ones the friend also shared.
+        // Sharing a goal shares every topic in it.
         topics: links
           .filter((l) => l.topic && !l.topic.deletedAt)
-          .map((l) => ({ title: l.topic!.title, sharedTopicId: l.topic!.shared ? l.topic!.id : null })),
+          .map((l) => ({ title: l.topic!.title, sharedTopicId: l.topic!.id })),
       })),
     });
   } catch (e) {
