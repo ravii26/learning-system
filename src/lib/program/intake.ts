@@ -10,10 +10,11 @@ const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v
 const keys = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.length <= 80).slice(0, 60) : []);
 
 /** Quick start without a stated target: infer it from the goal's own words. */
+/** Reads the goal and "done" text together: "get a high paying job" is as telling as "interview". */
 export function inferTarget(goal: string): TargetLevel {
   const g = goal.toLowerCase();
-  if (/\b(interview|crack|faang|maang|placement|job[- ]ready|master)\b/.test(g)) return 'interview';
-  if (/\b(build|ship|project|develop|make an? )\b/.test(g)) return 'build';
+  if (/\b(interview|interviews|crack|faang|maang|placement|job[- ]ready|master|hired|high[- ]paying|senior)\b/.test(g)) return 'interview';
+  if (/\b(build|ship|deploy|project|develop|production|make an? )\b/.test(g)) return 'build';
   if (/\b(basics|overview|curious|understand|intro|what is)\b/.test(g)) return 'aware';
   return 'use';
 }

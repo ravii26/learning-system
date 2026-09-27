@@ -98,9 +98,24 @@ describe('scoping and hours', () => {
     expect(estimateHours(c, intake({ placement: { strong: [], weak: ['sd-caching'] } }))).toBeGreaterThan(base);
   });
 
-  it('an awareness goal becomes exploration, not a fake course', () => {
+  it('"know about it" on a structured field is a short overview course, on an open field it is exploring', () => {
     const d = skeleton(intake({ target: 'aware' }));
-    expect(items(d).every((i) => i.shape === 'exploration')).toBe(true);
+    expect(items(d).every((i) => i.shape === 'course')).toBe(true);
+    const open = sanitizeMap({ title: 'Quantum', competencies: [
+      { key: 'a', title: 'Qubits', kind: 'concept', importance: 'core', from: 'aware' },
+      { key: 'b', title: 'Superposition', kind: 'concept', importance: 'core', from: 'aware' },
+      { key: 'c', title: 'Gates', kind: 'concept', importance: 'core', from: 'aware' },
+    ] }, 'quantum').map!;
+    expect(items(skeleton(intake({ goal: 'curious about quantum', target: 'aware' }), open)).every((i) => i.shape === 'exploration')).toBe(true);
+  });
+
+  it('warns when the chosen level is below what the goal and "done" ask for (the real case from testing)', () => {
+    const d = skeleton(intake({
+      goal: 'Become interview-ready in system design', target: 'aware',
+      doneMeans: 'I should be able to build and deploy products and get a high paying job',
+    }));
+    expect(d.warnings[0]).toMatch(/sounds like “interview-ready”.*covers 6 of the 25 topics/);
+    expect(skeleton(intake({ target: 'interview' })).warnings.join(' ')).not.toMatch(/sounds like/);
   });
 
   it('a book goal becomes chapters of reading with the book as an unreviewed search link', () => {
@@ -197,6 +212,8 @@ describe('intake', () => {
     expect(inferTarget('build a portfolio site')).toBe('build');
     expect(inferTarget('curious what quantum computing is')).toBe('aware');
     expect(inferTarget('learn SQL')).toBe('use');
+    expect(inferTarget('learn system design and get a high paying job')).toBe('interview');
+    expect(inferTarget('build and deploy products')).toBe('build');
   });
 
   it('validates and clamps', () => {

@@ -84,6 +84,10 @@ export default function BuildProgramPage() {
 
   const matched = useMemo(() => (goal.trim().length > 2 ? matchMap(goal) : null), [goal]);
   const effectiveTarget = target ?? inferTarget(goal);
+  // What the learner's own words ask for (goal + "done"), to catch a level picked too low.
+  const impliedTarget = inferTarget(`${goal} ${doneMeans}`);
+  const RANK: TargetLevel[] = ['aware', 'use', 'build', 'interview'];
+  const topicsAt = (t: TargetLevel) => (matched ? competenciesForTarget(matched, t).length : null);
 
   const intakeBody = (): Partial<Intake> & Record<string, unknown> => ({
     goal, path: serious ? 'serious' : 'quick', currentLevel: level, hoursPerWeek: hours,
@@ -101,14 +105,14 @@ export default function BuildProgramPage() {
     } : {}),
   });
 
-  const requestDraft = async (mapOverride?: CompetencyMap) => {
+  const requestDraft = async (mapOverride?: CompetencyMap, targetOverride?: TargetLevel) => {
     setBusy(mapOverride ? 'Building your plan from your topic list…' : 'Building your plan…');
     setError(null);
     try {
       const res = await fetch('/api/programs/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...intakeBody(), ...(mapOverride ? { customMap: mapOverride } : {}) }),
+        body: JSON.stringify({ ...intakeBody(), ...(targetOverride ? { target: targetOverride } : {}), ...(mapOverride ? { customMap: mapOverride } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not build a plan.');
@@ -223,6 +227,18 @@ export default function BuildProgramPage() {
             ))}
           </div>
           {!target && goal.trim() && <p className="m-0 text-[0.85rem] text-fg-muted">Guessed from your goal. Tap to change.</p>}
+          {RANK.indexOf(effectiveTarget) < RANK.indexOf(impliedTarget) && (
+            <p role="alert" className="m-0 rounded-lg border border-line px-3 py-2 text-[0.88rem] text-fg-secondary">
+              Your goal sounds like <strong>{TARGET_LABEL[impliedTarget]}</strong>.
+              {' '}“{sentence(TARGET_LABEL[effectiveTarget])}” {topicsAt(effectiveTarget) !== null ? `covers ${topicsAt(effectiveTarget)} of the ${topicsAt(impliedTarget)} topics that level needs` : 'is a much smaller plan'}.{' '}
+              <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setTarget(impliedTarget)}>Use {TARGET_LABEL[impliedTarget]}</button>
+            </p>
+          )}
+          {matched && (
+            <p className="m-0 text-[0.82rem] text-fg-muted">
+              Topics in {matched.title} at each level: {RANK.map((t) => `${sentence(TARGET_LABEL[t])} ${topicsAt(t)}`).join(' · ')}
+            </p>
+          )}
         </fieldset>
 
         <label className="flex cursor-pointer items-center gap-3 rounded-xl border-[1.5px] border-line px-4 py-3.5">
@@ -389,6 +405,8 @@ export default function BuildProgramPage() {
           </ul>
         )}
 
+        <FullSyllabus draft={draft} busy={!!busy} onRebuild={(t) => { setTarget(t); requestDraft(draft.mapQuality === 'approved_draft' ? draft.map : undefined, t); }} />
+
         {draft.phases.map((p) => (
           <section key={p.phase} aria-labelledby={`ph-${p.phase}`} className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between gap-3">
@@ -455,4 +473,53 @@ export default function BuildProgramPage() {
   }
 
   return null;
+}
+
+/**
+ * The whole field, not just this plan: every topic in the map grouped by
+ * area, marked in-plan or "deeper level", with one-click rebuilds at higher
+ * levels. A learner who doesn't know the syllabus can see what exists.
+ */
+function FullSyllabus({ draft, busy, onRebuild }: { draft: ProgramDraft; busy: boolean; onRebuild: (t: TargetLevel) => void }) {
+  const LEVELS: TargetLevel[] = ['aware', 'use', 'build', 'interview'];
+  const inPlan = new Set(draft.coverage.filter((c) => c.itemIds.length).map((c) => c.key));
+  const groups = Array.from(new Set(draft.map.competencies.map((c) => c.group)));
+  const total = draft.map.competencies.length;
+  const higher = LEVELS.filter((t) => LEVELS.indexOf(t) > LEVELS.indexOf(draft.intake.target));
+  const sentenceCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  return (
+    <details className="rounded-xl border border-line" open={inPlan.size < total}>
+      <summary className="flex cursor-pointer flex-wrap items-baseline justify-between gap-2 px-5 py-4">
+        <span className="font-semibold">Everything in {draft.map.title}</span>
+        <span className="text-[0.88rem] text-fg-secondary">This plan covers {inPlan.size} of {total} topics</span>
+      </summary>
+      <div className="flex flex-col gap-5 border-t border-line px-5 py-4">
+        {higher.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <span className="text-[0.88rem] text-fg-secondary">Want more of the field? Rebuild the plan at a higher level:</span>
+            <div className="flex flex-wrap gap-2">
+              {higher.map((t) => (
+                <button key={t} type="button" disabled={busy} onClick={() => onRebuild(t)} className="btn btn-secondary h-9 py-0 text-[0.85rem]">
+                  {sentenceCase(TARGET_LABEL[t])} · {competenciesForTarget(draft.map, t).length} topics
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {groups.map((g) => (
+          <div key={g} className="flex flex-col gap-1.5">
+            <span className="text-[0.8rem] font-semibold uppercase tracking-wide text-fg-muted">{g}</span>
+            <ul className="m-0 flex list-none flex-col gap-1 p-0">
+              {draft.map.competencies.filter((c) => c.group === g).map((c) => (
+                <li key={c.key} className="flex items-baseline justify-between gap-3 text-[0.92rem]">
+                  <span className={inPlan.has(c.key) ? 'text-fg' : 'text-fg-muted'}>{inPlan.has(c.key) ? '✓' : '○'} {c.title}</span>
+                  {!inPlan.has(c.key) && <span className="shrink-0 text-[0.78rem] text-fg-muted">from “{TARGET_LABEL[c.from]}”</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
 }

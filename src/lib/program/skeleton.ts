@@ -4,6 +4,8 @@ import {
 } from '@/data/competencies';
 import { findCatalogResources, type CatalogResource, type ResourceRole } from '@/data/resources';
 import type { CoverageRow, DraftItem, DraftPhase, DraftResource, Intake, ProgramDraft, Shape } from './types';
+import { inferTarget } from './intake';
+import { TARGET_LABEL } from './why';
 
 /**
  * The deterministic core of program generation. Given a competency map and
@@ -32,11 +34,16 @@ export function estimateHours(c: Competency, intake: Intake, emphasis = 1): numb
   return roundHalf(h * emphasis);
 }
 
-export function shapeFor(c: Competency, intake: Intake): Shape {
+/**
+ * "Know about it" on a curated (structured) field is a short overview course
+ * with lessons; Explore (collecting notes, no syllabus) is for open-ended
+ * fields the AI drafted, like marketing or investing.
+ */
+export function shapeFor(c: Competency, intake: Intake, curated = false): Shape {
   if (c.kind === 'build' && /project/i.test(`${c.key} ${c.title}`)) return 'project';
   if (c.kind === 'skill') return 'practice';
   if (intake.bookTitle) return 'reading';
-  if (intake.target === 'aware') return 'exploration';
+  if (intake.target === 'aware' && !curated) return 'exploration';
   return 'course';
 }
 
@@ -234,7 +241,7 @@ export function buildSkeleton(map: CompetencyMap, intake: Intake, opts: Skeleton
 
     const byShape = new Map<Shape, Competency[]>();
     for (const c of pcomps) {
-      const s = shapeFor(c, intake);
+      const s = shapeFor(c, intake, curated);
       byShape.set(s, [...(byShape.get(s) ?? []), c]);
     }
     const items: DraftItem[] = SHAPE_ORDER.filter((s) => byShape.has(s)).map((shape) => {
@@ -280,6 +287,16 @@ export function buildSkeleton(map: CompetencyMap, intake: Intake, opts: Skeleton
   }));
 
   if (!curated && !intake.bookTitle) warnings.push('There are no curated resources for this field yet. Add sources you trust to each item.');
+
+  // The level picked is lower than what the learner's own words ask for:
+  // say so, with how much of the field it leaves out.
+  const implied = inferTarget(`${intake.goal} ${intake.doneMeans ?? ''}`);
+  const rank = (t: TargetLevel) => ['aware', 'use', 'build', 'interview'].indexOf(t);
+  if (rank(intake.target) < rank(implied)) {
+    const covered = competenciesForTarget(map, intake.target).length;
+    const full = competenciesForTarget(map, implied).length;
+    warnings.unshift(`Your goal sounds like “${TARGET_LABEL[implied]}”, but this plan is for “${TARGET_LABEL[intake.target]}”: it covers ${covered} of the ${full} topics that level needs. Rebuild it at a higher level below if you meant more.`);
+  }
 
   return {
     field: opts.field,
