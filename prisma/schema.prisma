@@ -90,6 +90,12 @@ model User {
   placementChecks  PlacementCheck[]
   friendRequestsSent     Friendship[] @relation("FriendshipRequester")
   friendRequestsReceived Friendship[] @relation("FriendshipAddressee")
+  programs               Program[]
+  programItems           ProgramItem[]
+  checkpoints            Checkpoint[]
+  competencyEvidence     CompetencyEvidence[]
+  programChanges         ProgramChange[]
+  weeklyCheckins         WeeklyCheckin[]
 }
 
 model Topic {
@@ -176,6 +182,7 @@ model Topic {
   studyTime       StudyTimeEntry[]
   problemAttempts ProblemAttempt[]
   placementChecks PlacementCheck[]
+  programItems    ProgramItem[]
 }
 
 /// Evidence from the Study Room: one row per checked quiz or graded
@@ -571,6 +578,11 @@ model Goal {
   updatedAt DateTime @updatedAt
 
   links GoalLink[]
+  // A goal made from the program flow carries its plan here; every approved
+  // change adds a new Program version rather than editing the old one.
+  programs       Program[]
+  programChanges ProgramChange[]
+  weeklyCheckins WeeklyCheckin[]
 
   @@index([userId, status, targetDate])
 }
@@ -814,6 +826,15 @@ model Resource {
   url      String @default("")
   purpose  String @default("")
   status   String @default("NOT_STARTED") // NOT_STARTED | IN_PROGRESS | COMPLETED | PAUSED
+  // Five independent questions about a resource — a link that works is not
+  // the same as a resource worth trusting:
+  source        String    @default("user")       // user | catalog | search | ai
+  catalogKey    String?                          // id in src/data/resources when source = catalog
+  linkStatus    String    @default("unchecked")  // ok | broken | unchecked
+  linkCheckedAt DateTime?
+  quality       String    @default("unreviewed") // curated | evaluated | unreviewed
+  pricing       String    @default("unknown")    // free | freemium | paid | unknown
+  role          String    @default("reference")  // primary | practice | reference | supplementary
   notes    String @default("")
 
   removed Boolean @default(false)
@@ -928,4 +949,140 @@ model Friendship {
 
   @@unique([requesterId, addresseeId])
   @@index([addresseeId, status])
+}
+
+/// One version of a learning program: the plan built for a Goal from its
+/// intake and competency map. Immutable once created — an approved change
+/// creates version + 1 and marks this one superseded (see ProgramChange).
+model Program {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goalId String
+  goal   Goal   @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  version       Int
+  status        String @default("active") // active | superseded
+  field         String // competency map key (src/data/competencies), or "custom"
+  mapQuality    String // curated | approved_draft (AI-drafted, reviewed by the user)
+  intake        Json   // the answers the plan was built from
+  competencyMap Json   // snapshot of the map used, so later map edits don't rewrite history
+  whyThisPlan   String
+  hoursPerWeek  Int
+  totalWeeks    Int
+
+  createdAt DateTime @default(now())
+
+  items       ProgramItem[]
+  checkpoints Checkpoint[]
+  evidence    CompetencyEvidence[]
+
+  @@unique([goalId, version])
+  @@index([userId, status])
+}
+
+/// One thing to do in a phase: a course, reading, practice, exploration or
+/// project, covering one or more competencies. topicId links the app topic
+/// created for it on approval.
+model ProgramItem {
+  id        String  @id @default(uuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  programId String
+  program   Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  phase          Int
+  phaseTitle     String
+  order          Int
+  shape          String   // course | reading | practice | exploration | project
+  title          String
+  competencyKeys String[]
+  hoursPerWeek   Float
+  weeks          Int
+  resourceKeys   String[] @default([]) // catalogue ids; resources are never free text from the AI
+  details        Json?
+
+  topicId String?
+  topic   Topic?  @relation(fields: [topicId], references: [id], onDelete: SetNull)
+
+  @@index([programId, phase, order])
+}
+
+/// Evidence gate for a phase. Control, not a learning shape: it's met when
+/// every listed competency's evidence requirements are satisfied.
+model Checkpoint {
+  id        String  @id @default(uuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  programId String
+  program   Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  phase          Int
+  title          String
+  competencyKeys String[]
+  status         String    @default("not_started") // not_started | in_progress | ready
+  metAt          DateTime?
+
+  @@index([programId, phase])
+}
+
+/// Competency evidence matrix row: what a competency requires at the target
+/// level, what the evidence tables actually show, and the resulting status.
+/// A cache of src/lib/program/evidence.ts, rewritten on each evaluation.
+model CompetencyEvidence {
+  id            String  @id @default(uuid())
+  userId        String
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  programId     String
+  program       Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  competencyKey String
+  required      Json
+  actual        Json
+  status        String // not_started | in_progress | ready
+  evaluatedAt   DateTime @default(now())
+
+  @@unique([programId, competencyKey])
+}
+
+/// Why a program changed: the history a learner reads months later.
+model ProgramChange {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goalId String
+  goal   Goal   @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  fromVersion Int?     // null for the first version
+  toVersion   Int
+  reason      String
+  evidenceIds String[] @default([])
+  changes     Json     // the accepted change list
+  approvedBy  String   // userId of whoever approved it
+  createdAt   DateTime @default(now())
+
+  @@index([goalId, toVersion])
+}
+
+/// A week's review for a goal's program: planned vs actual, the evidence
+/// summary, and the AI's proposal with the user's decision per change.
+model WeeklyCheckin {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goalId String
+  goal   Goal   @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  programVersion Int
+  weekStart      DateTime
+  plannedMinutes Int
+  actualMinutes  Int
+  evidence       Json
+  proposal       Json?
+  decisions      Json?
+  status         String    @default("proposed") // no_change | proposed | decided
+  decidedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@unique([goalId, weekStart])
 }
