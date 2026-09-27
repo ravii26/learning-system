@@ -6,6 +6,33 @@ import { resolveMap } from '@/lib/program/resolve';
 import { composeDraft, sanitizeClientAdjustments } from '@/lib/program/generate';
 import { persistProgram } from '@/lib/program/persist';
 import { recomputeGoalReadiness } from '@/lib/goalReadinessRecompute';
+import { checkinDueAt } from '@/lib/program/checkinServer';
+
+/** Your active programs, with whether a weekly check-in is due or waiting — for the Today card. */
+export async function GET() {
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const { userId } = auth;
+
+  try {
+    const programs = await db.program.findMany({
+      where: { userId, status: 'active', goal: { status: 'active' } },
+      select: { goalId: true, version: true, goal: { select: { title: true } } },
+    });
+    const out = [];
+    for (const p of programs) {
+      const [dueAt, pending] = await Promise.all([
+        checkinDueAt(db, userId, p.goalId),
+        db.weeklyCheckin.count({ where: { userId, goalId: p.goalId, status: 'proposed' } }),
+      ]);
+      out.push({ goalId: p.goalId, title: p.goal.title, version: p.version, dueAt, checkinDue: !!dueAt && Date.now() >= dueAt.getTime(), checkinPending: pending > 0 });
+    }
+    return NextResponse.json(out);
+  } catch (e) {
+    console.error('Failed to list programs:', e);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
 
 /**
  * Approves a draft. The program is rebuilt here from trusted parts — the
