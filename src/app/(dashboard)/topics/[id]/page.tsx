@@ -18,6 +18,7 @@ import { useStudyTracker } from '@/lib/useStudyTracker';
 import { formatDuration } from '@/lib/timeSummary';
 import TopicTimeDrawer from './TopicTimeDrawer';
 import PlacementDrawer from './PlacementDrawer';
+import TopicToolsMenu from './TopicToolsMenu';
 
 /** Latest quiz/challenge result per module — from /api/topics/[id]/attempts. */
 export interface ModuleEvidence {
@@ -138,6 +139,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
   const tracker = useStudyTracker({ topicId: params.id, moduleId: activeModuleId, forceActive: timerActive });
   const [timeTotals, setTimeTotals] = useState({ todaySeconds: 0, allTimeSeconds: 0 });
   const [timeDrawerOpen, setTimeDrawerOpen] = useState(false);
+  const [addingModule, setAddingModule] = useState(false);
   const [placementOpen, setPlacementOpen] = useState(false);
   const fetchTimeTotals = useCallback(async () => {
     const tz = new Date().getTimezoneOffset();
@@ -565,13 +567,6 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           </Link>
           <span className="flex-1" />
 
-          {/* Real study time — tracked while you're active here, plus anything you log */}
-          <button type="button" onClick={() => setTimeDrawerOpen(true)} className={chip} title="Time you spent on this topic — see history, log or correct it">
-            <Icon name="clock" size={16} className="text-fg-muted" />
-            <span className="font-semibold text-fg">{formatDuration(timeTotals.todaySeconds + tracker.unflushedSeconds)}</span>
-            <span className="text-fg-muted">today · {formatDuration(timeTotals.allTimeSeconds + tracker.unflushedSeconds)} total</span>
-          </button>
-
           {/* Focus timer (while it runs, reading without touching anything still counts) */}
           <div className={`${chip} pr-1.5`}>
             <span className={`h-2 w-2 rounded-full ${timerActive ? 'bg-ink' : 'bg-[var(--border-strong)]'}`} aria-hidden="true" />
@@ -584,15 +579,20 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
             </button>
           </div>
 
-          <button type="button" onClick={() => setConfusionsDrawerOpen(true)} className={chip} title="Open questions and mistakes to look at again">
-            Questions &amp; mistakes <span className="text-fg-muted">{confusions.length + mistakes.length}</span>
-          </button>
-          <button type="button" onClick={() => setResourcesDrawerOpen(true)} className={chip} title="Books, videos and links for this topic">
-            Sources <span className="text-fg-muted">{resources.length}</span>
-          </button>
-          <button type="button" onClick={() => setSettingsDrawerOpen(true)} className={`${chip} w-10 justify-center px-0`} aria-label="Topic settings">
-            <Icon name="edit" size={16} />
-          </button>
+          {/* Everything else, one click away: keeps the header to what you use every session. */}
+          <TopicToolsMenu
+            attention={confusions.filter((c) => !c.resolved).length + mistakes.length || undefined}
+            items={[
+              { label: 'Sources', detail: String(resources.length), onSelect: () => setResourcesDrawerOpen(true) },
+              { label: 'Questions & mistakes', detail: String(confusions.length + mistakes.length), onSelect: () => setConfusionsDrawerOpen(true) },
+              {
+                label: 'Study time',
+                detail: `${formatDuration(timeTotals.todaySeconds + tracker.unflushedSeconds)} today`,
+                onSelect: () => setTimeDrawerOpen(true),
+              },
+              { label: 'Topic settings', onSelect: () => setSettingsDrawerOpen(true) },
+            ]}
+          />
         </div>
 
         <div className="flex flex-col gap-2">
@@ -694,13 +694,14 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           ) : curriculum.length > 0 ? (
             <>
               {completedCount === 0 && curriculum.length >= 2 && (
-                <div className="flex flex-col gap-2 rounded-xl bg-sunk px-4 py-3.5">
-                  <span className="text-[0.9rem] font-semibold">Already know some of this?</span>
-                  <span className="text-[0.82rem] text-fg-secondary">A few minutes of questions. Modules you get fully right start as known.</span>
-                  <button type="button" onClick={() => setPlacementOpen(true)} className="btn btn-secondary h-9 self-start px-3 py-0 text-[0.82rem]">
-                    Take the placement check
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setPlacementOpen(true)}
+                  className="self-start px-1 text-left text-[0.85rem] font-medium text-fg-secondary underline-offset-4 hover:text-fg hover:underline"
+                  title="A few minutes of questions. Modules you get fully right start as known."
+                >
+                  Already know some of this? Take the placement check
+                </button>
               )}
               <ol className="m-0 flex max-h-[62vh] list-none flex-col gap-0.5 overflow-y-auto p-0 pr-1">
                 {curriculum.map((mod) => {
@@ -755,14 +756,20 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
             </div>
           )}
 
-          {!editingSyllabus && (
-            <form onSubmit={handleAddModule} className="flex gap-2">
+          {!editingSyllabus && !addingModule && curriculum.length > 0 && (
+            <button type="button" onClick={() => setAddingModule(true)} className="self-start px-1 text-[0.85rem] font-medium text-fg-muted hover:text-fg">
+              + Add module
+            </button>
+          )}
+          {!editingSyllabus && (addingModule || curriculum.length === 0) && (
+            <form onSubmit={(e) => { handleAddModule(e); setAddingModule(false); }} className="flex gap-2">
               <label htmlFor="add-module" className="sr-only">Add a module</label>
               <input
                 id="add-module"
                 type="text"
                 className="form-input h-10 flex-1 py-0 text-[0.875rem]"
                 placeholder="Add a module"
+                autoFocus={addingModule}
                 value={newModuleTitle}
                 onChange={(e) => setNewModuleTitle(e.target.value)}
               />
