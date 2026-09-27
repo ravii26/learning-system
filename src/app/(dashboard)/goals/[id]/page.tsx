@@ -6,6 +6,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useToast } from '@/components/ToastProvider';
 import { Icon, KnowledgeStrip } from '@/components/ui';
 import type { Knowledge } from '@/lib/moduleState';
+import type { ProgramView } from '@/lib/program/load';
+import ProgramPanel from './ProgramPanel';
 
 /**
  * Goal detail: the roadmap as a dependency-ordered path (GoalLinks,
@@ -58,6 +60,7 @@ export default function GoalDetailPage() {
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [knowledge, setKnowledge] = useState<Record<string, Knowledge[]>>({});
+  const [program, setProgram] = useState<ProgramView | null>(null);
 
   useEffect(() => {
     fetch('/api/progress')
@@ -68,7 +71,12 @@ export default function GoalDetailPage() {
 
   const fetchGoal = useCallback(async () => {
     try {
-      const res = await fetch(`/api/goals/${params.id}`);
+      const [res, prog] = await Promise.all([
+        fetch(`/api/goals/${params.id}`),
+        fetch(`/api/goals/${params.id}/program`).catch(() => null),
+      ]);
+      // Goals built with "Build a learning plan" have a program; older goals don't.
+      setProgram(prog?.ok ? await prog.json() : null);
       if (res.ok) {
         setGoal(await res.json());
       } else if (res.status === 404) {
@@ -151,6 +159,7 @@ export default function GoalDetailPage() {
         </div>
       </header>
 
+      {program ? <ProgramPanel view={program} /> : (<>
       <section aria-labelledby="ready-h" className="glass-panel flex flex-col gap-4 p-7">
         <h2 id="ready-h" className="m-0 text-[1.15rem] font-semibold">How ready you are</h2>
         {goal.readiness.total > 0 ? (
@@ -207,6 +216,7 @@ export default function GoalDetailPage() {
           )}
         </ol>
       </section>
+      </>)}
     </div>
   );
 }
