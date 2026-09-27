@@ -187,7 +187,7 @@ export async function POST(request: Request) {
       }
 
       return goal.id;
-    });
+    }, { timeout: 30_000 });
 
     const readiness = await recomputeGoalReadiness(db, userId, result);
 
