@@ -121,7 +121,7 @@ function hasCycle(map: CompetencyMap): boolean {
     state.set(k, 2);
     return false;
   };
-  return [...deps.keys()].some(visit);
+  return Array.from(deps.keys()).some(visit);
 }
 
 /** Prerequisite-respecting order (stable: keeps map order where free). */
