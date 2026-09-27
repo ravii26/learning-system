@@ -41,7 +41,7 @@ vi.mock('@/lib/db', () => ({
     },
     topic: {
       findMany: async ({ where }: any) => {
-        if (where.shared) topicWhere = where;
+        if (where.OR) topicWhere = where;
         return [];
       },
     },
@@ -141,7 +141,7 @@ describe('viewing a friend', () => {
     as('alice');
     const res = await viewFriend(new Request('http://x'), { params: { userId: 'bob' } });
     expect(res.status).toBe(200);
-    expect(topicWhere).toMatchObject({ userId: 'bob', shared: true, deletedAt: null });
+    expect(topicWhere).toMatchObject({ userId: 'bob', deletedAt: null, OR: [{ shared: true }, { goalLinks: { some: { goal: { shared: true } } } }] });
     expect((await res.json()).friend.name).toBe('bob'); // no name set: falls back to the email's local part
   });
 

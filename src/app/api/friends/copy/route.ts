@@ -22,14 +22,6 @@ const toSource = (t: SourceRow): SourceTopic => ({
   rubricTemplate: t.rubricTemplate, modules: t.curriculumItems, resources: t.resourceRows,
 });
 
-// A goal's unshared topics come across as a title only: the friend chose
-// not to share that topic's plan, and its title is already visible on the
-// shared goal.
-const titleOnly = (t: { id: string; title: string }): SourceTopic => ({
-  id: t.id, title: t.title, area: 'Other', mode: 'syllabus', topicMode: null, depthTarget: null,
-  rubricTemplate: null, modules: [], resources: [],
-});
-
 /** Copies a friend's shared topic, or a shared goal with its topics, into your learning. */
 export async function POST(request: Request) {
   const auth = requireAuth();
@@ -44,7 +36,10 @@ export async function POST(request: Request) {
     const notFound = NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     if (kind === 'topic') {
-      const source = await db.topic.findFirst({ where: { id, shared: true, deletedAt: null }, select: sourceSelect });
+      const source = await db.topic.findFirst({
+        where: { id, deletedAt: null, OR: [{ shared: true }, { goalLinks: { some: { goal: { shared: true } } } }] },
+        select: sourceSelect,
+      });
       if (!source || !(await areFriends(userId, source.userId))) return notFound;
       const result = await db.$transaction((tx) => copyTopicPlan(tx, userId, toSource(source)));
       return NextResponse.json({ topicId: result.id, created: result.created });
@@ -69,7 +64,9 @@ export async function POST(request: Request) {
       for (const link of goal.links) {
         const t = link.topic;
         if (!t || t.deletedAt) continue;
-        const copy = await copyTopicPlan(tx, userId, t.shared ? toSource(t) : titleOnly(t));
+        // Sharing a goal shares the roadmap of every topic in it, so the
+        // copy gets the full plan whether or not the topic was shared alone.
+        const copy = await copyTopicPlan(tx, userId, toSource(t));
         await tx.goalLink.create({
           data: { userId, goalId: mine.id, topicId: copy.id, order: link.order, required: link.required },
         });
