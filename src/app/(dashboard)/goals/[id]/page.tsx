@@ -61,6 +61,14 @@ export default function GoalDetailPage() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [knowledge, setKnowledge] = useState<Record<string, Knowledge[]>>({});
   const [program, setProgram] = useState<ProgramView | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const deleteGoal = async (withTopics: boolean) => {
+    setDeleting(true);
+    const res = await fetch(`/api/goals/${params.id}${withTopics ? '?withTopics=1' : ''}`, { method: 'DELETE' }).catch(() => null);
+    if (res?.ok) { toast.success('Goal deleted'); router.push('/goals'); }
+    else { toast.error('Could not delete the goal'); setDeleting(false); }
+  };
 
   useEffect(() => {
     fetch('/api/progress')
@@ -156,6 +164,16 @@ export default function GoalDetailPage() {
           <select id="goal-status" value={goal.status} onChange={(e) => handleStatusChange(e.target.value)} disabled={updatingStatus} className="form-input h-10 w-auto py-0">
             {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_WORD[s] ?? s}</option>)}
           </select>
+          {!confirmDelete ? (
+            <button type="button" onClick={() => setConfirmDelete(true)} className="self-start text-[0.85rem] text-fg-muted hover:text-danger">Delete goal…</button>
+          ) : (
+            <div className="flex flex-col gap-1.5 rounded-lg border border-line p-2.5 text-[0.85rem]">
+              <button type="button" disabled={deleting} onClick={() => deleteGoal(true)} className="btn h-8 py-0 text-[0.82rem]" style={{ background: 'var(--color-danger)', color: '#fff' }}>Delete goal and its topics</button>
+              <button type="button" disabled={deleting} onClick={() => deleteGoal(false)} className="btn btn-secondary h-8 py-0 text-[0.82rem]">Delete goal only</button>
+              <button type="button" onClick={() => setConfirmDelete(false)} className="text-fg-muted hover:text-fg">Cancel</button>
+              <span className="max-w-[220px] text-[0.75rem] text-fg-muted">Topics go to Trash on the Learn page and can be restored.</span>
+            </div>
+          )}
         </div>
       </header>
 
