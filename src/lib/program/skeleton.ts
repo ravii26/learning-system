@@ -180,9 +180,36 @@ export function namedToDraft(title: string, type: DraftResource['type'] = 'BOOK'
   return { catalogKey: null, title, url: searchUrl(title), source: 'ai', quality: 'unreviewed', pricing: 'unknown', role, type };
 }
 
-function pickResources(field: string, shape: Shape, comps: Competency[], intake: Intake, curated: boolean): DraftResource[] {
+/** A resource the learner marked as trusted for this field (their library). */
+export interface TrustedResource {
+  title: string;
+  url: string;
+  type: DraftResource['type'];
+  pricing: DraftResource['pricing'];
+  role: ResourceRole;
+  competencyKeys: string[];
+}
+
+const trustedToDraft = (t: TrustedResource, role: ResourceRole = t.role): DraftResource =>
+  ({ catalogKey: null, title: t.title, url: t.url, source: 'user', quality: 'evaluated', pricing: t.pricing, role, type: t.type });
+
+function pickResources(field: string, shape: Shape, comps: Competency[], intake: Intake, curated: boolean, trusted: TrustedResource[] = []): DraftResource[] {
   if (shape === 'reading' && intake.bookTitle) return [namedToDraft(intake.bookTitle, 'BOOK', 'primary')];
-  if (!curated) return [];
+  // The learner's own trusted picks come first, when they cover these topics (or the field in general).
+  const keys = new Set(comps.map((c) => c.key));
+  const wantsPractice = shape === 'project' || shape === 'practice';
+  const mine = trusted
+    .filter((t) => (!t.competencyKeys.length || t.competencyKeys.some((k) => keys.has(k))) && (intake.budget !== 'free_only' || t.pricing !== 'paid'))
+    .sort((a, b) => Number(b.competencyKeys.some((k) => keys.has(k))) - Number(a.competencyKeys.some((k) => keys.has(k))))
+    .filter((t) => (wantsPractice ? t.role === 'practice' || t.role === 'primary' : t.role !== 'practice'))
+    .slice(0, 2)
+    .map((t, i) => trustedToDraft(t, i === 0 && !wantsPractice ? 'primary' : t.role));
+  if (!curated) return mine;
+  const fromCatalog = pickCatalog(field, shape, comps, intake);
+  return [...mine, ...fromCatalog.filter((c) => !mine.some((m) => m.url === c.url) && !(mine.length && c.role === 'primary'))].slice(0, 3);
+}
+
+function pickCatalog(field: string, shape: Shape, comps: Competency[], intake: Intake): DraftResource[] {
   const q = {
     field, competencyKeys: comps.map((c) => c.key), budget: intake.budget,
     formats: intake.formats, level: intake.currentLevel,
@@ -223,6 +250,7 @@ export interface SkeletonOptions {
   emphasis?: Record<string, number>;
   phaseTitles?: Record<number, string>;
   focus?: Record<string, string>;
+  trusted?: TrustedResource[];
 }
 
 export function buildSkeleton(map: CompetencyMap, intake: Intake, opts: SkeletonOptions): ProgramDraft {
@@ -254,7 +282,7 @@ export function buildSkeleton(map: CompetencyMap, intake: Intake, opts: Skeleton
         competencyKeys: icomps.map((c) => c.key),
         hoursPerWeek: round1(itemHours / weeks),
         weeks,
-        resources: pickResources(opts.field, shape, icomps, intake, curated),
+        resources: pickResources(opts.field, shape, icomps, intake, curated, opts.trusted),
         ...(opts.focus?.[id] ? { focus: opts.focus[id] } : {}),
       };
     });

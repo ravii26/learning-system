@@ -25,7 +25,7 @@ export function describeRequirement(r: EvidenceRequirement): string {
 export const describeRequirements = (reqs: EvidenceRequirement[]) => reqs.map(describeRequirement).join(' · ');
 
 export function resourceBadges(r: DraftResource): string[] {
-  const out = [r.quality === 'curated' ? 'Curated' : 'Unreviewed'];
+  const out = [r.quality === 'curated' ? 'Curated' : r.quality === 'evaluated' ? 'Trusted by you' : 'Unreviewed'];
   if (r.pricing === 'free') out.push('Free');
   else if (r.pricing === 'freemium') out.push('Free tier');
   else if (r.pricing === 'paid') out.push('Paid');

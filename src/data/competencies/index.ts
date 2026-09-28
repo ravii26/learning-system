@@ -22,11 +22,12 @@ export function getMap(key: string): CompetencyMap | null {
  * null when nothing fits (the unknown-topic path takes over). Longest alias
  * match wins, so "system design" beats "design".
  */
-export function matchMap(text: string): CompetencyMap | null {
+export function matchMap(text: string, maps: CompetencyMap[] = CURATED_MAPS): CompetencyMap | null {
   const t = ` ${text.toLowerCase().replace(/[^a-z0-9+.#/ -]/g, ' ').replace(/\s+/g, ' ')} `;
   let best: { map: CompetencyMap; len: number } | null = null;
-  for (const map of CURATED_MAPS) {
-    for (const alias of map.aliases) {
+  for (const map of maps) {
+    // A map's own title counts as an alias ("Marketing" matches "learn marketing").
+    for (const alias of [...map.aliases, map.title.toLowerCase()]) {
       if (t.includes(` ${alias} `) && (!best || alias.length > best.len)) best = { map, len: alias.length };
     }
   }

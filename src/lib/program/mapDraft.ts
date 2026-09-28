@@ -13,21 +13,16 @@ import type { Intake } from './types';
 
 const KINDS: CompetencyKind[] = ['concept', 'algorithm', 'design', 'build', 'skill'];
 const IMPORTANCES: Importance[] = ['core', 'supporting', 'optional'];
-export const MAX_DRAFT_COMPETENCIES = 25;
+export const MAX_DRAFT_COMPETENCIES = 30;
+export const MIN_GOOD_DRAFT = 15;
 
 export const slug = (s: string) =>
   s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'item';
 
-export function buildMapDraftMessages(intake: Intake): AIMessage[] {
-  const book = intake.bookTitle ? `\nThey are learning it from the book "${intake.bookTitle}": competencies should follow that book's main parts/ideas in order.` : '';
-  return [
-    { role: 'system', content: 'You are a curriculum designer. You list the competencies a field requires, like an expert syllabus. Return valid JSON only.' },
-    {
-      role: 'user',
-      content: `A learner wants: ${intake.goal}${intake.doneMeans ? `\n"Done" for them means: ${intake.doneMeans}` : ''}${book}
+/** Excerpts from real syllabi/course outlines, used to ground the draft (optional). */
+export interface GroundingSource { title: string; url: string; content: string }
 
-List the competencies of this field as JSON:
-{
+const MAP_JSON_SHAPE = `{
   "title": "<field name>",
   "description": "<one sentence>",
   "competencies": [
@@ -42,10 +37,68 @@ List the competencies of this field as JSON:
       "summary": "<what being able to do this means, one sentence>"
     }
   ]
-}
-Rules: 8 to ${MAX_DRAFT_COMPETENCIES} competencies in learning order; use "skill" for things improved by repeated practice (speaking, writing, drawing); include at least one "build" competency with "project" in its title when the field is learned by doing (e.g. "Run a first campaign project"); "from" is the lowest ambition at which it matters ("aware" = general understanding, "interview" = expert level).`,
+}`;
+
+const MAP_RULES = `Rules:
+- ${MIN_GOOD_DRAFT} to ${MAX_DRAFT_COMPETENCIES} competencies in learning order, grouped into 4-6 sections.
+- Cover the whole field, not just the basics: spread "from" across all four levels ("aware" = general understanding, "use" = everyday work, "build" = real projects, "interview" = expert depth). At least 4 at "aware", 4 at "use", 3 at "build" and 3 at "interview" (advanced topics, hard trade-offs, what experts are asked).
+- "kind": "concept" for knowledge, "skill" for practical abilities you improve by doing them repeatedly (writing ads, speaking, running social accounts), "build" ONLY for 1 or 2 end-to-end projects that prove the whole field (e.g. "Run a first campaign project"). Put "project" in those titles.
+- Prerequisites only point to earlier competencies.`;
+
+export function buildMapDraftMessages(intake: Intake, grounding: GroundingSource[] = []): AIMessage[] {
+  const book = intake.bookTitle ? `
+They are learning it from the book "${intake.bookTitle}": competencies should follow that book's main parts/ideas in order, then go beyond it where the field needs it.` : '';
+  const sources = grounding.length
+    ? `
+
+Real course outlines and syllabi for this field (use them as evidence of what the field covers; do not copy their wording):
+${grounding.map((g, i) => `[${i + 1}] ${g.title}
+${g.content.slice(0, 900)}`).join('\n\n')}`
+    : '';
+  return [
+    { role: 'system', content: 'You are an expert curriculum designer. You list the competencies a field requires, as a strong university or professional syllabus would. Return valid JSON only.' },
+    {
+      role: 'user',
+      content: `A learner wants: ${intake.goal}${intake.doneMeans ? `
+"Done" for them means: ${intake.doneMeans}` : ''}${book}${sources}
+
+List the competencies of this field as JSON:
+${MAP_JSON_SHAPE}
+${MAP_RULES}`,
     },
   ];
+}
+
+/**
+ * Second pass: an expert review of the draft. Returns the corrected full
+ * list (same JSON), fixing missing essentials, wrong order, wrong levels and
+ * duplicates. Keeps existing keys so the two passes line up.
+ */
+export function buildMapCritiqueMessages(intake: Intake, draft: CompetencyMap): AIMessage[] {
+  const list = draft.competencies.map((c) => `- ${c.key} | ${c.title} | ${c.group} | ${c.kind} | ${c.importance} | from ${c.from}${c.prerequisites?.length ? ` | after ${c.prerequisites.join(', ')}` : ''}`).join('\n');
+  return [
+    { role: 'system', content: 'You are a senior practitioner reviewing a syllabus for gaps and mistakes. Return valid JSON only.' },
+    {
+      role: 'user',
+      content: `Goal: ${intake.goal}${intake.doneMeans ? `. Done means: ${intake.doneMeans}` : ''}
+Draft topic list for "${draft.title}" (key | title | section | kind | importance | level):
+${list}
+
+Review it as an expert would: what essential topics are missing, what is out of order, what is at the wrong level or importance, what is duplicated or too vague to learn? Then return the corrected complete list (keep the keys of topics you keep) as JSON:
+${MAP_JSON_SHAPE}
+${MAP_RULES}`,
+    },
+  ];
+}
+
+/** Uses the critique only when it's a real improvement: valid, not shrunk, not a different field. */
+export function pickBetterMap(first: CompetencyMap, critiqued: CompetencyMap | null): { map: CompetencyMap; improved: boolean } {
+  if (!critiqued) return { map: first, improved: false };
+  const keep = new Set(first.competencies.map((c) => c.key));
+  const overlap = critiqued.competencies.filter((c) => keep.has(c.key)).length;
+  const sameField = overlap >= Math.min(5, Math.floor(first.competencies.length / 2));
+  const notShrunk = critiqued.competencies.length >= Math.min(first.competencies.length, MIN_GOOD_DRAFT);
+  return sameField && notShrunk ? { map: critiqued, improved: true } : { map: first, improved: false };
 }
 
 /** Parses the AI's map, repairs what's safely repairable, and validates the rest. */
@@ -56,7 +109,26 @@ export function parseMapDraft(raw: string, fallbackTitle: string): { map: Compet
   } catch {
     return { map: null, problems: ['The AI did not return a readable topic list.'] };
   }
+  capProjects(j);
   return sanitizeMap(j, fallbackTitle);
+}
+
+export const MAX_DRAFT_PROJECTS = 2;
+
+/**
+ * AI drafts only: at most two end-to-end projects. Extra "build" topics are
+ * practical abilities, so they become skills (practice) rather than more
+ * projects. Prefers keeping the ones the AI titled as projects, latest first.
+ * Lists the learner edits are not capped.
+ */
+export function capProjects(j: any): void {
+  const comps: any[] = Array.isArray(j?.competencies) ? j.competencies : [];
+  const builds = comps.filter((c) => c?.kind === 'build');
+  if (builds.length <= MAX_DRAFT_PROJECTS) return;
+  const ranked = [...builds].sort((a, b) =>
+    Number(/project/i.test(String(b.title))) - Number(/project/i.test(String(a.title))) || comps.indexOf(b) - comps.indexOf(a));
+  const keep = new Set(ranked.slice(0, MAX_DRAFT_PROJECTS));
+  for (const c of builds) if (!keep.has(c)) c.kind = 'skill';
 }
 
 /**

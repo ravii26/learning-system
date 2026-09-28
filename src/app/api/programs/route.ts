@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { parseIntake } from '@/lib/program/intake';
-import { resolveMap } from '@/lib/program/resolve';
+import { resolveFieldForUser, saveFieldMap, trustedResources } from '@/lib/program/library';
 import { composeDraft, sanitizeClientAdjustments } from '@/lib/program/generate';
 import { persistProgram } from '@/lib/program/persist';
 import { recomputeGoalReadiness } from '@/lib/goalReadinessRecompute';
@@ -50,21 +50,35 @@ export async function POST(request: Request) {
     const parsed = parseIntake(body.intake);
     if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
-    const resolved = resolveMap(body, parsed.intake.goal);
+    const resolved = await resolveFieldForUser(db, userId, body, parsed.intake.goal);
     if (resolved.kind !== 'map') {
       return NextResponse.json({ error: 'Approve a topic list before creating the program.' }, { status: 400 });
     }
 
     const base = { map: resolved.map, field: resolved.field, mapQuality: resolved.mapQuality, intake: parsed.intake };
+    const trusted = await trustedResources(db, userId, resolved.field);
     const adjustments = sanitizeClientAdjustments(body.adjustments, base);
     adjustments.foundResources = await reverifyFound(adjustments.foundResources ?? []);
     const removedItemIds = Array.isArray(body.removedItemIds)
       ? body.removedItemIds.filter((x): x is string => typeof x === 'string').slice(0, 50)
       : [];
-    const draft = composeDraft({ ...base, adjustments, removedItemIds });
+    const draft = composeDraft({ ...base, adjustments, removedItemIds, trusted });
     if (draft.phases.length === 0) return NextResponse.json({ error: 'The plan is empty.' }, { status: 400 });
 
-    const result = await db.$transaction((tx) => persistProgram(tx, { userId, draft, adjustments }), { timeout: 60_000 });
+    const result = await db.$transaction(async (tx) => {
+      // A topic list you just approved joins your library, so the next plan
+      // for this field starts from it instead of a fresh AI draft.
+      if (resolved.origin === 'approved') {
+        const sources = Array.isArray(body.mapSources)
+          ? body.mapSources
+              .filter((x: any) => x && typeof x.title === 'string' && typeof x.url === 'string' && /^https:\/\//.test(x.url))
+              .slice(0, 8)
+              .map((x: any) => ({ title: String(x.title).slice(0, 140), url: String(x.url).slice(0, 500) }))
+          : null;
+        await saveFieldMap(tx, userId, resolved.map, { source: 'ai', sources });
+      }
+      return persistProgram(tx, { userId, draft, adjustments });
+    }, { timeout: 60_000 });
     await recomputeGoalReadiness(db, userId, result.goalId).catch(() => {});
     return NextResponse.json(result, { status: 201 });
   } catch (e) {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui';
@@ -82,12 +82,28 @@ export default function BuildProgramPage() {
   const [adjustments, setAdjustments] = useState<Adjustments | null>(null);
   const [removed, setRemoved] = useState<Set<string>>(new Set());
 
-  const matched = useMemo(() => (goal.trim().length > 2 ? matchMap(goal) : null), [goal]);
+  // Your library's lists win over built-in ones, like on the server.
+  const [library, setLibrary] = useState<Array<{ key: string; title: string; aliases: string[]; topics: number; levels: number[] }>>([]);
+  const [mapReviewed, setMapReviewed] = useState(false);
+  const [mapSources, setMapSources] = useState<Array<{ title: string; url: string }>>([]);
+  const [origin, setOrigin] = useState<'builtin' | 'library' | 'approved' | null>(null);
+  useEffect(() => {
+    fetch('/api/library').then((r) => (r.ok ? r.json() : null)).then((d) => d && setLibrary(d.mine ?? [])).catch(() => {});
+  }, []);
+  const libraryMatch = useMemo(() => {
+    if (goal.trim().length <= 2 || !library.length) return null;
+    const hit = matchMap(goal, library.map((l) => ({ key: l.key, title: l.title, aliases: l.aliases, description: '', competencies: [] })));
+    return hit ? library.find((l) => l.key === hit.key) ?? null : null;
+  }, [goal, library]);
+  const builtInMatch = useMemo(() => (goal.trim().length > 2 ? matchMap(goal) : null), [goal]);
+  const matched = libraryMatch ? null : builtInMatch;
   const effectiveTarget = target ?? inferTarget(goal);
   // What the learner's own words ask for (goal + "done"), to catch a level picked too low.
   const impliedTarget = inferTarget(`${goal} ${doneMeans}`);
   const RANK: TargetLevel[] = ['aware', 'use', 'build', 'interview'];
-  const topicsAt = (t: TargetLevel) => (matched ? competenciesForTarget(matched, t).length : null);
+  const topicsAt = (t: TargetLevel) =>
+    libraryMatch ? libraryMatch.levels[RANK.indexOf(t)] ?? null : matched ? competenciesForTarget(matched, t).length : null;
+  const matchedTitle = libraryMatch?.title ?? matched?.title ?? null;
 
   const intakeBody = (): Partial<Intake> & Record<string, unknown> => ({
     goal, path: serious ? 'serious' : 'quick', currentLevel: level, hoursPerWeek: hours,
@@ -118,8 +134,11 @@ export default function BuildProgramPage() {
       if (!res.ok) throw new Error(data.error || 'Could not build a plan.');
       if (data.stage === 'review_map') {
         setCustomMap(data.map);
+        setMapReviewed(!!data.reviewed);
+        setMapSources(Array.isArray(data.sources) ? data.sources : []);
         setStage('review_map');
       } else {
+        setOrigin(data.origin ?? null);
         setDraft(data.draft);
         setAdjustments(data.adjustments);
         setRemoved(new Set());
@@ -144,7 +163,7 @@ export default function BuildProgramPage() {
         body: JSON.stringify({
           intake: draft.intake,
           field: draft.field,
-          ...(draft.mapQuality === 'approved_draft' ? { customMap: draft.map } : {}),
+          ...(origin === 'approved' ? { customMap: draft.map, mapSources } : draft.mapQuality === 'approved_draft' ? { field: draft.field } : {}),
           adjustments,
           removedItemIds: Array.from(removed),
         }),
@@ -186,9 +205,11 @@ export default function BuildProgramPage() {
           />
           {goal.trim().length > 2 && (
             <p className="m-0 text-[0.9rem] text-fg-secondary">
-              {matched
-                ? <>We have a reviewed topic list for <strong>{matched.title}</strong>: your plan is built on it.</>
-                : <>No reviewed list for this yet: the AI will draft one and you’ll check it before anything is built.</>}
+              {libraryMatch
+                ? <>Using <strong>your</strong> topic list for <strong>{libraryMatch.title}</strong> from your library ({libraryMatch.topics} topics).</>
+                : matched
+                  ? <>We have a reviewed topic list for <strong>{matched.title}</strong>: your plan is built on it.</>
+                  : <>No list for this yet: the AI will draft one, an expert pass will review it, and you’ll check it before anything is built.</>}
             </p>
           )}
         </div>
@@ -234,9 +255,9 @@ export default function BuildProgramPage() {
               <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setTarget(impliedTarget)}>Use {TARGET_LABEL[impliedTarget]}</button>
             </p>
           )}
-          {matched && (
+          {matchedTitle && (
             <p className="m-0 text-[0.82rem] text-fg-muted">
-              Topics in {matched.title} at each level: {RANK.map((t) => `${sentence(TARGET_LABEL[t])} ${topicsAt(t)}`).join(' · ')}
+              Topics in {matchedTitle} at each level: {RANK.map((t) => `${sentence(TARGET_LABEL[t])} ${topicsAt(t)}`).join(' · ')}
             </p>
           )}
         </fieldset>
@@ -254,7 +275,7 @@ export default function BuildProgramPage() {
             <div className="flex flex-col gap-1.5">
               <label htmlFor="done" className="font-semibold">What does “done” mean to you?</label>
               <input id="done" className="form-input h-11 py-0" value={doneMeans} onChange={(e) => setDoneMeans(e.target.value)}
-                placeholder={(matched && DONE_EXAMPLES[matched.key]) || 'e.g. hold a 15-minute conversation comfortably'} />
+                placeholder={(matched && DONE_EXAMPLES[matched.key]) || (libraryMatch && DONE_EXAMPLES[libraryMatch.key]) || 'e.g. hold a 15-minute conversation comfortably'} />
               <span className="text-[0.82rem] text-fg-muted">This becomes your plan’s finish line.</span>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -335,9 +356,22 @@ export default function BuildProgramPage() {
           <Icon name="arrowLeft" size={16} /> Your answers
         </button>
         <header className="flex flex-col gap-2">
-          <span className="self-start rounded-md bg-fill-2 px-2 py-0.5 text-[0.78rem] font-semibold text-fg-secondary">Drafted by AI · unreviewed</span>
+          <span className="self-start rounded-md bg-fill-2 px-2 py-0.5 text-[0.78rem] font-semibold text-fg-secondary">
+            Drafted by AI{mapReviewed ? ' · improved by an expert review pass' : ''} · not yet checked by you
+          </span>
           <h1 className="m-0 font-serif text-[2.2rem] font-normal leading-tight">Check the topic list for {customMap.title}</h1>
-          <p className="m-0 text-fg-secondary">There’s no reviewed list for this field yet, so the AI drafted one. Your plan will be built only from what you approve here: rename, remove or add topics until it looks right.</p>
+          <p className="m-0 text-fg-secondary">
+            There’s no list for this field in your library yet, so the AI drafted one ({customMap.competencies.length} topics). Your plan is built only from what you approve here: rename, remove or add topics until it looks right.
+            Approving also <strong>saves it to your library</strong>, so your next plan for this field starts from your version.
+          </p>
+          {mapSources.length > 0 && (
+            <details className="text-[0.88rem] text-fg-secondary">
+              <summary className="cursor-pointer font-semibold">Based on {mapSources.length} real course outline{mapSources.length === 1 ? '' : 's'}</summary>
+              <ul className="m-0 mt-2 flex list-none flex-col gap-1 p-0">
+                {mapSources.map((src) => <li key={src.url}><a href={src.url} target="_blank" rel="noopener noreferrer">{src.title}</a></li>)}
+              </ul>
+            </details>
+          )}
         </header>
         <ul className="m-0 flex list-none flex-col p-0">
           {customMap.competencies.map((c, i) => (

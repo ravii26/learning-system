@@ -55,3 +55,25 @@ export async function searchVideos(query: string, max = 1, fetchImpl: typeof fet
     .slice(0, max)
     .map((i) => ({ title: i.snippet!.title!.slice(0, 140), url: `https://www.youtube.com/watch?v=${i.id!.videoId}`, type: 'VIDEO' }));
 }
+
+/**
+ * Real syllabi / course outlines for a field, to ground an AI-drafted topic
+ * list (Tavily, free tier). Returns [] without a key or on any failure.
+ */
+export async function searchSyllabi(goal: string, fetchImpl: typeof fetch = fetch): Promise<Array<{ title: string; url: string; content: string }>> {
+  const key = process.env.TAVILY_API_KEY;
+  if (!key) return [];
+  const data = await withTimeout(async (signal) => {
+    const res = await fetchImpl('https://api.tavily.com/search', {
+      method: 'POST',
+      signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ query: `${goal} course syllabus curriculum topics`, max_results: 5, search_depth: 'basic' }),
+    });
+    return res.ok ? ((await res.json()) as { results?: Array<{ title?: string; url?: string; content?: string }> }) : null;
+  });
+  return (data?.results ?? [])
+    .filter((r) => r.title && r.url && r.content && /^https:\/\//.test(r.url))
+    .slice(0, 5)
+    .map((r) => ({ title: r.title!.slice(0, 140), url: r.url!, content: r.content!.slice(0, 1200) }));
+}

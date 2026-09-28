@@ -96,6 +96,10 @@ model User {
   competencyEvidence     CompetencyEvidence[]
   programChanges         ProgramChange[]
   weeklyCheckins         WeeklyCheckin[]
+  fieldMaps              FieldMap[]
+  fieldResources         FieldResource[]
+  fieldMapSharesSent     FieldMapShare[] @relation("FieldMapShareFrom")
+  fieldMapSharesReceived FieldMapShare[] @relation("FieldMapShareTo")
 }
 
 model Topic {
@@ -1088,4 +1092,70 @@ model WeeklyCheckin {
   createdAt      DateTime  @default(now())
 
   @@unique([goalId, weekStart])
+}
+
+/// A learner's own version of a field's topic list (competency map). Either
+/// an AI draft they approved, a copy of a built-in list they edited, or a
+/// copy a friend shared. Plans for that field start from it. Personal: edits
+/// never affect anyone else.
+model FieldMap {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  key          String   // slug, unique per user; equals the built-in key when it customises one
+  title        String
+  aliases      String[] @default([])
+  description  String   @default("")
+  competencies Json     // Competency[] — validated by validateMap before every save
+  source       String   // ai | edited | shared
+  basedOn      String?  // built-in map key this started from, if any (keeps its catalogue resources)
+  sharedFromUserId String?
+  sources      Json?    // syllabi/pages the AI draft was grounded on: [{title, url}]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+}
+
+/// A resource the learner marked as trusted for a field; used in their
+/// future plans for that field alongside the built-in catalogue.
+model FieldResource {
+  id       String @id @default(uuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fieldKey String
+
+  title          String
+  url            String
+  type           String   @default("ARTICLE")
+  pricing        String   @default("unknown")
+  role           String   @default("reference")
+  competencyKeys String[] @default([])
+  note           String   @default("")
+  linkStatus     String   @default("ok")
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, fieldKey, url])
+  @@index([userId, fieldKey])
+}
+
+/// Sharing a field's topic list with a friend. The snapshot is taken when
+/// it is sent; accepting writes exactly that list into the friend's library.
+model FieldMapShare {
+  id         String    @id @default(uuid())
+  fromUserId String
+  from       User      @relation("FieldMapShareFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId   String
+  to         User      @relation("FieldMapShareTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  fieldKey   String
+  title      String
+  snapshot   Json      // { map, resources } exactly as the sender had it
+  status     String    @default("pending") // pending | accepted | declined
+  createdAt  DateTime  @default(now())
+  respondedAt DateTime?
+
+  @@index([toUserId, status])
 }

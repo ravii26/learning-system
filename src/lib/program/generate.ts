@@ -1,5 +1,5 @@
 import type { CompetencyMap } from '@/data/competencies';
-import { buildSkeleton, namedToDraft } from './skeleton';
+import { buildSkeleton, namedToDraft, type TrustedResource } from './skeleton';
 import { EMPTY_ADJUSTMENTS, parseAdjustments, type Adjustments } from './adapt';
 import { factualWhy } from './why';
 import type { Intake, ProgramDraft } from './types';
@@ -12,6 +12,8 @@ export interface ComposeInput {
   mapQuality: 'curated' | 'approved_draft';
   intake: Intake;
   adjustments?: Adjustments;
+  /** The learner's trusted resources for this field (their library). */
+  trusted?: TrustedResource[];
   /** Items the learner removed on the draft screen. Their call, but coverage will show the gap. */
   removedItemIds?: string[];
 }
@@ -29,6 +31,7 @@ export function composeDraft(input: ComposeInput): ProgramDraft {
     emphasis: adj.emphasis,
     phaseTitles: adj.phaseTitles,
     focus: adj.focus,
+    trusted: input.trusted,
   });
 
   const allItems = () => draft.phases.flatMap((p) => p.items);

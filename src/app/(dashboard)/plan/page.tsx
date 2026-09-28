@@ -562,6 +562,7 @@ export default function PlanPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => setShowLearnNow(true)} className="btn btn-secondary h-11 py-0">Pick for me</button>
+          <Link href="/library" className="btn btn-secondary h-11 py-0 no-underline hover:no-underline">Field library</Link>
           <Link href="/learn/new" className="btn btn-secondary h-11 py-0 no-underline hover:no-underline">
             <Icon name="plus" size={16} /> Add a single topic
           </Link>
