@@ -1,4 +1,5 @@
 'use client';
+import { alertDialog, confirmDialog } from '@/components/dialogs';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -85,7 +86,7 @@ export default function ExplorePage() {
 
   const startSession = () => {
     if (!topicTitle.trim()) {
-      alert('Please enter a topic title to explore.');
+      alertDialog({ title: 'Add a topic first', message: 'Type what you want to explore, then start.' });
       return;
     }
     setSecondsRemaining(durationMinutes * 60);
@@ -100,8 +101,8 @@ export default function ExplorePage() {
     setSessionState('running');
   };
 
-  const handleFinishEarly = () => {
-    if (confirm('Finish your exploration session early?')) {
+  const handleFinishEarly = async () => {
+    if (await confirmDialog({ title: 'Finish early?', message: 'You can still save what you found.', confirmLabel: 'Finish now', cancelLabel: 'Keep going' })) {
       setSessionState('evaluate');
     }
   };
@@ -164,11 +165,11 @@ export default function ExplorePage() {
         setSessionState('saved');
         router.refresh();
       } else {
-        alert('Failed to save exploration outcome.');
+        alertDialog({ title: 'Couldn’t save', message: 'Your exploration wasn’t saved. Please try again.' });
       }
     } catch (e) {
       console.error(e);
-      alert('Connection error.');
+      alertDialog({ title: 'Connection problem', message: 'Check your internet connection and try again.' });
     } finally {
       setSaving(false);
     }

@@ -1,4 +1,5 @@
 'use client';
+import { alertDialog, confirmDialog } from '@/components/dialogs';
 
 import React, { useState } from 'react';
 
@@ -124,7 +125,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
       setModuleLessons(prev => ({ ...prev, [mod.id]: data }));
     } catch (e) {
       console.error('Error generating lesson:', e);
-      alert('Failed to generate AI lesson. Please try again.');
+      alertDialog({ title: 'Couldn’t write the lesson', message: 'The AI didn’t finish this lesson. Please try again.' });
     } finally {
       setGeneratingLessonId(null);
     }
@@ -189,7 +190,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Remove this module?')) return;
+    if (!(await confirmDialog({ title: 'Remove this module?', message: 'It will be taken out of this topic’s syllabus.', confirmLabel: 'Remove', danger: true }))) return;
     const updated = modules.filter(m => m.id !== id).map((m, i) => ({ ...m, order: i + 1 }));
     setModules(updated);
     await save(updated);

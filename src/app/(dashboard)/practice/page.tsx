@@ -1,4 +1,5 @@
 'use client';
+import { confirmDialog } from '@/components/dialogs';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
@@ -166,7 +167,7 @@ export default function PracticePage() {
 
   const handleChangeTemplate = async (key: string) => {
     if (!selectedTopic) return;
-    if (reps.length > 0 && !window.confirm('Switch rubric? Existing reps keep their old scores, but the trend will show both sets of dimensions.')) return;
+    if (reps.length > 0 && !(await confirmDialog({ title: 'Switch rubric?', message: 'Your existing reps keep their old scores, but the trend will show both sets of dimensions.', confirmLabel: 'Switch' }))) return;
     const res = await fetch(`/api/topics/${selectedTopic.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

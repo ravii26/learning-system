@@ -1,4 +1,5 @@
 'use client';
+import { alertDialog, confirmDialog } from '@/components/dialogs';
 
 import React, { useState, useEffect } from 'react';
 import { generateSessionPlan, SessionPlan, SessionPlanStep, Topic } from '@/lib/sessionHeuristics';
@@ -110,8 +111,8 @@ export default function LearnNowModal({
     }
   };
 
-  const handleFinishEarly = () => {
-    if (confirm('Finish this learning session early?')) {
+  const handleFinishEarly = async () => {
+    if (await confirmDialog({ title: 'Finish early?', message: 'You’ll go straight to the reflection step.', confirmLabel: 'Finish now', cancelLabel: 'Keep going' })) {
       setView('completed');
     }
   };
@@ -121,7 +122,7 @@ export default function LearnNowModal({
     if (!plan) return;
 
     if (!reflectLearn.trim() || !reflectNext.trim()) {
-      alert('Please fill out what you learned and your next action to log the session.');
+      alertDialog({ title: 'Two answers needed', message: 'Write what you learned and your next action to log this session.' });
       return;
     }
 
@@ -135,7 +136,7 @@ export default function LearnNowModal({
       onClose();
     } catch (e) {
       console.error(e);
-      alert('Connection error logging reflection.');
+      alertDialog({ title: 'Couldn’t save', message: 'Your reflection wasn’t logged. Check your connection and try again.' });
     } finally {
       setSubmitting(false);
     }

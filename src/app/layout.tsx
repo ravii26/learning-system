@@ -1,6 +1,8 @@
 import './globals.css';
 import { Metadata, Viewport } from 'next';
 import { Newsreader, Schibsted_Grotesk, JetBrains_Mono } from 'next/font/google';
+import { ActivityIndicator } from '@/components/ActivityIndicator';
+import { DialogHost } from '@/components/dialogs';
 
 // Serif for headings and anything you read at length; a quiet grotesk for
 // the interface; mono for code. Exposed as CSS variables that globals.css
@@ -44,7 +46,11 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <ActivityIndicator />
+        <DialogHost />
+        {children}
+      </body>
     </html>
   );
 }
