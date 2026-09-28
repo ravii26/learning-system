@@ -81,6 +81,12 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     // deleteMany, not delete — see the same reasoning on Topic's DELETE
     // route: `delete` needs a unique where (id alone), which would let a
     // request delete another user's goal by id.
+    // ?withTopics=1 also moves the goal's topics to Trash (soft delete, restorable).
+    if (new URL(request.url).searchParams.get('withTopics') === '1') {
+      const links = await db.goalLink.findMany({ where: { goalId: params.id, userId, topicId: { not: null } }, select: { topicId: true } });
+      const ids = links.map((l) => l.topicId!).filter(Boolean);
+      if (ids.length) await db.topic.updateMany({ where: { id: { in: ids }, userId, deletedAt: null }, data: { deletedAt: new Date(), activeSlotType: null } });
+    }
     const result = await db.goal.deleteMany({ where: { id: params.id, userId } });
     if (result.count === 0) {
       return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
