@@ -161,6 +161,30 @@ export default function ModuleStudyRoom({
 
   // Grade locally right away, then save the attempt: the score becomes
   // evidence and every miss becomes a Daily Review card due tomorrow.
+  // A fresh quiz of 5, 10 or 20 questions from this module's lesson. It becomes
+  // the module's saved quiz, so checking it is scored on the server as usual.
+  const [makingQuiz, setMakingQuiz] = useState<number | null>(null);
+  const [quizError, setQuizError] = useState<string | null>(null);
+  const makeQuiz = async (count: number) => {
+    setMakingQuiz(count);
+    setQuizError(null);
+    try {
+      const res = await fetch(`/api/topics/${topicId}/modules/${module.id}/quiz`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ count }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not write the quiz.');
+      setLesson((prev: any) => ({ ...prev, quiz: data.quiz }));
+      setQuizSelections({});
+      setQuizSubmitted(false);
+      setQuizResult(null);
+    } catch (e) {
+      setQuizError(e instanceof Error ? e.message : 'Could not write the quiz.');
+    } finally {
+      setMakingQuiz(null);
+    }
+  };
+
   const handleCheckQuiz = async () => {
     setQuizSubmitted(true);
     const quiz: any[] = Array.isArray(lesson?.quiz) ? lesson.quiz : [];
@@ -442,6 +466,16 @@ export default function ModuleStudyRoom({
                 <div className="flex items-baseline justify-between gap-3">
                   <h3 id="quiz-h" className="m-0 text-[1.2rem] font-semibold">Check yourself</h3>
                   <span className="text-[0.9rem] text-fg-muted">{quiz.length} question{quiz.length === 1 ? '' : 's'} · misses become review cards</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-[0.88rem] text-fg-secondary">
+                  <span>New quiz:</span>
+                  {[5, 10, 20].map((n) => (
+                    <button key={n} type="button" disabled={!!makingQuiz} onClick={() => makeQuiz(n)}
+                      className="h-8 rounded-full border border-line px-3 font-medium hover:border-line-hover hover:text-fg disabled:opacity-50">
+                      {makingQuiz === n ? 'Writing…' : `${n} questions`}
+                    </button>
+                  ))}
+                  {quizError && <span role="alert" className="text-danger">{quizError}</span>}
                 </div>
                 {quiz.map((q: any, qIdx: number) => {
                   const selected = quizSelections[qIdx];
