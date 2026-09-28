@@ -10,3 +10,4 @@ export { KnowledgeMark, KNOWLEDGE_LABEL } from './KnowledgeMark';
 export { KnowledgeStrip, knowledgeSummary } from './KnowledgeStrip';
 export { Icon, type IconName } from './Icon';
 export { cn } from './cn';
+export { Accordion } from './Accordion';

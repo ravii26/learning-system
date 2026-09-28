@@ -18,6 +18,7 @@ import { useStudyTracker } from '@/lib/useStudyTracker';
 import { formatDuration } from '@/lib/timeSummary';
 import TopicTimeDrawer from './TopicTimeDrawer';
 import PlacementDrawer from './PlacementDrawer';
+import TopicToolsMenu from './TopicToolsMenu';
 
 /** Latest quiz/challenge result per module — from /api/topics/[id]/attempts. */
 export interface ModuleEvidence {
@@ -138,6 +139,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
   const tracker = useStudyTracker({ topicId: params.id, moduleId: activeModuleId, forceActive: timerActive });
   const [timeTotals, setTimeTotals] = useState({ todaySeconds: 0, allTimeSeconds: 0 });
   const [timeDrawerOpen, setTimeDrawerOpen] = useState(false);
+  const [addingModule, setAddingModule] = useState(false);
   const [placementOpen, setPlacementOpen] = useState(false);
   const fetchTimeTotals = useCallback(async () => {
     const tz = new Date().getTimezoneOffset();
@@ -557,20 +559,13 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
   const chip = 'flex h-10 items-center gap-2 rounded-[10px] border border-line bg-surface px-3 text-[0.875rem] hover:border-line-hover';
 
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-7">
-      <header className="flex flex-col gap-5">
+    <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-8">
+      <header className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2.5">
           <Link href="/plan" className="flex items-center gap-1.5 text-[0.9rem] text-fg-secondary no-underline hover:text-fg hover:no-underline">
             <Icon name="arrowLeft" size={16} /> Learn
           </Link>
           <span className="flex-1" />
-
-          {/* Real study time — tracked while you're active here, plus anything you log */}
-          <button type="button" onClick={() => setTimeDrawerOpen(true)} className={chip} title="Time you spent on this topic — see history, log or correct it">
-            <Icon name="clock" size={16} className="text-fg-muted" />
-            <span className="font-semibold text-fg">{formatDuration(timeTotals.todaySeconds + tracker.unflushedSeconds)}</span>
-            <span className="text-fg-muted">today · {formatDuration(timeTotals.allTimeSeconds + tracker.unflushedSeconds)} total</span>
-          </button>
 
           {/* Focus timer (while it runs, reading without touching anything still counts) */}
           <div className={`${chip} pr-1.5`}>
@@ -584,23 +579,29 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
             </button>
           </div>
 
-          <button type="button" onClick={() => setConfusionsDrawerOpen(true)} className={chip} title="Open questions and mistakes to look at again">
-            Questions &amp; mistakes <span className="text-fg-muted">{confusions.length + mistakes.length}</span>
-          </button>
-          <button type="button" onClick={() => setResourcesDrawerOpen(true)} className={chip} title="Books, videos and links for this topic">
-            Sources <span className="text-fg-muted">{resources.length}</span>
-          </button>
-          <button type="button" onClick={() => setSettingsDrawerOpen(true)} className={`${chip} w-10 justify-center px-0`} aria-label="Topic settings">
-            <Icon name="edit" size={16} />
-          </button>
+          {/* Everything else, one click away: keeps the header to what you use every session. */}
+          <TopicToolsMenu
+            attention={confusions.filter((c) => !c.resolved).length + mistakes.length || undefined}
+            items={[
+              { label: 'Sources', detail: String(resources.length), onSelect: () => setResourcesDrawerOpen(true) },
+              { label: 'Questions & mistakes', detail: String(confusions.length + mistakes.length), onSelect: () => setConfusionsDrawerOpen(true) },
+              {
+                label: 'Study time',
+                detail: `${formatDuration(timeTotals.todaySeconds + tracker.unflushedSeconds)} today`,
+                onSelect: () => setTimeDrawerOpen(true),
+              },
+              { label: 'Topic settings', onSelect: () => setSettingsDrawerOpen(true) },
+            ]}
+          />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-baseline gap-3">
-            <h1 className="m-0 font-serif text-[2.4rem] font-normal leading-[1.1] tracking-[-0.015em]">{title}</h1>
+        {/* The topic is context; the module title below is the page's one heading. */}
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="m-0 text-[1.35rem] font-semibold leading-tight">{title}</h1>
             <span className="badge">{area}</span>
           </div>
-          {why && <p className="m-0 max-w-[760px] text-[1rem] text-fg-secondary">{why}</p>}
+          {why && <p className="m-0 max-w-[760px] text-[0.92rem] text-fg-muted">{why}</p>}
         </div>
       </header>
 
@@ -627,8 +628,11 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
         </div>
       )}
 
-      <div className="grid items-start gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <nav aria-label="Modules" className="flex flex-col gap-4 lg:sticky lg:top-6">
+      <div className="grid items-start gap-12 lg:grid-cols-[300px_minmax(0,1fr)]">
+        {/* Left column: modules, then this module's notes / progress / options
+            (ModuleStudyRoom renders those into #module-side-panel). */}
+        <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
+        <nav aria-label="Modules" className="flex flex-col gap-4 rounded-2xl border border-line p-3">
           <div className="flex flex-col gap-3 px-1">
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-[0.95rem] font-semibold">
@@ -694,16 +698,17 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           ) : curriculum.length > 0 ? (
             <>
               {completedCount === 0 && curriculum.length >= 2 && (
-                <div className="flex flex-col gap-2 rounded-xl bg-sunk px-4 py-3.5">
-                  <span className="text-[0.9rem] font-semibold">Already know some of this?</span>
-                  <span className="text-[0.82rem] text-fg-secondary">A few minutes of questions. Modules you get fully right start as known.</span>
-                  <button type="button" onClick={() => setPlacementOpen(true)} className="btn btn-secondary h-9 self-start px-3 py-0 text-[0.82rem]">
-                    Take the placement check
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setPlacementOpen(true)}
+                  className="self-start px-1 text-left text-[0.85rem] font-medium text-fg-secondary underline-offset-4 hover:text-fg hover:underline"
+                  title="A few minutes of questions. Modules you get fully right start as known."
+                >
+                  Already know some of this? Take the placement check
+                </button>
               )}
-              <ol className="m-0 flex max-h-[62vh] list-none flex-col gap-0.5 overflow-y-auto p-0 pr-1">
-                {curriculum.map((mod) => {
+              <ol className="m-0 flex max-h-[62vh] list-none flex-col gap-1 overflow-y-auto p-0">
+                {curriculum.map((mod, modIdx) => {
                   const isSelected = mod.id === activeModule?.id;
                   const ev = evidence[mod.id];
                   const state: Knowledge = ev?.state ?? 'unseen';
@@ -714,14 +719,22 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                         onClick={() => setActiveModuleId(mod.id)}
                         aria-current={isSelected ? 'step' : undefined}
                         title={ev?.reason ? `${KNOWLEDGE_LABEL[state]}: ${ev.reason}` : KNOWLEDGE_LABEL[state]}
-                        className="flex min-h-[44px] min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left"
+                        className="flex min-h-[52px] min-w-0 flex-1 items-center gap-3 px-2.5 py-2 text-left"
                       >
                         <span
                           aria-hidden="true"
-                          className={`h-3 w-3 shrink-0 rounded-[3px] ${state === 'solid' ? 'bg-k-solid' : state === 'learning' ? 'bg-k-learning' : state === 'fading' ? 'bg-k-fading' : 'shadow-[inset_0_0_0_1.5px_var(--k-unseen)]'}`}
-                        />
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.78rem] font-semibold tabular-nums ${
+                            mod.completed ? 'bg-ink text-on-ink'
+                              : state === 'solid' ? 'bg-k-solid text-on-ink'
+                              : state === 'learning' ? 'bg-k-learning text-on-ink'
+                              : state === 'fading' ? 'bg-k-fading text-on-ink'
+                              : 'text-fg-muted shadow-[inset_0_0_0_1.5px_var(--k-unseen)]'
+                          }`}
+                        >
+                          {mod.completed ? <Icon name="check" size={13} strokeWidth={2.6} /> : modIdx + 1}
+                        </span>
                         <span className="flex min-w-0 flex-col">
-                          <span className={`truncate text-[0.9rem] ${isSelected ? 'font-semibold text-fg' : state === 'unseen' ? 'text-fg-muted' : 'text-fg-secondary'}`}>
+                          <span className={`line-clamp-2 text-[0.9rem] leading-snug ${isSelected ? 'font-semibold text-fg' : state === 'unseen' ? 'text-fg-muted' : 'text-fg-secondary'}`}>
                             {mod.title}
                           </span>
                           {isSelected && (
@@ -755,14 +768,20 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
             </div>
           )}
 
-          {!editingSyllabus && (
-            <form onSubmit={handleAddModule} className="flex gap-2">
+          {!editingSyllabus && !addingModule && curriculum.length > 0 && (
+            <button type="button" onClick={() => setAddingModule(true)} className="self-start px-1 text-[0.85rem] font-medium text-fg-muted hover:text-fg">
+              + Add module
+            </button>
+          )}
+          {!editingSyllabus && (addingModule || curriculum.length === 0) && (
+            <form onSubmit={(e) => { handleAddModule(e); setAddingModule(false); }} className="flex gap-2">
               <label htmlFor="add-module" className="sr-only">Add a module</label>
               <input
                 id="add-module"
                 type="text"
                 className="form-input h-10 flex-1 py-0 text-[0.875rem]"
                 placeholder="Add a module"
+                autoFocus={addingModule}
                 value={newModuleTitle}
                 onChange={(e) => setNewModuleTitle(e.target.value)}
               />
@@ -770,6 +789,8 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
             </form>
           )}
         </nav>
+        <div id="module-side-panel" className="flex flex-col gap-2" />
+        </div>
 
         <div className="flex min-w-0 flex-col gap-6">
           {activeModule ? (

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import CheckinsDue from './CheckinsDue';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/ToastProvider';
@@ -293,7 +294,7 @@ export default function TodayPage() {
               </Button>
             </form>
             <p className="m-0 text-[0.85rem] text-fg-muted">
-              Or <Link href="/goals" className="underline underline-offset-2">start from a goal</Link>, like “pass a backend interview”.
+              Or <Link href="/learn/program" className="underline underline-offset-2">build a full learning plan</Link> from a goal, like “pass a backend interview”.
             </p>
           </section>
         )}
@@ -347,6 +348,8 @@ export default function TodayPage() {
             </section>
           )
         )}
+
+        <CheckinsDue />
 
         {due.length > 0 ? (
           <section aria-labelledby="rev-h" className="glass-panel flex flex-wrap items-center gap-6 px-7 py-6">
