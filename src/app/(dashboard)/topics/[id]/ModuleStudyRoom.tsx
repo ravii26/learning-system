@@ -201,7 +201,7 @@ export default function ModuleStudyRoom({
       const added: number = data.cardsAdded ?? 0;
       setQuizResult(
         `Score ${data.attempt?.correct ?? correct}/${data.attempt?.total ?? quiz.length} saved` +
-          (added > 0 ? ` · ${added} missed question${added === 1 ? '' : 's'} added to Daily Review` : '')
+          (added > 0 ? ` · ${added} missed question${added === 1 ? '' : 's'} ${added === 1 ? 'comes' : 'come'} back in Review tomorrow` : '')
       );
       onEvidenceChanged?.();
     } catch {

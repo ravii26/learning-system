@@ -69,7 +69,23 @@ export async function GET() {
       consecutiveRecalls: c.reps,
     }));
 
-    return NextResponse.json({ dueConcepts });
+    // Cards scheduled later, so an empty queue can say what's coming.
+    const upcomingWhere = {
+      userId,
+      suspended: false,
+      masteryLevel: { not: 'Unknown' as const },
+      nextReview: { gt: now },
+      topic: { status: { not: 'dropped' }, deletedAt: null },
+    };
+    const [upcomingCount, nextUp] = await Promise.all([
+      db.concept.count({ where: upcomingWhere }),
+      db.concept.findFirst({ where: upcomingWhere, orderBy: { nextReview: 'asc' }, select: { nextReview: true } }),
+    ]);
+
+    return NextResponse.json({
+      dueConcepts,
+      upcoming: { count: upcomingCount, nextAt: nextUp?.nextReview?.toISOString() ?? null },
+    });
   } catch (e) {
     console.error('Failed to get due spaced concepts:', e);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

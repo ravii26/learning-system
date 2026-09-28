@@ -58,6 +58,17 @@ interface ReviewDecision {
   nextAction: string;
 }
 
+/** "later today", "tomorrow", "in 3 days" or "on 12 Oct", by calendar day. */
+function whenLabel(iso: string): string {
+  const d = new Date(iso);
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOf(d) - startOf(new Date())) / 86_400_000);
+  if (days <= 0) return 'later today';
+  if (days === 1) return 'tomorrow';
+  if (days < 7) return `in ${days} days`;
+  return `on ${d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
+}
+
 export default function ReviewPage() {
   const router = useRouter();
   
@@ -66,6 +77,7 @@ export default function ReviewPage() {
   const [activePaused, setActivePaused] = useState<Topic[]>([]);
   const [queuedTopics, setQueuedTopics] = useState<Topic[]>([]);
   const [dueConcepts, setDueConcepts] = useState<DueConcept[]>([]);
+  const [upcoming, setUpcoming] = useState<{ count: number; nextAt: string | null } | null>(null);
   const [currentConceptIdx, setCurrentConceptIdx] = useState(0);
   const [revealedAnswer, setRevealedAnswer] = useState(false);
   // One natural stopping point: once the slipping cards are done.
@@ -116,6 +128,7 @@ export default function ReviewPage() {
         // ones you'd otherwise lose. The API's most-overdue order is kept
         // within each group.
         setDueConcepts([...list.filter((c) => c.lastRecalledAt), ...list.filter((c) => !c.lastRecalledAt)]);
+        setUpcoming(spacedData.upcoming ?? null);
       }
     } catch (e) {
       console.error(e);
@@ -372,6 +385,11 @@ export default function ReviewPage() {
               <p className="m-0 max-w-[520px] text-[1rem] text-fg-secondary">
                 Cards come back here just before you’d forget them. Finish a module or check a quiz and new ones appear.
               </p>
+              {upcoming && upcoming.count > 0 && upcoming.nextAt && (
+                <p className="m-0 text-[0.95rem] font-medium text-fg">
+                  {upcoming.count} card{upcoming.count === 1 ? '' : 's'} coming up · next one {whenLabel(upcoming.nextAt)}
+                </p>
+              )}
               <ButtonLink href="/" className="mt-2 self-start">Back to Today</ButtonLink>
             </section>
           ) : pauseAfterSlipping ? (
