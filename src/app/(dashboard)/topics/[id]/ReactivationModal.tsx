@@ -1,4 +1,5 @@
 'use client';
+import { alertDialog } from '@/components/dialogs';
 
 import React, { useState } from 'react';
 import type { Concept } from './KnowledgeMap';
@@ -34,7 +35,7 @@ export default function ReactivationModal({
       setStep('recall');
     } else if (step === 'recall') {
       if (freeRecallText.trim().length < 10) {
-        alert('Please write what you remember (at least 10 characters) to help reactivate your brain.');
+        alertDialog({ title: 'Write a little more', message: 'Write what you remember, at least a sentence. Recalling first is what brings it back.' });
         return;
       }
       if (testConcepts.length > 0) {
@@ -69,7 +70,7 @@ export default function ReactivationModal({
       onClose();
     } catch (e) {
       console.error(e);
-      alert('Error during resume activation.');
+      alertDialog({ title: 'Couldn’t resume', message: 'Something went wrong resuming this topic. Please try again.' });
     } finally {
       setSubmitting(false);
     }

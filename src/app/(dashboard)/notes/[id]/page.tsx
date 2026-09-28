@@ -1,4 +1,5 @@
 'use client';
+import { confirmDialog } from '@/components/dialogs';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
@@ -122,7 +123,7 @@ export default function NoteDetailPage() {
 
   const handleDelete = async () => {
     if (isNew || !note) return;
-    if (!confirm(`Delete "${note.title}"? This cannot be undone.`)) return;
+    if (!(await confirmDialog({ title: `Delete “${note.title}”?`, message: 'This note will be gone for good. This can’t be undone.', danger: true }))) return;
     try {
       const res = await fetch(`/api/notes/${note.id}`, { method: 'DELETE' });
       if (res.ok) {

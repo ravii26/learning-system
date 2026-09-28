@@ -1,4 +1,5 @@
 'use client';
+import { alertDialog } from '@/components/dialogs';
 
 import React, { useState } from 'react';
 
@@ -416,7 +417,7 @@ export default function ConfusionMistakeBank({
                     setRevealed(false);
                     if (testIdx + 1 < mistakes.length) setTestIdx(testIdx + 1);
                     else {
-                      alert('Mistake review complete!');
+                      alertDialog({ title: 'Mistake review done', message: 'You went through every mistake in this bank.' });
                       setTestingMistakes(false);
                     }
                   }}
@@ -430,7 +431,7 @@ export default function ConfusionMistakeBank({
                     setRevealed(false);
                     if (testIdx + 1 < mistakes.length) setTestIdx(testIdx + 1);
                     else {
-                      alert('Mistake review complete!');
+                      alertDialog({ title: 'Mistake review done', message: 'You went through every mistake in this bank.' });
                       setTestingMistakes(false);
                     }
                   }}

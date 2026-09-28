@@ -1,4 +1,5 @@
 'use client';
+import { promptDialog } from '@/components/dialogs';
 
 import { Icon } from '@/components/ui/Icon';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -76,10 +77,10 @@ export default function RichTextEditor({
     return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
   }, []);
 
-  const setLink = useCallback(() => {
+  const setLink = useCallback(async () => {
     if (!editor) return;
     const prev = editor.getAttributes('link').href;
-    const url = window.prompt('Enter URL', prev || 'https://');
+    const url = await promptDialog({ title: prev ? 'Edit link' : 'Add link', message: 'Leave it empty to remove the link.', value: prev || 'https://', confirmLabel: 'Save link' });
     if (url === null) return;
     if (url === '') {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();

@@ -1,4 +1,5 @@
 'use client';
+import { alertDialog } from '@/components/dialogs';
 
 import React, { useState } from 'react';
 import type { Concept } from './KnowledgeMap';
@@ -123,7 +124,7 @@ export default function LearningContract({
   const submitDiagnostic = () => {
     onDiagnoseConcepts(diagnosticLevels);
     setShowDiagnostic(false);
-    alert('Adaptive learning diagnostic complete. Map levels updated!');
+    alertDialog({ title: 'Diagnostic done', message: 'Your knowledge map levels are updated.' });
   };
 
   return (

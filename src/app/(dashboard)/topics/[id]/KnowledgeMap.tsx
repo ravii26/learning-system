@@ -1,4 +1,5 @@
 'use client';
+import { confirmDialog } from '@/components/dialogs';
 
 import React, { useState } from 'react';
 
@@ -77,8 +78,8 @@ export default function KnowledgeMap({
     setShowAddConcept(false);
   };
 
-  const handleDeleteConcept = (id: string) => {
-    if (!confirm('Are you sure you want to remove this concept from the knowledge map?')) return;
+  const handleDeleteConcept = async (id: string) => {
+    if (!(await confirmDialog({ title: 'Remove this concept?', message: 'It will be taken off the knowledge map. Concepts under it move to the top level.', confirmLabel: 'Remove', danger: true }))) return;
     const updated = concepts.filter((c) => c.id !== id).map(c => {
       if (c.parentId === id) {
         return { ...c, parentId: null };
