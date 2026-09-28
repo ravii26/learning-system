@@ -2,12 +2,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { callAIContent, hasAnyAIProviderConfigured, AllAIProvidersFailedError } from './aiClient';
 import * as groqClient from './groqClient';
 import * as aiCreditsClient from './aiCreditsClient';
+import * as geminiClient from './geminiClient';
 
 describe('callAIContent', () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    // A real key in .env must never reach a test: tests that want Gemini set it themselves.
+    delete process.env.GEMINI_API_KEY;
   });
 
   afterEach(() => {
@@ -24,6 +27,29 @@ describe('callAIContent', () => {
     expect(result).toEqual({ content: 'from aicredits', provider: 'aicredits' });
     expect(acSpy).toHaveBeenCalledTimes(1);
     expect(groqSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses Gemini after AICredits fails and before Groq, passing the tier on', async () => {
+    process.env.AICREDITS_API_KEY = 'ac-key';
+    process.env.GEMINI_API_KEY = 'gm-key';
+    process.env.GROQ_API_KEY = 'groq-key';
+    vi.spyOn(aiCreditsClient, 'callAICreditsContent').mockRejectedValue(new Error('402 budget'));
+    const gmSpy = vi.spyOn(geminiClient, 'callGeminiContent').mockResolvedValue('from gemini');
+    const groqSpy = vi.spyOn(groqClient, 'callGroqContent').mockResolvedValue('from groq');
+
+    const result = await callAIContent([{ role: 'user', content: 'hi' }], { tier: 'plan' });
+    expect(result).toEqual({ content: 'from gemini', provider: 'gemini' });
+    expect(gmSpy.mock.calls[0][2]).toMatchObject({ tier: 'plan' });
+    expect(groqSpy).not.toHaveBeenCalled();
+  });
+
+  it('falls back to Groq when Gemini fails too', async () => {
+    delete process.env.AICREDITS_API_KEY;
+    process.env.GEMINI_API_KEY = 'gm-key';
+    process.env.GROQ_API_KEY = 'groq-key';
+    vi.spyOn(geminiClient, 'callGeminiContent').mockRejectedValue(new Error('429 free tier limit'));
+    vi.spyOn(groqClient, 'callGroqContent').mockResolvedValue('from groq');
+    expect(await callAIContent([{ role: 'user', content: 'hi' }])).toEqual({ content: 'from groq', provider: 'groq' });
   });
 
   it('falls back to Groq when AICredits fails entirely', async () => {
@@ -93,6 +119,7 @@ describe('callAIContent', () => {
 
 describe('hasAnyAIProviderConfigured', () => {
   const originalEnv = { ...process.env };
+  beforeEach(() => { delete process.env.GEMINI_API_KEY; });
   afterEach(() => {
     process.env = { ...originalEnv };
   });

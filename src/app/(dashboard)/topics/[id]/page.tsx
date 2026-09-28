@@ -7,6 +7,7 @@ import Link from 'next/link';
 // Modular Components
 import SocraticCoach from './SocraticCoach';
 import ModuleStudyRoom from './ModuleStudyRoom';
+import DailySessions from './DailySessions';
 import ConfusionMistakeBank from './ConfusionMistakeBank';
 import RichTextEditor from './RichTextEditor';
 import SessionDebriefModal, { SessionLog } from './SessionDebriefModal';
@@ -81,6 +82,8 @@ interface Topic {
   mistakes: any[];
   sessionLogs: SessionLog[];
   curriculum: CourseModule[];
+  /** "practice" topics (speaking, instrument, mock tests) are daily sessions, not modules. */
+  mode?: string;
 }
 
 export default function TopicStudyRoomPage({ params }: { params: { id: string } }) {
@@ -628,6 +631,9 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
         </div>
       )}
 
+      {topic?.mode === 'practice' ? (
+        <DailySessions topicId={params.id} topicTitle={title} />
+      ) : (
       <div className="grid items-start gap-12 lg:grid-cols-[300px_minmax(0,1fr)]">
         {/* Left column: modules, then this module's notes / progress / options
             (ModuleStudyRoom renders those into #module-side-panel). */}
@@ -843,6 +849,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           )}
         </div>
       </div>
+      )}
 
       {/* ── SLIDE-OVER DRAWER: Confusions & Mistakes ─────────────────── */}
       <Drawer

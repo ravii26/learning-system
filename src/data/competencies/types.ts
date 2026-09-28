@@ -30,6 +30,12 @@ export interface Competency {
   prerequisites?: string[];
   /** One line: what being able to do this means. */
   summary: string;
+  /**
+   * AI-drafted maps: the concrete lessons inside this topic, in order, each
+   * one sitting (e.g. "Present simple: habits and facts"). Each becomes its
+   * own module, so a 7-hour topic isn't squeezed into one lesson.
+   */
+  lessons?: string[];
 }
 
 export interface CompetencyMap {
@@ -39,6 +45,8 @@ export interface CompetencyMap {
   aliases: string[];
   description: string;
   competencies: Competency[];
+  /** What kind of learning this is (language, exam, hands-on skill...). See src/lib/program/fieldGuide.ts. */
+  archetype?: string;
 }
 
 /** One piece of evidence a checkpoint can require for a competency. */
@@ -52,6 +60,11 @@ export type EvidenceRequirement =
 
 /** Module ids for competencies use this prefix, so evidence maps back to a competency. */
 export const COMPETENCY_MODULE_PREFIX = 'c:';
-export const moduleIdFor = (competencyKey: string) => `${COMPETENCY_MODULE_PREFIX}${competencyKey}`;
+/** Lesson 2+ of a competency: "c:<key>~2". Keys are slugs, so "~" never appears in one. */
+export const LESSON_SEPARATOR = '~';
+export const moduleIdFor = (competencyKey: string, lesson = 1) =>
+  `${COMPETENCY_MODULE_PREFIX}${competencyKey}${lesson > 1 ? `${LESSON_SEPARATOR}${lesson}` : ''}`;
 export const competencyFromModuleId = (moduleId: string | null | undefined): string | null =>
-  moduleId && moduleId.startsWith(COMPETENCY_MODULE_PREFIX) ? moduleId.slice(COMPETENCY_MODULE_PREFIX.length) : null;
+  moduleId && moduleId.startsWith(COMPETENCY_MODULE_PREFIX) ? moduleId.slice(COMPETENCY_MODULE_PREFIX.length).split(LESSON_SEPARATOR)[0] : null;
+/** The lessons a competency is taught in: its drafted lesson list, or one lesson named after it. */
+export const lessonsOf = (c: Competency): string[] => (c.lessons?.length ? c.lessons : [c.title]);

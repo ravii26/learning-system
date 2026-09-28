@@ -32,6 +32,14 @@ export interface ReadinessTopicInput {
   depthTarget?: string | null;
   /** When present, readiness comes from what you've proven, not progress %. */
   evidence?: ReadinessEvidence | null;
+  /**
+   * Plan topics know what they teach. false = nothing on this topic is solved
+   * as a problem (spoken English, cooking), so "problems solved cold" doesn't
+   * apply. Undefined (topics outside a plan) keeps the old rule.
+   */
+  needsProblems?: boolean;
+  /** Practice topics (speaking, guitar, drills): proven by sessions done, not modules. */
+  practice?: { done: number; needed: number } | null;
 }
 
 export interface ReadinessCriterion {
@@ -62,15 +70,23 @@ function judge(t: ReadinessTopicInput): { met: boolean; reason: string } {
   const e = t.evidence;
   const total = e ? e.counts.unseen + e.counts.learning + e.counts.solid + e.counts.fading : 0;
 
+  if (t.practice) {
+    const { done, needed } = t.practice;
+    return done >= needed
+      ? { met: true, reason: `${done} practice session${done === 1 ? '' : 's'} done` }
+      : { met: false, reason: `${done} of ${needed} practice sessions done` };
+  }
+
   if (e && e.unit === 'module' && total > 0) {
     const needSolid = Math.ceil(total * READY_SOLID_SHARE);
     const gaps: string[] = [];
-    if (e.counts.solid < needSolid) gaps.push(`${e.counts.solid} of ${needSolid} modules solid`);
+    const lessons = (n: number) => `lesson${n === 1 ? '' : 's'}`;
+    if (e.counts.solid < needSolid) gaps.push(`${e.counts.solid} of ${needSolid} ${lessons(needSolid)} solid`);
     if (e.counts.fading > 0) gaps.push(`${e.counts.fading} slipping`);
-    const interview = INTERVIEW_DEPTHS.has(t.depthTarget ?? '');
+    const interview = INTERVIEW_DEPTHS.has(t.depthTarget ?? '') && t.needsProblems !== false;
     if (interview && e.problemsCold < READY_PROBLEMS_COLD) gaps.push(`${e.problemsCold} of ${READY_PROBLEMS_COLD} problems solved cold`);
     if (gaps.length === 0) {
-      return { met: true, reason: `${e.counts.solid} of ${total} modules solid${interview ? `, ${e.problemsCold} problems solved cold` : ''}` };
+      return { met: true, reason: `${e.counts.solid} of ${total} ${lessons(total)} solid${interview ? `, ${e.problemsCold} problems solved cold` : ''}` };
     }
     return { met: false, reason: gaps.join(' · ') };
   }

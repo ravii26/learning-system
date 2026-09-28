@@ -7,6 +7,7 @@
  * core teaching content returns null so the caller shows an honest failure.
  */
 import { isValidQuizQuestion } from './reviewCards';
+import { normalizeExercises } from './program/lessonGuide';
 
 const strList = (v: unknown, max = 12): string[] =>
   (Array.isArray(v) ? v : [])
@@ -65,5 +66,6 @@ export function normalizeLesson(raw: unknown): Record<string, unknown> | null {
     recommendedResources,
     reviewCards,
     socraticChallenge,
+    exercises: normalizeExercises(l.exercises),
   };
 }

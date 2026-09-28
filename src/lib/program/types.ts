@@ -1,4 +1,5 @@
 import type { CompetencyMap, TargetLevel } from '@/data/competencies';
+import type { Archetype } from './fieldGuide';
 import type { Budget, Pricing, ResourceFormat, ResourceRole, ResourceType } from '@/data/resources';
 
 export type Shape = 'course' | 'reading' | 'practice' | 'exploration' | 'project';
@@ -20,6 +21,10 @@ export interface Intake {
   formats?: ResourceFormat[];
   bookTitle?: string;           // "learn investing from The Intelligent Investor"
   placement?: { strong: string[]; weak: string[] };
+  /** Answers to the goal-specific questions asked before drafting ("What is hardest for you?" → "I freeze"). */
+  answers?: { question: string; answer: string }[];
+  /** What kind of learning this is (see fieldGuide.ts); decides the plan's shape and level words. */
+  archetype?: Archetype;
 }
 
 export interface DraftResource {

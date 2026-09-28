@@ -8,6 +8,38 @@ import {
 import { db } from '@/lib/db';
 import { buildLessonContext, type LessonContext } from '@/lib/lessonContext';
 import { normalizeLesson } from '@/lib/lessonNormalize';
+import { competencyFromModuleId, type CompetencyMap } from '@/data/competencies';
+import { guessArchetype, isArchetype, type Archetype } from '@/lib/program/fieldGuide';
+import { EXERCISES_JSON, LESSON_GUIDE } from '@/lib/program/lessonGuide';
+import type { Intake } from '@/lib/program/types';
+
+export const maxDuration = 90;
+
+/**
+ * When the topic belongs to a learning plan: what kind of learning it is,
+ * which topic this lesson belongs to and what the learner told us about
+ * themselves. A grammar lesson for a nervous interview candidate should
+ * not read like one for a homemaker learning to shop in English.
+ */
+async function loadPlanContext(userId: string, topicId: string, moduleId: string | undefined) {
+  const item = await db.programItem.findFirst({
+    where: { userId, topicId, program: { status: 'active' } },
+    select: { program: { select: { competencyMap: true, intake: true } } },
+  });
+  if (!item) return null;
+  const map = item.program.competencyMap as unknown as CompetencyMap;
+  const intake = item.program.intake as unknown as Intake;
+  const key = competencyFromModuleId(moduleId);
+  const comp = key ? map.competencies?.find((c) => c.key === key) : undefined;
+  const archetype = isArchetype(map.archetype) ? map.archetype : isArchetype(intake.archetype) ? intake.archetype : guessArchetype(`${map.title} ${intake.goal}`);
+  return {
+    archetype,
+    field: map.title,
+    goal: intake.goal,
+    answers: intake.answers ?? [],
+    competency: comp ? { title: comp.title, summary: comp.summary, lessons: comp.lessons ?? [] } : null,
+  };
+}
 
 /** Loads the rows buildLessonContext needs for one topic/module. */
 async function loadLessonContext(userId: string, topicId: string, moduleId: string | undefined): Promise<LessonContext | null> {
@@ -69,7 +101,27 @@ export async function GET(request: Request) {
   }
 }
 
+/**
+ * Lessons being written right now, by user+topic+module. A second request
+ * for the same lesson (React's double mount in development, two tabs, a
+ * double click) waits for the first instead of paying for it twice.
+ */
+const writing = new Map<string, Promise<Response>>();
+
 export async function POST(request: Request) {
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const peek = (await request.clone().json().catch(() => ({}))) as Record<string, unknown>;
+  const key = peek.topicId && peek.moduleId && !peek.regenerate ? `${auth.userId}:${peek.topicId}:${peek.moduleId}` : null;
+  if (!key) return writeLesson(request);
+  const running = writing.get(key);
+  if (running) return (await running).clone();
+  const job = writeLesson(request).finally(() => writing.delete(key));
+  writing.set(key, job);
+  return (await job).clone();
+}
+
+async function writeLesson(request: Request) {
   const auth = requireAuth();
   if (auth instanceof NextResponse) return auth;
 
@@ -220,6 +272,15 @@ To study it independently:
     return null;
   }) : null;
 
+  const plan = topicId ? await loadPlanContext(userId, topicId, moduleId).catch(() => null) : null;
+  const archetype: Archetype = plan?.archetype ?? guessArchetype(`${topicTitle ?? ''} ${moduleTitle}`);
+  const planBlock = plan
+    ? `The learner's goal: ${plan.goal} (plan: ${plan.field}).
+${plan.answers.map((a) => `- ${a.question} → ${a.answer}`).join('\n')}${plan.competency ? `
+This lesson is part of the topic "${plan.competency.title}", which should leave them able to: ${plan.competency.summary}
+Lessons in that topic, in order: ${plan.competency.lessons.join(' | ') || plan.competency.title}. Teach only this lesson's part.` : ''}`
+    : '';
+
   const learnerLevel: string = bodyLearnerLevel || ctx?.learnerLevel || 'beginner';
   const priorKnowledge: string = bodyPriorKnowledge || ctx?.priorKnowledge || '';
   const coursePosition: string = ctx?.coursePosition || '';
@@ -269,6 +330,20 @@ ${normalizedMistakes.length
       ? normalizedMistakes.map((item: string) => `- ${item}`).join('\n')
       : 'No recent mistakes provided.'
     }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHO THIS IS FOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${planBlock || 'No plan context.'}
+
+Use their situation for every example (their job, exam, city, goal), not generic textbook examples.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HOW TO TEACH THIS KIND OF SUBJECT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${LESSON_GUIDE[archetype]}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 COURSE POSITION
@@ -569,6 +644,16 @@ Do not fabricate sources or claim something is "industry standard" unless
 the claim is genuinely justified.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PRACTICE RULE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Reading is not learning. Write "exercises" the learner does right after
+reading, following the guide above for this kind of subject: the actual
+items (sentences, questions, tasks), each with a model answer or a clear
+success check. Start easy and end with at least one exercise that uses the
+learner's own situation. Every model answer must be correct.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 REVIEW CARDS RULE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -601,6 +686,7 @@ Before returning the JSON, verify:
 8. Is anything generic filler?
 9. Did the lesson accidentally become a lesson about the entire topic?
 10. Does the content match the learner level?
+11. Are there enough exercises, and is every model answer and every technical/grammar label correct?
 
 If any answer is NO, improve the lesson before returning it.
 
@@ -708,6 +794,8 @@ Use exactly this structure:
     "idealAnswer": "Clear, complete breakdown of how to solve the challenge correctly."
   },
 
+${EXERCISES_JSON}
+
   "reviewCards": [
     {
       "concept": "Short name of the idea",
@@ -779,7 +867,9 @@ Actually teach the concept.
         },
       ],
       {
-        temperature: 0.35,
+        purpose: 'lesson', temperature: 0.35,
+        tier: 'content',
+        maxTokens: 9000,
       }
     );
 

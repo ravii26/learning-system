@@ -1,6 +1,6 @@
 import type { AIMessage } from '@/lib/ai/aiClient';
 import type { ProgramDraft } from './types';
-import { TARGET_LABEL } from './why';
+import { targetLabel } from './why';
 
 /**
  * The AI's whole job in program generation: adjust emphasis, name phases,
@@ -54,9 +54,10 @@ export function buildAdaptMessages(skeleton: ProgramDraft, factualWhy: string): 
   const custom = skeleton.mapQuality !== 'curated';
 
   const user = `Learner goal (their words): ${clip(i.goal, 300)}
-Target: ${TARGET_LABEL[i.target]}${i.doneMeans ? `. "Done" for them means: ${clip(i.doneMeans, 300)}` : ''}
+Target: ${targetLabel(i.target, i.archetype ?? skeleton.map.archetype)}${i.doneMeans ? `. "Done" for them means: ${clip(i.doneMeans, 300)}` : ''}
 Current level: ${i.currentLevel}. Hours per week: ${i.hoursPerWeek}.${i.why ? ` Why: ${clip(i.why, 300)}.` : ''}
 ${i.placement ? `Placement: strong in ${i.placement.strong.join(', ') || 'nothing yet'}; weak in ${i.placement.weak.join(', ') || 'nothing'}.` : 'No placement check.'}
+${(i.answers ?? []).map((x) => `${clip(x.question, 160)} → ${clip(x.answer, 300)}`).join('\n')}
 
 Competencies in scope (key | title | kind | importance):
 ${comps}

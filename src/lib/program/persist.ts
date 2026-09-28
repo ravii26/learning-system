@@ -1,9 +1,9 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
-import { DEPTH_FOR_TARGET, moduleIdFor, type Competency } from '@/data/competencies';
+import { DEPTH_FOR_TARGET, lessonsOf, moduleIdFor, type Competency } from '@/data/competencies';
 import { ensureAreaSkillId } from '@/lib/areaSkill';
 import { syncTopicListsAndMirror } from '@/lib/topicListSync';
 import { estimateHours } from './skeleton';
-import { TARGET_LABEL } from './why';
+import { targetLabel } from './why';
 import type { Adjustments } from './adapt';
 import type { DraftItem, Intake, ProgramDraft, Shape } from './types';
 
@@ -54,7 +54,7 @@ export async function persistProgram(tx: Tx, { userId, draft, adjustments }: Per
   const goal = await tx.goal.create({
     data: {
       userId,
-      title: `${draft.map.title}: ${TARGET_LABEL[intake.target]}`,
+      title: `${draft.map.title}: ${targetLabel(intake.target, intake.archetype ?? draft.map.archetype)}`,
       outcome: intake.doneMeans || intake.goal,
       why: intake.why ?? null,
       status: 'active',
@@ -88,15 +88,12 @@ export async function persistProgram(tx: Tx, { userId, draft, adjustments }: Per
     for (let order = 0; order < phase.items.length; order++) {
       const item = phase.items[order];
       const comps: Competency[] = item.competencyKeys.map(comp);
-      const modules = comps.map((c, i) => ({
-        id: moduleIdFor(c.key),
-        order: i + 1,
-        title: c.title,
-        estimatedMinutes: Math.round(estimateHours(c, intake, adjustments.emphasis[c.key] ?? 1) * 60),
-        completed: false,
-        completedAt: null,
-        notes: '',
-      }));
+      // One module per lesson, so a 7-hour topic is taught in several sittings, not squeezed into one.
+      const modules = comps.flatMap((c) => {
+        const lessons = lessonsOf(c);
+        const minutes = Math.round((estimateHours(c, intake, adjustments.emphasis[c.key] ?? 1) * 60) / lessons.length);
+        return lessons.map((title, j) => ({ id: moduleIdFor(c.key, j + 1), title, estimatedMinutes: minutes }));
+      }).map((m, i) => ({ ...m, order: i + 1, completed: false, completedAt: null, notes: '' }));
       const resources = item.resources.map((r) => ({
         title: r.title, type: r.type, url: r.url, purpose: r.role, status: 'NOT_STARTED', notes: '',
       }));

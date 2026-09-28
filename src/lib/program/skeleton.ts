@@ -5,7 +5,7 @@ import {
 import { findCatalogResources, type CatalogResource, type ResourceRole } from '@/data/resources';
 import type { CoverageRow, DraftItem, DraftPhase, DraftResource, Intake, ProgramDraft, Shape } from './types';
 import { inferTarget } from './intake';
-import { TARGET_LABEL } from './why';
+import { targetLabel } from './why';
 
 /**
  * The deterministic core of program generation. Given a competency map and
@@ -323,7 +323,7 @@ export function buildSkeleton(map: CompetencyMap, intake: Intake, opts: Skeleton
   if (rank(intake.target) < rank(implied)) {
     const covered = competenciesForTarget(map, intake.target).length;
     const full = competenciesForTarget(map, implied).length;
-    warnings.unshift(`Your goal sounds like “${TARGET_LABEL[implied]}”, but this plan is for “${TARGET_LABEL[intake.target]}”: it covers ${covered} of the ${full} topics that level needs. Rebuild it at a higher level below if you meant more.`);
+    warnings.unshift(`Your goal sounds like “${targetLabel(implied, intake.archetype ?? map.archetype)}”, but this plan is for “${targetLabel(intake.target, intake.archetype ?? map.archetype)}”: it covers ${covered} of the ${full} topics that level needs. Rebuild it at a higher level below if you meant more.`);
   }
 
   return {

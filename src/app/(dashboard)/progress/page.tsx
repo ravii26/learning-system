@@ -1,5 +1,6 @@
 'use client';
 
+import { topicLabelUnderGoal } from '@/lib/statusLabels';
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ButtonLink, KNOWLEDGE_LABEL, KnowledgeStrip, Sparkline, knowledgeSummary } from '@/components/ui';
@@ -389,7 +390,7 @@ export default function WhereYouStandPage() {
                     <div className="flex flex-col gap-1 text-[0.9rem] text-fg-secondary">
                       <span className="font-semibold text-fg-muted">Still to prove</span>
                       {unmet.slice(0, 4).map((c) => (
-                        <span key={c.topicId}>{c.label}{c.reason && <span className="text-fg-muted"> — {c.reason}</span>}</span>
+                        <span key={c.topicId}>{topicLabelUnderGoal(c.label, g.title)}{c.reason && <span className="text-fg-muted"> — {c.reason}</span>}</span>
                       ))}
                     </div>
                   )}

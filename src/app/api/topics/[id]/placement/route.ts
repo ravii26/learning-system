@@ -41,7 +41,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
     const plan = planPlacement(open.map((m) => ({ id: m.legacyId, title: m.title })));
     let questions;
     try {
-      const { content } = await callAIContent(buildPlacementMessages(topic.title, topic.depthTarget, plan), { temperature: 0.3, jsonMode: true });
+      const { content } = await callAIContent(buildPlacementMessages(topic.title, topic.depthTarget, plan), { purpose: 'placement', temperature: 0.3, jsonMode: true });
       questions = parsePlacement(content, plan);
     } catch (e) {
       console.warn('Placement check generation failed:', e instanceof Error ? e.message : e);

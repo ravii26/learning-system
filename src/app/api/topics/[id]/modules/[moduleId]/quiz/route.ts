@@ -41,7 +41,7 @@ ${text}
 
 Write exactly ${count} multiple-choice questions on this module: a mix of concept, application, prediction and edge-case questions, easy to hard. Each has 4 plausible options, one correct, and a short explanation of why. Vary which option is correct. No "all of the above".
 Return JSON: { "quiz": [ { "question": "...", "options": ["...","...","...","..."], "correctIndex": 0, "explanation": "..." } ] }` },
-    ], { temperature: 0.4, jsonMode: true });
+    ], { purpose: 'quiz', temperature: 0.4, jsonMode: true });
 
     let parsed: any;
     try { parsed = JSON.parse(content.replace(/^```(?:json)?\s*|\s*```$/g, '')); } catch { parsed = null; }

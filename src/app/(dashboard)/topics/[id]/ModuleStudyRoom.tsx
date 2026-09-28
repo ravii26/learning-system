@@ -7,6 +7,7 @@ import { renderMarkdown } from '@/lib/markdown';
 import RichTextEditor from './RichTextEditor';
 import { Accordion, Icon, KnowledgeMark } from '@/components/ui';
 import ProblemLog from './ProblemLog';
+import LessonPractice from './LessonPractice';
 
 interface ModuleStudyRoomProps {
   topicId: string;
@@ -48,7 +49,7 @@ export default function ModuleStudyRoom({
   evidence,
   onEvidenceChanged,
 }: ModuleStudyRoomProps) {
-  const [activeTab, setActiveTab] = useState<'guide' | 'media' | 'challenge' | 'quiz'>('guide');
+  const [activeTab, setActiveTab] = useState<'guide' | 'practice' | 'media' | 'challenge' | 'quiz'>('guide');
   const [lesson, setLesson] = useState<any | null>(null);
   const [loadingLesson, setLoadingLesson] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -230,9 +231,11 @@ export default function ModuleStudyRoom({
   const avoidWhen = listOf(lesson?.whenNotToUse);
   const pitfalls = listOf(lesson?.commonMistakes);
   const checkTab: 'quiz' | 'challenge' = quiz.length ? 'quiz' : 'challenge';
+  const exercises: any[] = Array.isArray(lesson?.exercises) ? lesson.exercises : [];
 
   const STEPS: Array<{ key: typeof activeTab; label: string }> = [
     { key: 'guide', label: 'Read' },
+    ...(exercises.length ? [{ key: 'practice' as const, label: 'Practice' }] : []),
     ...(quiz.length ? [{ key: 'quiz' as const, label: 'Check' }] : []),
     { key: 'challenge', label: 'Explain it back' },
     { key: 'media', label: 'Go deeper' },
@@ -453,10 +456,10 @@ export default function ModuleStudyRoom({
                 )}
 
                 <div className="flex flex-wrap items-center gap-4 border-t border-line pt-6">
-                  <button type="button" onClick={() => setActiveTab(checkTab)} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
-                    Check yourself <Icon name="arrowRight" size={16} />
+                  <button type="button" onClick={() => setActiveTab(exercises.length ? 'practice' : checkTab)} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
+                    {exercises.length ? 'Practise it' : 'Check yourself'} <Icon name="arrowRight" size={16} />
                   </button>
-                  <span className="text-[0.9rem] text-fg-muted">Recalling it now is what makes it stay.</span>
+                  <span className="text-[0.9rem] text-fg-muted">{exercises.length ? `${exercises.length} exercises: doing it is what makes it stay.` : 'Recalling it now is what makes it stay.'}</span>
                 </div>
               </div>
             )}
@@ -622,6 +625,11 @@ export default function ModuleStudyRoom({
                   </div>
                 )}
               </section>
+            )}
+
+            {activeTab === 'practice' && exercises.length > 0 && (
+              <LessonPractice key={module.id} exercises={exercises} subject={`${topicTitle}: ${module.title}`} onDone={() => setActiveTab(checkTab)}
+                saved={lesson?.practice} onWork={(p) => setLesson((l: any) => (l ? { ...l, practice: p } : l))} saveUrl={`/api/topics/${topicId}/modules/${encodeURIComponent(module.id)}/practice`} />
             )}
 
             {activeTab === 'media' && (

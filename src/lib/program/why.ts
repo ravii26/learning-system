@@ -1,5 +1,6 @@
 import type { TargetLevel } from '@/data/competencies';
 import type { ProgramDraft } from './types';
+import { LEVEL_WORDS, isArchetype } from './fieldGuide';
 
 export const TARGET_LABEL: Record<TargetLevel, string> = {
   aware: 'know about it',
@@ -7,6 +8,11 @@ export const TARGET_LABEL: Record<TargetLevel, string> = {
   build: 'build real things with it',
   interview: 'interview-ready',
 };
+
+/** The level in the words of this kind of learning: "advanced" for cooking, "interview-ready" for DSA. */
+export function targetLabel(target: TargetLevel, archetype?: unknown): string {
+  return isArchetype(archetype) ? LEVEL_WORDS[archetype][target] : TARGET_LABEL[target];
+}
 
 /**
  * "Why this plan?" built only from facts: the intake, the scope and the
@@ -17,7 +23,7 @@ export function factualWhy(d: ProgramDraft): string {
   const i = d.intake;
   const core = d.coverage.filter((c) => c.importance === 'core' && c.itemIds.length).length;
   const parts = [
-    `You want to reach "${TARGET_LABEL[i.target]}" in ${d.map.title}${i.doneMeans ? `, which for you means: ${i.doneMeans.trim()}` : ''}.`,
+    `You want to reach "${targetLabel(i.target, i.archetype ?? d.map.archetype)}" in ${d.map.title}${i.doneMeans ? `, which for you means: ${i.doneMeans.trim()}` : ''}.`,
     `You're starting as a ${i.currentLevel} with ${i.hoursPerWeek} hours a week, so the plan runs about ${d.totalWeeks} weeks in ${d.phases.length} phases.`,
     `It covers ${core} core topics, with prerequisites always before what depends on them.`,
   ];

@@ -1,3 +1,4 @@
+import { usageOf, type AttemptLog } from './attempt';
 /**
  * Single Groq chat-completion client, replacing three near-identical
  * copies that had grown independently in generate-lesson/route.ts,
@@ -15,7 +16,12 @@
  * collapsing into the same unhelpful string.
  */
 
-export const GROQ_CANDIDATE_MODELS = ['openai/gpt-oss-120b', 'groq/compound', 'qwen/qwen3.6-27b'] as const;
+// Checked against GET /openai/v1/models for this key on 2026-09-29 ("groq/compound"
+// and "qwen/qwen3.6-27b" had been retired, leaving one working model). Override
+// with GROQ_MODELS (comma-separated) when Groq renames models again.
+export const GROQ_CANDIDATE_MODELS = (
+  process.env.GROQ_MODELS?.split(',').map((m) => m.trim()).filter(Boolean) ?? ['openai/gpt-oss-120b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-20b']
+) as readonly string[];
 
 export interface GroqMessage {
   role: 'system' | 'user' | 'assistant';
@@ -26,6 +32,9 @@ export interface GroqCallOptions {
   temperature?: number;
   jsonMode?: boolean;
   models?: readonly string[];
+  maxTokens?: number;
+  /** Called once per request with its tokens and timing, for cost logging. */
+  onAttempt?: (a: AttemptLog) => void;
 }
 
 export interface GroqAttempt {
@@ -52,10 +61,11 @@ export class GroqCallError extends Error {
  * since GroqCallError.message lists exactly what each model returned.
  */
 export async function callGroqContent(apiKey: string, messages: GroqMessage[], options: GroqCallOptions = {}): Promise<string> {
-  const { temperature = 0.3, jsonMode = true, models = GROQ_CANDIDATE_MODELS } = options;
+  const { temperature = 0.3, jsonMode = true, models = GROQ_CANDIDATE_MODELS, maxTokens, onAttempt } = options;
   const attempts: GroqAttempt[] = [];
 
   for (const model of models) {
+    const t0 = Date.now();
     try {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -68,20 +78,25 @@ export async function callGroqContent(apiKey: string, messages: GroqMessage[], o
           messages,
           temperature,
           response_format: jsonMode ? { type: 'json_object' } : undefined,
+          ...(maxTokens ? { max_tokens: maxTokens } : {}),
         }),
       });
 
       if (res.ok) {
         const data = await res.json();
         const content = data.choices?.[0]?.message?.content;
+        const log = (ok: boolean, error?: string) => onAttempt?.({ provider: 'groq', model, ok, status: res.status, error, ...usageOf(data), durationMs: Date.now() - t0 });
+        log(!!content, content ? undefined : 'no message content');
         if (content) return content;
         attempts.push({ model, status: res.status, detail: 'response had no message content' });
         continue;
       }
 
       const bodyText = await res.text().catch(() => '');
+      onAttempt?.({ provider: 'groq', model, ok: false, status: res.status, error: bodyText.slice(0, 300) || res.statusText, durationMs: Date.now() - t0 });
       attempts.push({ model, status: res.status, detail: bodyText.slice(0, 300) || res.statusText });
     } catch (e) {
+      onAttempt?.({ provider: 'groq', model, ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 300), durationMs: Date.now() - t0 });
       attempts.push({ model, detail: e instanceof Error ? e.message : String(e) });
     }
   }

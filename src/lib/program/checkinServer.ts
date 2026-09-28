@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
-import { competencyFromModuleId, moduleIdFor, type CompetencyMap } from '@/data/competencies';
+import { LESSON_SEPARATOR, competencyFromModuleId, lessonsOf, moduleIdFor, type CompetencyMap } from '@/data/competencies';
 import { callAIContent, hasAnyAIProviderConfigured } from '@/lib/ai/aiClient';
 import { consumeAiQuota } from '@/lib/rateLimit';
 import { loadProgramView } from './load';
@@ -71,7 +71,7 @@ export async function summarizeWeek(db: Db, userId: string, goalId: string, now 
     windowEnd: end.toISOString(),
     plannedMinutes: program.hoursPerWeek * 60,
     actualMinutes: Math.round((time._sum.seconds ?? 0) / 60),
-    modulesCompleted: modules.map((m) => competencyFromModuleId(m.legacyId)).filter((k): k is string => !!k).map(title),
+    modulesCompleted: Array.from(new Set(modules.map((m) => competencyFromModuleId(m.legacyId)).filter((k): k is string => !!k))).map(title),
     quizzes: Array.from(bestQuiz.entries()).map(([key, score]) => ({ key, title: title(key), score })),
     problems: {
       cold: problems.filter((p) => p.outcome === 'cold').length,
@@ -123,7 +123,7 @@ export async function createCheckin(db: Db, userId: string, goalId: string, now 
         const keys = program.items.flatMap((i) => i.competencyKeys);
         const { content } = await callAIContent(
           buildCheckinMessages(summary, signals, { goal: (program.intake as unknown as Intake).goal, hoursPerWeek: program.hoursPerWeek, competencies: map.competencies.filter((c) => keys.includes(c.key)) }),
-          { temperature: 0.2, jsonMode: true },
+          { purpose: 'checkin', temperature: 0.2, jsonMode: true },
         );
         proposal = parseProposal(content, signals, keys);
         if (!proposal.length) console.warn('Check-in: AI proposal had no usable changes; using the fallback. Reply:', content.slice(0, 600));
@@ -216,9 +216,14 @@ export async function decideCheckin(db: PrismaClient, userId: string, goalId: st
     }
     // Module time estimates follow the new emphasis and hours.
     for (const c of map.competencies.filter((x) => program.items.some((i) => i.competencyKeys.includes(x.key)))) {
+      const lessons = lessonsOf(c).length;
       await tx.curriculumItem.updateMany({
-        where: { userId, legacyId: moduleIdFor(c.key), topicId: { in: program.items.map((i) => i.topicId).filter((x): x is string => !!x) } },
-        data: { estimatedMinutes: Math.round(estimateHours(c, next.intake, next.emphasis[c.key] ?? 1) * 60) },
+        where: {
+          userId,
+          OR: [{ legacyId: moduleIdFor(c.key) }, { legacyId: { startsWith: `${moduleIdFor(c.key)}${LESSON_SEPARATOR}` } }],
+          topicId: { in: program.items.map((i) => i.topicId).filter((x): x is string => !!x) },
+        },
+        data: { estimatedMinutes: Math.round((estimateHours(c, next.intake, next.emphasis[c.key] ?? 1) * 60) / lessons) },
       });
     }
     await tx.programChange.create({

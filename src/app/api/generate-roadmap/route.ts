@@ -946,7 +946,7 @@ The learner should be able to look at the roadmap and know:
         },
       ],
       {
-        temperature: 0.35,
+        purpose: 'roadmap', temperature: 0.35,
       }
     );
 

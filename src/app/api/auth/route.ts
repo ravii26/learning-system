@@ -65,6 +65,8 @@ export async function GET() {
   return NextResponse.json({
     authenticated: !!user,
     user,
+    // The owner account also sees business screens (AI usage and cost).
+    isOwner: !!user && userId === SEED_USER_ID,
     signupOpen: signupOpen(),
     ownerUnclaimed: await ownerUnclaimed(),
   });

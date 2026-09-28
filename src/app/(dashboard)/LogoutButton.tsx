@@ -11,11 +11,12 @@ export default function LogoutButton() {
   const [signingOut, setSigningOut] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [account, setAccount] = useState<{ email: string | null; name: string | null } | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth')
       .then((r) => r.json())
-      .then((d) => setAccount(d.user ?? null))
+      .then((d) => { setAccount(d.user ?? null); setIsOwner(d.isOwner === true); })
       .catch(() => {});
   }, []);
 
@@ -73,6 +74,12 @@ export default function LogoutButton() {
             <Icon name="you" size={16} />
             <span>Friends</span>
           </Link>
+          {isOwner && (
+            <Link href="/usage" className="avatar-dropdown-item no-underline hover:no-underline" onClick={() => setOpen(false)}>
+              <Icon name="board" size={16} />
+              <span>AI usage &amp; cost</span>
+            </Link>
+          )}
           <button
             className="avatar-dropdown-item danger"
             onClick={handleSignOut}
