@@ -1,6 +1,8 @@
 import { TARGET_LEVELS, type TargetLevel } from '@/data/competencies';
 import type { Budget, ResourceFormat } from '@/data/resources';
 import type { CurrentLevel, Intake } from './types';
+import { isArchetype } from './fieldGuide';
+import { parseAnswers } from './questions';
 
 const LEVELS: CurrentLevel[] = ['beginner', 'intermediate', 'advanced'];
 const BUDGETS: Budget[] = ['free_only', 'free_preferred', 'any'];
@@ -49,6 +51,8 @@ export function parseIntake(body: unknown): { ok: true; intake: Intake } | { ok:
       formats: Array.isArray(b.formats) ? (b.formats as unknown[]).filter((f): f is ResourceFormat => FORMATS.includes(f as ResourceFormat)) : undefined,
       bookTitle: text(b.bookTitle, 160),
       placement,
+      ...(parseAnswers(b.answers).length ? { answers: parseAnswers(b.answers) } : {}),
+      ...(isArchetype(b.archetype) ? { archetype: b.archetype } : {}),
     },
   };
 }

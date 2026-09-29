@@ -26,3 +26,13 @@ export const STATUS_LABELS: Record<string, string> = {
 export function statusLabel(status: string): string {
   return STATUS_LABELS[status] || status;
 }
+
+/**
+ * A plan topic's title without the goal's field name in front of it: under
+ * "English Speaking Mastery: interview-ready", "English Speaking Mastery:
+ * Foundations" reads as just "Foundations".
+ */
+export function topicLabelUnderGoal(label: string, goalTitle: string | null | undefined): string {
+  const field = (goalTitle ?? '').split(': ').slice(0, -1).join(': ');
+  return field && label.startsWith(`${field}: `) ? label.slice(field.length + 2) : label;
+}

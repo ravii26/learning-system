@@ -7,6 +7,9 @@ import { renderMarkdown } from '@/lib/markdown';
 import RichTextEditor from './RichTextEditor';
 import { Accordion, Icon, KnowledgeMark } from '@/components/ui';
 import ProblemLog from './ProblemLog';
+import LessonPractice from './LessonPractice';
+import ManualAiPanel, { postManual } from '@/components/ManualAiPanel';
+import { useAiMode } from '@/lib/useAiMode';
 
 interface ModuleStudyRoomProps {
   topicId: string;
@@ -48,10 +51,14 @@ export default function ModuleStudyRoom({
   evidence,
   onEvidenceChanged,
 }: ModuleStudyRoomProps) {
-  const [activeTab, setActiveTab] = useState<'guide' | 'media' | 'challenge' | 'quiz'>('guide');
+  const [activeTab, setActiveTab] = useState<'guide' | 'practice' | 'media' | 'challenge' | 'quiz'>('guide');
   const [lesson, setLesson] = useState<any | null>(null);
   const [loadingLesson, setLoadingLesson] = useState(true);
   const [generating, setGenerating] = useState(false);
+  // "Use my own ChatGPT/Claude": a lesson not written yet comes from the learner's chat.
+  const { mode: aiMode, manual: manualMode } = useAiMode();
+  const [manualHere, setManualHere] = useState(false);
+  const [manualPrompt, setManualPrompt] = useState<string | null>(null);
 
   // Socratic Challenge Interactive State
   const [challengeAnswer, setChallengeAnswer] = useState('');
@@ -72,8 +79,9 @@ export default function ModuleStudyRoom({
   const [quizResult, setQuizResult] = useState<string | null>(null);
 
   // Fetch or Generate Full Comprehensive Lesson
-  const loadLesson = useCallback(async (forceRegenerate = false) => {
+  const loadLesson = useCallback(async (forceRegenerate = false, viaManual = false) => {
     setLoadingLesson(true);
+    setManualPrompt(null);
     setEvaluation(null);
     setChallengeAnswer('');
     setQuizSelections({});
@@ -91,12 +99,17 @@ export default function ModuleStudyRoom({
           topicTitle,
           area: topicArea || 'Tech',
           regenerate: forceRegenerate,
+          ...(viaManual ? { mode: 'manual', step: 'prompt' } : {}),
         }),
       });
 
       if (res.ok) {
         const data = await res.json();
-        setLesson(data);
+        // A saved lesson comes back as the lesson; otherwise, in copy-paste mode, as its prompt.
+        if (typeof data.prompt === 'string' && !data.explanation) {
+          setLesson(null);
+          setManualPrompt(data.prompt);
+        } else setLesson(data);
       }
     } catch (err) {
       console.error('Failed to load lesson:', err);
@@ -106,9 +119,14 @@ export default function ModuleStudyRoom({
     }
   }, [topicId, module.id, module.title, topicTitle, topicArea]);
 
+  // Wait until we know the mode, so copy-paste learners never trigger a paid call.
+  const useManual = manualMode || manualHere;
   useEffect(() => {
-    loadLesson(false);
-  }, [loadLesson]);
+    if (aiMode === null) return;
+    loadLesson(false, aiMode === 'manual');
+    // Only on module change or once the mode is known; switching mode later is explicit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadLesson, aiMode === null]);
 
   // Evaluate Socratic Challenge Answer
   const handleEvaluateChallenge = async () => {
@@ -230,9 +248,11 @@ export default function ModuleStudyRoom({
   const avoidWhen = listOf(lesson?.whenNotToUse);
   const pitfalls = listOf(lesson?.commonMistakes);
   const checkTab: 'quiz' | 'challenge' = quiz.length ? 'quiz' : 'challenge';
+  const exercises: any[] = Array.isArray(lesson?.exercises) ? lesson.exercises : [];
 
   const STEPS: Array<{ key: typeof activeTab; label: string }> = [
     { key: 'guide', label: 'Read' },
+    ...(exercises.length ? [{ key: 'practice' as const, label: 'Practice' }] : []),
     ...(quiz.length ? [{ key: 'quiz' as const, label: 'Check' }] : []),
     { key: 'challenge', label: 'Explain it back' },
     { key: 'media', label: 'Go deeper' },
@@ -327,7 +347,7 @@ export default function ModuleStudyRoom({
             <span className="text-[0.85rem] text-fg-muted">Didn’t click? Get the same module explained again with fresh examples.</span>
             <button
               type="button"
-              onClick={() => { setGenerating(true); loadLesson(true); }}
+              onClick={() => { setGenerating(true); loadLesson(true, useManual); }}
               disabled={loadingLesson || generating}
               className="btn btn-secondary h-9 py-0 text-[0.85rem]"
             >
@@ -365,7 +385,7 @@ export default function ModuleStudyRoom({
           )}
         </header>
 
-        <div role="tablist" aria-label="Steps in this module" className="flex flex-wrap gap-1.5">
+        {!manualPrompt && <div role="tablist" aria-label="Steps in this module" className="flex flex-wrap gap-1.5">
           {STEPS.map((step, i) => {
             const on = activeTab === step.key;
             return (
@@ -381,13 +401,30 @@ export default function ModuleStudyRoom({
               </button>
             );
           })}
-        </div>
+        </div>}
 
         {loadingLesson ? (
           <div className="flex flex-col gap-4" aria-busy="true">
             <p className="m-0 text-[0.95rem] text-fg-secondary">Writing this lesson for you — the first time takes a few seconds.</p>
             {[92, 100, 84, 96, 70].map((w, i) => <div key={i} className="skeleton h-4 rounded" style={{ width: `${w}%` }} />)}
           </div>
+        ) : manualPrompt ? (
+          <ManualAiPanel
+            key={module.id}
+            title="Get this lesson from your own chat"
+            what={`the lesson “${module.title}” with exercises and a quiz`}
+            getPrompt={async () => manualPrompt}
+            importReply={async (reply) => {
+              const r = await postManual<any>('/api/generate-lesson', {
+                topicId, moduleId: module.id, moduleTitle: module.title, topicTitle, area: topicArea || 'Tech', step: 'import', reply,
+              });
+              if (!r.ok) return r;
+              setManualPrompt(null);
+              setLesson(r.data);
+              setActiveTab('guide');
+              return { ok: true };
+            }}
+          />
         ) : !lesson ? (
           <div className="flex flex-col items-start gap-3 rounded-xl bg-sunk p-5">
             <p className="m-0 text-[1rem] text-fg-secondary">Couldn’t load this lesson.</p>
@@ -395,6 +432,14 @@ export default function ModuleStudyRoom({
           </div>
         ) : (
           <>
+            {lesson?.fallback && !useManual && (
+              <p className="m-0 rounded-xl border border-line px-4 py-3 text-[0.95rem]">
+                Our AI couldn’t write this lesson right now.{' '}
+                <button type="button" className="font-semibold underline underline-offset-2" onClick={() => { setManualHere(true); loadLesson(true, true); }}>
+                  Get it from your own ChatGPT or Claude instead
+                </button>
+              </p>
+            )}
             {activeTab === 'guide' && (
               <div className="flex flex-col gap-9">
                 {objectives.length > 0 && (
@@ -453,10 +498,10 @@ export default function ModuleStudyRoom({
                 )}
 
                 <div className="flex flex-wrap items-center gap-4 border-t border-line pt-6">
-                  <button type="button" onClick={() => setActiveTab(checkTab)} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
-                    Check yourself <Icon name="arrowRight" size={16} />
+                  <button type="button" onClick={() => setActiveTab(exercises.length ? 'practice' : checkTab)} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
+                    {exercises.length ? 'Practise it' : 'Check yourself'} <Icon name="arrowRight" size={16} />
                   </button>
-                  <span className="text-[0.9rem] text-fg-muted">Recalling it now is what makes it stay.</span>
+                  <span className="text-[0.9rem] text-fg-muted">{exercises.length ? `${exercises.length} exercises: doing it is what makes it stay.` : 'Recalling it now is what makes it stay.'}</span>
                 </div>
               </div>
             )}
@@ -622,6 +667,11 @@ export default function ModuleStudyRoom({
                   </div>
                 )}
               </section>
+            )}
+
+            {activeTab === 'practice' && exercises.length > 0 && (
+              <LessonPractice key={module.id} exercises={exercises} subject={`${topicTitle}: ${module.title}`} onDone={() => setActiveTab(checkTab)}
+                saved={lesson?.practice} onWork={(p) => setLesson((l: any) => (l ? { ...l, practice: p } : l))} saveUrl={`/api/topics/${topicId}/modules/${encodeURIComponent(module.id)}/practice`} />
             )}
 
             {activeTab === 'media' && (

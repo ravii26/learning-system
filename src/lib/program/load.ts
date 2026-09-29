@@ -68,7 +68,7 @@ export async function loadProgramView(db: Db, userId: string, goalId: string) {
     program: {
       id: program.id, version: program.version, field: program.field, mapQuality: program.mapQuality,
       whyThisPlan: program.whyThisPlan, hoursPerWeek: program.hoursPerWeek, totalWeeks: program.totalWeeks,
-      createdAt: program.createdAt, intake, mapTitle: map.title,
+      createdAt: program.createdAt, intake, mapTitle: map.title, archetype: map.archetype ?? intake.archetype ?? null,
     },
     items: program.items.map((i) => ({
       id: i.id, phase: i.phase, phaseTitle: i.phaseTitle, shape: i.shape, title: i.title,

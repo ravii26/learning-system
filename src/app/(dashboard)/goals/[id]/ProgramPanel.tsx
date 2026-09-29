@@ -5,7 +5,7 @@ import Link from 'next/link';
 import type { ProgramView } from '@/lib/program/load';
 import type { EvidenceStatus } from '@/lib/program/evidence';
 import { describeRequirement, SHAPE_LABEL } from '@/lib/program/describe';
-import { TARGET_LABEL } from '@/lib/program/why';
+import { targetLabel } from '@/lib/program/why';
 import type { Shape } from '@/lib/program/types';
 import CheckinCard from './CheckinCard';
 
@@ -41,7 +41,7 @@ export default function ProgramPanel({ view, goalId, onPlanChanged }: { view: Pr
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="stand-h" className="m-0 text-[1.15rem] font-semibold">Where you stand</h2>
           <span className="text-[0.85rem] text-fg-muted">
-            {sentence(TARGET_LABEL[program.intake.target])} · {program.hoursPerWeek} h/week · about {program.totalWeeks} weeks · plan v{program.version}
+            {sentence(targetLabel(program.intake.target, program.archetype))} · {program.hoursPerWeek} h/week · about {program.totalWeeks} weeks · plan v{program.version}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -54,7 +54,7 @@ export default function ProgramPanel({ view, goalId, onPlanChanged }: { view: Pr
         </div>
         <p className="m-0 text-[0.9rem] text-fg-secondary">
           {current ? <>You’re in <strong>Phase {current}</strong>. A topic counts as proven only when its evidence is in: quizzes, recall days later, problems solved cold, explanations, projects or practice.</>
-            : <>Every checkpoint is met. Your evidence meets the “{TARGET_LABEL[program.intake.target]}” bar.</>}
+            : <>Every checkpoint is met. Your evidence meets the “{targetLabel(program.intake.target, program.archetype)}” bar.</>}
         </p>
         <details>
           <summary className="cursor-pointer text-[0.9rem] font-semibold text-fg-secondary">Why this plan</summary>

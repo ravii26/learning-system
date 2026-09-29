@@ -73,7 +73,7 @@ describe('computeGoalReadiness with evidence', () => {
 
   it('needs 80% of modules solid, whatever progress % says', () => {
     const r = computeGoalReadiness([topic({ progressPct: 100, evidence: ev({ solid: 7, learning: 3 }) })]);
-    expect(r.criteria[0]).toMatchObject({ met: false, reason: '7 of 8 modules solid' });
+    expect(r.criteria[0]).toMatchObject({ met: false, reason: '7 of 8 lessons solid' });
     expect(computeGoalReadiness([topic({ evidence: ev({ solid: 8, learning: 2 }) })]).met).toBe(1);
   });
 
@@ -86,6 +86,17 @@ describe('computeGoalReadiness with evidence', () => {
     const t = (cold: number) => topic({ depthTarget: 'Deep', evidence: ev({ solid: 10 }, cold) });
     expect(computeGoalReadiness([t(2)]).criteria[0]).toMatchObject({ met: false, reason: '2 of 5 problems solved cold' });
     expect(computeGoalReadiness([t(5)]).met).toBe(1);
+  });
+
+  it('a plan topic with nothing to solve (spoken English) never asks for problems', () => {
+    const t = topic({ depthTarget: 'Deep', needsProblems: false, evidence: ev({ solid: 10 }, 0) });
+    expect(computeGoalReadiness([t]).criteria[0]).toMatchObject({ met: true, reason: '10 of 10 lessons solid' });
+  });
+
+  it('practice topics are proven by sessions done', () => {
+    const t = (done: number) => topic({ practice: { done, needed: 8 }, evidence: null });
+    expect(computeGoalReadiness([t(3)]).criteria[0]).toMatchObject({ met: false, reason: '3 of 8 practice sessions done' });
+    expect(computeGoalReadiness([t(8)]).met).toBe(1);
   });
 
   it('idea topics are ready when nothing is slipping', () => {

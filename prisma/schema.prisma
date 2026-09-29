@@ -55,41 +55,45 @@ enum CaptureStatus {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String?  @unique
+  id           String   @id @default(uuid())
+  email        String?  @unique
   // scrypt hash (see src/lib/password.ts); null for the legacy seed user
   // until it's claimed, and later for Google-only accounts.
   passwordHash String?
-  name      String?
-  createdAt DateTime @default(now())
+  name         String?
+  createdAt    DateTime @default(now())
+  // "app": the app's AI writes plans/lessons/practice days. "manual": the
+  // learner runs our prompt in their own ChatGPT/Claude and pastes the reply.
+  aiMode       String   @default("app")
 
-  topics         Topic[]
-  activityLogs   ActivityLog[]
-  reviewSessions ReviewSession[]
-  concepts       Concept[]
-  conceptLinks   ConceptLink[]
-  reviewLogs     ReviewLog[]
-  sessionLogs    SessionLog[]
-  topicPauses    TopicPause[]
-  confusions     Confusion[]
-  mistakes       Mistake[]
-  skills         Skill[]
-  goals          Goal[]
-  goalLinks      GoalLink[]
-  captures       CaptureItem[]
-  notes          Note[]
-  noteLinks      NoteLink[]
-  practiceReps   PracticeRep[]
-  artifacts      Artifact[]
-  generatedLessons GeneratedLesson[]
-  curriculumItems  CurriculumItem[]
-  resourceRows     Resource[]
-  moduleAttempts   ModuleAttempt[]
-  studyTime        StudyTimeEntry[]
-  problemAttempts  ProblemAttempt[]
-  placementChecks  PlacementCheck[]
-  friendRequestsSent     Friendship[] @relation("FriendshipRequester")
-  friendRequestsReceived Friendship[] @relation("FriendshipAddressee")
+  topics                 Topic[]
+  activityLogs           ActivityLog[]
+  reviewSessions         ReviewSession[]
+  concepts               Concept[]
+  conceptLinks           ConceptLink[]
+  reviewLogs             ReviewLog[]
+  sessionLogs            SessionLog[]
+  topicPauses            TopicPause[]
+  confusions             Confusion[]
+  mistakes               Mistake[]
+  skills                 Skill[]
+  goals                  Goal[]
+  goalLinks              GoalLink[]
+  captures               CaptureItem[]
+  notes                  Note[]
+  noteLinks              NoteLink[]
+  practiceReps           PracticeRep[]
+  practiceSessions       PracticeSession[]
+  artifacts              Artifact[]
+  generatedLessons       GeneratedLesson[]
+  curriculumItems        CurriculumItem[]
+  resourceRows           Resource[]
+  moduleAttempts         ModuleAttempt[]
+  studyTime              StudyTimeEntry[]
+  problemAttempts        ProblemAttempt[]
+  placementChecks        PlacementCheck[]
+  friendRequestsSent     Friendship[]         @relation("FriendshipRequester")
+  friendRequestsReceived Friendship[]         @relation("FriendshipAddressee")
   programs               Program[]
   programItems           ProgramItem[]
   checkpoints            Checkpoint[]
@@ -98,95 +102,96 @@ model User {
   weeklyCheckins         WeeklyCheckin[]
   fieldMaps              FieldMap[]
   fieldResources         FieldResource[]
-  fieldMapSharesSent     FieldMapShare[] @relation("FieldMapShareFrom")
-  fieldMapSharesReceived FieldMapShare[] @relation("FieldMapShareTo")
+  fieldMapSharesSent     FieldMapShare[]      @relation("FieldMapShareFrom")
+  fieldMapSharesReceived FieldMapShare[]      @relation("FieldMapShareTo")
 }
 
 model Topic {
-  id              String         @id @default(uuid())
+  id              String    @id @default(uuid())
   userId          String
-  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   title           String
-  area            String         // Tech, Business, Finance, Creative, Personal, Other — kept as-is; skillId below is additive, not a replacement
+  area            String // Tech, Business, Finance, Creative, Personal, Other — kept as-is; skillId below is additive, not a replacement
   skillId         String?
-  skill           Skill?         @relation(fields: [skillId], references: [id], onDelete: SetNull)
-  why             String?        // Required before moving to active
-  depthTarget     String?        // Awareness, Working Knowledge, Proficiency, Deep, Mastery (required before active)
-  status          String         // inbox, queued, active, paused, maintenance, reference, dropped
+  skill           Skill?    @relation(fields: [skillId], references: [id], onDelete: SetNull)
+  why             String? // Required before moving to active
+  depthTarget     String? // Awareness, Working Knowledge, Proficiency, Deep, Mastery (required before active)
+  status          String // inbox, queued, active, paused, maintenance, reference, dropped
   // Soft-delete only — DELETE /api/topics/[id] sets this instead of
   // removing the row. Concept/ReviewLog/SessionLog/etc. all cascade off
   // Topic; a hard delete would have taken a year of FSRS history with it
   // on one misclick. Every read path that lists or looks up a user's
   // topics filters deletedAt: null (see src/app/api/topics/**).
   deletedAt       DateTime?
-  progressPct     Int            @default(0) // 0-100
+  progressPct     Int       @default(0) // 0-100
   // Visible to accepted friends (title, status, progress, module plan) —
   // never notes. Off by default.
-  shared          Boolean        @default(false)
+  shared          Boolean   @default(false)
   // Set when this topic's plan was copied from a friend's shared topic;
   // lets the two be compared module by module. Not a FK: the source may be
   // deleted or unshared later, and the copy must not care.
   copiedFromId    String?
-  currentStage    String         // Define, Map, Fundamentals, Core Knowledge, Application, Advanced, Proof
+  currentStage    String // Define, Map, Fundamentals, Core Knowledge, Application, Advanced, Proof
   lastCompleted   String?
-  nextAction      String?        // Required for active or paused
+  nextAction      String? // Required for active or paused
   startedDate     DateTime?
-  lastTouchedDate DateTime       @default(now()) @updatedAt
+  lastTouchedDate DateTime  @default(now()) @updatedAt
   proofOfLearning String?
-  resources       Json?          // List of link/text resources: [{title, type, url, purpose, status, notes}]
-  subtasks        Json?          // List of checklist subtasks: [{id, title, completed, createdAt}]
+  resources       Json? // List of link/text resources: [{title, type, url, purpose, status, notes}]
+  subtasks        Json? // List of checklist subtasks: [{id, title, completed, createdAt}]
   notes           String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   // Advanced learning science structures
-  contract        Json?          // { estimatedEffort, successCriterion, currentLevel, prerequisites: [{ title, status }] }
+  contract       Json? // { estimatedEffort, successCriterion, currentLevel, prerequisites: [{ title, status }] }
   // Concept is now the source of truth (see Concept model below). This JSON
   // is a generated mirror, kept in sync by src/lib/conceptSync.ts so the
   // pre-migration UI (KnowledgeMap.tsx, KnowledgeGraph.tsx) keeps working
   // unchanged. Do not hand-edit; write Concept rows and re-sync instead.
-  knowledgeMap    Json?          // { concepts: [{ id, title, parentId, status, difficulty, importance }] }
+  knowledgeMap   Json? // { concepts: [{ id, title, parentId, status, difficulty, importance }] }
   // Below: mirrors of their respective row tables, kept in sync the same
   // way knowledgeMap<->Concept is (src/lib/conceptSync.ts and its sibling
   // sync modules). Do not hand-edit; write rows and re-sync instead.
-  confusions      Json?          // [{ id, text, resolved, resolvedAt, answer }]
-  mistakes        Json?          // [{ id, concept, mistake, whyMade, correctUnderstanding, example, howToAvoid, createdAt }]
-  pauseHistory    Json?          // [{ id, pausedAt, resumedAt, reason, completedConcepts, currentConcept, openQuestion, reactivationScore }]
-  activeSlotType  String?        // 'primary' | 'secondary' | null
-  sessionLogs     Json?          // [{ id, activityType, whatDone, oneInsight, whatWasHard, nextAction, durationMinutes, moduleId?, timestamp }]
-  topicMode       String?        // 'self_directed' | 'course' — the existing self-directed/course toggle, untouched
+  confusions     Json? // [{ id, text, resolved, resolvedAt, answer }]
+  mistakes       Json? // [{ id, concept, mistake, whyMade, correctUnderstanding, example, howToAvoid, createdAt }]
+  pauseHistory   Json? // [{ id, pausedAt, resumedAt, reason, completedConcepts, currentConcept, openQuestion, reactivationScore }]
+  activeSlotType String? // 'primary' | 'secondary' | null
+  sessionLogs    Json? // [{ id, activityType, whatDone, oneInsight, whatWasHard, nextAction, durationMinutes, moduleId?, timestamp }]
+  topicMode      String? // 'self_directed' | 'course' — the existing self-directed/course toggle, untouched
   // syllabus | practice | accretion | reference — see the project plan's
   // Part 3. Not yet settable from any UI (that's Phase 8/9); exists so
   // progressCalculator.ts can branch on it. Backfilled from topicMode:
   // self_directed/course -> syllabus, everything else -> syllabus for now.
-  mode            String         @default("syllabus")
+  mode           String  @default("syllabus")
   // Practice mode only: which rubric template reps are scored against —
   // a key into src/lib/practiceRubrics.ts. Null = the default template.
-  rubricTemplate  String?
-  curriculum      Json?          // [{ id, order, title, estimatedMinutes, completed, completedAt, notes }]
+  rubricTemplate String?
+  curriculum     Json? // [{ id, order, title, estimatedMinutes, completed, completedAt, notes }]
 
-  activityLogs    ActivityLog[]
-  concepts        Concept[]
-  sessionLogRows  SessionLog[]
-  topicPauseRows  TopicPause[]
-  confusionRows   Confusion[]
-  mistakeRows     Mistake[]
-  goalLinks       GoalLink[]
+  activityLogs     ActivityLog[]
+  concepts         Concept[]
+  sessionLogRows   SessionLog[]
+  topicPauseRows   TopicPause[]
+  confusionRows    Confusion[]
+  mistakeRows      Mistake[]
+  goalLinks        GoalLink[]
   // Named linkedNotes, not notes — `notes String?` above is the existing
   // plain markdown field; this is the accretion-mode Note relation.
-  linkedNotes     Note[]
-  practiceReps    PracticeRep[]
-  artifacts       Artifact[]
+  linkedNotes      Note[]
+  practiceReps     PracticeRep[]
+  practiceSessions PracticeSession[]
+  artifacts        Artifact[]
   generatedLessons GeneratedLesson[]
   // Named to avoid the existing `curriculum` / `resources` Json columns,
   // which remain as generated mirrors of these rows.
-  curriculumItems CurriculumItem[]
-  resourceRows    Resource[]
-  moduleAttempts  ModuleAttempt[]
-  studyTime       StudyTimeEntry[]
-  problemAttempts ProblemAttempt[]
-  placementChecks PlacementCheck[]
-  programItems    ProgramItem[]
+  curriculumItems  CurriculumItem[]
+  resourceRows     Resource[]
+  moduleAttempts   ModuleAttempt[]
+  studyTime        StudyTimeEntry[]
+  problemAttempts  ProblemAttempt[]
+  placementChecks  PlacementCheck[]
+  programItems     ProgramItem[]
 }
 
 /// Evidence from the Study Room: one row per checked quiz or graded
@@ -263,7 +268,7 @@ model ReviewSession {
   userId         String
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   reviewedAt     DateTime @default(now())
-  topicsReviewed Json     // Snapshot of decisions made: [{topicId, title, decision}]
+  topicsReviewed Json // Snapshot of decisions made: [{topicId, title, decision}]
 }
 
 /// A concept: the atom of knowledge, promoted out of Topic.knowledgeMap's
@@ -272,38 +277,38 @@ model ReviewSession {
 /// eventually be linked across topics (ConceptLink) and rolled into a
 /// skill's mastery score.
 model Concept {
-  id            String       @id @default(uuid())
-  userId        String
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  topicId       String
-  topic         Topic        @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
 
-  title         String
-  parentId      String?
-  parent        Concept?     @relation("ConceptTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children      Concept[]    @relation("ConceptTree")
+  title    String
+  parentId String?
+  parent   Concept?  @relation("ConceptTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Concept[] @relation("ConceptTree")
 
   masteryLevel  MasteryLevel @default(Unknown)
-  difficultyTag String?      // 'Low' | 'Medium' | 'High' — the user's own hint, distinct from FSRS difficulty below
-  importance    String?      // 'Low' | 'Medium' | 'High'
+  difficultyTag String? // 'Low' | 'Medium' | 'High' — the user's own hint, distinct from FSRS difficulty below
+  importance    String? // 'Low' | 'Medium' | 'High'
 
   // FSRS scheduler state
-  state         FsrsState    @default(New)
-  stability     Float?       // days
-  difficulty    Float?       // FSRS 1..10, NOT difficultyTag
-  reps          Int          @default(0)
-  lapses        Int          @default(0)
+  state         FsrsState @default(New)
+  stability     Float? // days
+  difficulty    Float? // FSRS 1..10, NOT difficultyTag
+  reps          Int       @default(0)
+  lapses        Int       @default(0)
   lastReview    DateTime?
   nextReview    DateTime?
-  elapsedDays   Int          @default(0)
-  scheduledDays Int          @default(0)
-  suspended     Boolean      @default(false) // soft-removed via the knowledgeMap JSON sync; preserves review history
+  elapsedDays   Int       @default(0)
+  scheduledDays Int       @default(0)
+  suspended     Boolean   @default(false) // soft-removed via the knowledgeMap JSON sync; preserves review history
 
   // The old Math.random()-generated id from the JSON array, kept for
   // backfill idempotency and so the JSON<->row sync (src/lib/conceptSync.ts)
   // can match a concept across both representations.
   legacyId         String?
-  seededFromLegacy Boolean   @default(false)
+  seededFromLegacy Boolean @default(false)
 
   // Review-card fields: a concept created from a studied module carries an
   // explicit question and answer, so Daily Review can show the answer to
@@ -314,8 +319,8 @@ model Concept {
   sourceModuleId String? // CurriculumItem.legacyId of the module it came from
   sourceKind     String? // lesson_card | takeaway | quiz_miss
 
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   reviewLogs    ReviewLog[]
   outgoingLinks ConceptLink[] @relation("ConceptLinkFrom")
@@ -357,9 +362,9 @@ model ConceptLink {
 /// see src/lib/mastery.ts. Never write them from a form; targetLevel is
 /// the one field a user sets directly (an aspiration, not a claim).
 model Skill {
-  id     String    @id @default(uuid())
+  id     String @id @default(uuid())
   userId String
-  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   name     String
   slug     String
@@ -374,12 +379,12 @@ model Skill {
   // Evidence-earned mastery — see src/lib/mastery.ts. computedAt is null
   // until the first recompute; a stale computedAt with no error is how a
   // partial-failure recompute is caught, so never silently skip setting it.
-  masteryScore     Float         @default(0) // 0..1
-  masteryLevel     MasteryLevel  @default(Unknown)
-  evidenceCount    Int           @default(0)
+  masteryScore     Float        @default(0) // 0..1
+  masteryLevel     MasteryLevel @default(Unknown)
+  evidenceCount    Int          @default(0)
   lastEvidenceAt   DateTime?
   computedAt       DateTime?
-  masteryBreakdown Json?         // { retention, coverage, ... } — cached explanation, always shown next to the score, never just the number alone
+  masteryBreakdown Json? // { retention, coverage, ... } — cached explanation, always shown next to the score, never just the number alone
 
   targetLevel MasteryLevel? // the one user-set field: an aspiration, not a claim
 
@@ -399,11 +404,11 @@ model Skill {
 /// the interval-doubling math that used to live inline in
 /// api/review/spaced/route.ts; see src/lib/fsrs.ts for the scheduler.
 model ReviewLog {
-  id              String    @id @default(uuid())
-  userId          String
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  conceptId       String
-  concept         Concept   @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  id        String  @id @default(uuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conceptId String
+  concept   Concept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
 
   reviewedAt      DateTime  @default(now())
   grade           Grade
@@ -423,13 +428,13 @@ model ReviewLog {
 /// A timeboxed study session's debrief. Promoted out of Topic.sessionLogs
 /// JSON — see src/lib/sessionLogSync.ts.
 model SessionLog {
-  id              String   @id @default(uuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  topicId         String
-  topic           Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
 
-  activityType    String   // read_watch | write_practice | speak_converse | drill_repeat | course_module | free_explore
+  activityType    String // read_watch | write_practice | speak_converse | drill_repeat | course_module | free_explore
   whatDone        String
   oneInsight      String
   whatWasHard     String
@@ -440,10 +445,10 @@ model SessionLog {
 
   // Soft-delete only — see the note on Confusion.removed below for why the
   // array<->row sync never hard-deletes on "missing from the incoming array".
-  removed         Boolean  @default(false)
+  removed Boolean @default(false)
 
-  legacyId        String?
-  createdAt       DateTime @default(now())
+  legacyId  String?
+  createdAt DateTime @default(now())
 
   @@index([userId, topicId, timestamp])
   @@index([userId, timestamp])
@@ -452,11 +457,11 @@ model SessionLog {
 /// A pause/resume cycle. Promoted out of Topic.pauseHistory JSON — see
 /// src/lib/topicPauseSync.ts.
 model TopicPause {
-  id                String    @id @default(uuid())
-  userId            String
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  topicId           String
-  topic             Topic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
 
   pausedAt          DateTime
   resumedAt         DateTime?
@@ -468,10 +473,10 @@ model TopicPause {
   // forgotten"), not a numeric score — matches the legacy JSON shape.
   reactivationScore String?
 
-  removed           Boolean   @default(false)
+  removed Boolean @default(false)
 
-  legacyId          String?
-  createdAt         DateTime  @default(now())
+  legacyId  String?
+  createdAt DateTime @default(now())
 
   @@index([userId, topicId, pausedAt])
 }
@@ -479,11 +484,11 @@ model TopicPause {
 /// A logged "I don't understand X" note. Promoted out of Topic.confusions
 /// JSON — see src/lib/confusionSync.ts.
 model Confusion {
-  id         String    @id @default(uuid())
-  userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  topicId    String
-  topic      Topic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
 
   text       String
   resolved   Boolean   @default(false)
@@ -498,10 +503,10 @@ model Confusion {
   // explicit delete affordance in ConfusionMistakeBank.tsx still works: the
   // mirror omits removed rows, so a deleted item disappears from the UI
   // exactly as before.
-  removed    Boolean   @default(false)
+  removed Boolean @default(false)
 
-  legacyId   String?
-  createdAt  DateTime  @default(now())
+  legacyId  String?
+  createdAt DateTime @default(now())
 
   @@index([userId, topicId, resolved])
 }
@@ -510,13 +515,13 @@ model Confusion {
 /// src/lib/mistakeSync.ts. Also written directly by api/review/spaced's
 /// fail-a-review flow, which already targets a real Concept.
 model Mistake {
-  id                   String   @id @default(uuid())
-  userId               String
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  topicId              String
-  topic                Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  conceptId            String?
-  concept              Concept? @relation(fields: [conceptId], references: [id], onDelete: SetNull)
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId   String
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  conceptId String?
+  concept   Concept? @relation(fields: [conceptId], references: [id], onDelete: SetNull)
 
   // Free-text concept label from the legacy JSON's `concept` field. Kept
   // even when conceptId resolves, since not every mistake maps cleanly to
@@ -530,10 +535,10 @@ model Mistake {
 
   // Maps to the legacy JSON's `createdAt` field. Named occurredAt here so
   // it doesn't collide with this row's own createdAt audit column below.
-  occurredAt           DateTime
-  removed              Boolean  @default(false) // see Confusion.removed — same race, same fix
-  legacyId             String?
-  createdAt            DateTime @default(now())
+  occurredAt DateTime
+  removed    Boolean  @default(false) // see Confusion.removed — same race, same fix
+  legacyId   String?
+  createdAt  DateTime @default(now())
 
   @@index([userId, topicId, occurredAt])
   @@index([userId, conceptId])
@@ -546,9 +551,9 @@ model Mistake {
 /// what serves the goal (Topic and/or Skill, so a topic can serve more
 /// than one goal).
 model Goal {
-  id     String     @id @default(uuid())
+  id     String @id @default(uuid())
   userId String
-  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   title      String // e.g. roadmapTitle from the generator
   outcome    String // the user's own words — verbatim, not rephrased
@@ -562,9 +567,9 @@ model Goal {
   // percentage-with-confidence — see src/lib/goalReadiness.ts. Cached here
   // so the Today screen and goal list don't recompute it on every read;
   // readinessAt is how a stale cache after a failed recompute is caught.
-  readinessMet   Int       @default(0)
-  readinessTotal Int       @default(0)
-  readinessAt    DateTime?
+  readinessMet       Int       @default(0)
+  readinessTotal     Int       @default(0)
+  readinessAt        DateTime?
   // [{ id, label, met, topicIds }] — one entry per linked required topic
   // today (see goalReadiness.ts); schema-unstable once richer AI-authored
   // criteria exist, so this stays Json rather than its own table.
@@ -581,7 +586,7 @@ model Goal {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  links GoalLink[]
+  links          GoalLink[]
   // A goal made from the program flow carries its plan here; every approved
   // change adds a new Program version rather than editing the old one.
   programs       Program[]
@@ -635,8 +640,8 @@ model CaptureItem {
   highlight    String? // the quoted passage, if any
   tags         String[] @default([])
 
-  status      CaptureStatus @default(inbox)
-  processedAt DateTime?
+  status          CaptureStatus @default(inbox)
+  processedAt     DateTime?
   // Exactly one of these is set once status leaves 'inbox' — which fate
   // this capture resolved to, per the weekly triage ritual.
   resultNoteId    String?
@@ -660,9 +665,9 @@ model CaptureItem {
 /// (provenance), but stands on its own otherwise: the whole point of
 /// accretion mode is that most notes have no syllabus to hang off of.
 model Note {
-  id    String @id @default(uuid())
+  id     String @id @default(uuid())
   userId String
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   title String
   body  String // HTML from the existing RichTextEditor component — reused, not rebuilt
@@ -726,6 +731,34 @@ model NoteLink {
 /// mastery.ts needs, computed once at write time by
 /// src/lib/practiceScore.ts so mastery recompute never has to re-derive it
 /// (and never has to know which dimensions are inverted).
+// A practice topic's daily sessions (speaking drills, guitar routines,
+// mock tests...), generated a week at a time and adapted to how the last
+// ones went. Finishing one also records a PracticeRep, so readiness counts it.
+model PracticeSession {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  day     Int // 1, 2, 3... within the topic
+  title   String
+  focus   String? // competency key it mainly trains
+  minutes Int
+  content Json // { goal, steps: [{ kind, title, minutes, instructions, items, target, check }], successCheck }
+
+  status      String    @default("pending") // pending | done | skipped
+  rating      String? // easy | right | hard: how it felt, steers the next week
+  notes       String?
+  results     Json? // per-step answers and AI feedback
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([topicId, day])
+  @@index([userId, topicId])
+}
+
 model PracticeRep {
   id     String @id @default(uuid())
   userId String
@@ -734,16 +767,16 @@ model PracticeRep {
   topicId String
   topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
 
-  promptText String
+  promptText      String
   // The concept this rep's prompt was drawn from, if any — the cross-mode
   // payoff from the plan: "prompts pulled from concepts you're currently
   // learning doubles as retrieval practice." Null for a generic prompt.
   promptConceptId String?
   promptConcept   Concept? @relation(fields: [promptConceptId], references: [id], onDelete: SetNull)
 
-  rubricScores Json     // { [dimension]: 1..5 } raw, as entered — e.g. { fluency: 3, structure: 4, vocabulary: 2, fillers: 2 }
+  rubricScores Json // { [dimension]: 1..5 } raw, as entered — e.g. { fluency: 3, structure: 4, vocabulary: 2, fillers: 2 }
   invertedKeys String[] @default([]) // dimensions where a LOWER raw score is better, e.g. "fillers"
-  score        Float    // 0..1 rollup — see src/lib/practiceScore.ts; this is what mastery.ts reads
+  score        Float // 0..1 rollup — see src/lib/practiceScore.ts; this is what mastery.ts reads
 
   recordingUrl    String?
   transcript      String?
@@ -823,23 +856,23 @@ model Resource {
   topicId String
   topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
 
-  legacyId String
-  order    Int
-  title    String
-  type     String @default("OTHER") // ARTICLE | VIDEO | BOOK | PAPER | TOOL | WEBSITE | OTHER
-  url      String @default("")
-  purpose  String @default("")
-  status   String @default("NOT_STARTED") // NOT_STARTED | IN_PROGRESS | COMPLETED | PAUSED
+  legacyId      String
+  order         Int
+  title         String
+  type          String    @default("OTHER") // ARTICLE | VIDEO | BOOK | PAPER | TOOL | WEBSITE | OTHER
+  url           String    @default("")
+  purpose       String    @default("")
+  status        String    @default("NOT_STARTED") // NOT_STARTED | IN_PROGRESS | COMPLETED | PAUSED
   // Five independent questions about a resource — a link that works is not
   // the same as a resource worth trusting:
-  source        String    @default("user")       // user | catalog | search | ai
-  catalogKey    String?                          // id in src/data/resources when source = catalog
-  linkStatus    String    @default("unchecked")  // ok | broken | unchecked
+  source        String    @default("user") // user | catalog | search | ai
+  catalogKey    String? // id in src/data/resources when source = catalog
+  linkStatus    String    @default("unchecked") // ok | broken | unchecked
   linkCheckedAt DateTime?
   quality       String    @default("unreviewed") // curated | evaluated | unreviewed
-  pricing       String    @default("unknown")    // free | freemium | paid | unknown
-  role          String    @default("reference")  // primary | practice | reference | supplementary
-  notes    String @default("")
+  pricing       String    @default("unknown") // free | freemium | paid | unknown
+  role          String    @default("reference") // primary | practice | reference | supplementary
+  notes         String    @default("")
 
   removed Boolean @default(false)
 
@@ -969,8 +1002,8 @@ model Program {
   status        String @default("active") // active | superseded
   field         String // competency map key (src/data/competencies), or "custom"
   mapQuality    String // curated | approved_draft (AI-drafted, reviewed by the user)
-  intake        Json   // the answers the plan was built from
-  competencyMap Json   // snapshot of the map used, so later map edits don't rewrite history
+  intake        Json // the answers the plan was built from
+  competencyMap Json // snapshot of the map used, so later map edits don't rewrite history
   whyThisPlan   String
   hoursPerWeek  Int
   totalWeeks    Int
@@ -1001,7 +1034,7 @@ model ProgramItem {
   phase          Int
   phaseTitle     String
   order          Int
-  shape          String   // course | reading | practice | exploration | project
+  shape          String // course | reading | practice | exploration | project
   title          String
   competencyKeys String[]
   hoursPerWeek   Float
@@ -1037,11 +1070,11 @@ model Checkpoint {
 /// level, what the evidence tables actually show, and the resulting status.
 /// A cache of src/lib/program/evidence.ts, rewritten on each evaluation.
 model CompetencyEvidence {
-  id            String  @id @default(uuid())
-  userId        String
-  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  programId     String
-  program       Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  id        String  @id @default(uuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  programId String
+  program   Program @relation(fields: [programId], references: [id], onDelete: Cascade)
 
   competencyKey String
   required      Json
@@ -1060,12 +1093,12 @@ model ProgramChange {
   goalId String
   goal   Goal   @relation(fields: [goalId], references: [id], onDelete: Cascade)
 
-  fromVersion Int?     // null for the first version
+  fromVersion Int? // null for the first version
   toVersion   Int
   reason      String
   evidenceIds String[] @default([])
-  changes     Json     // the accepted change list
-  approvedBy  String   // userId of whoever approved it
+  changes     Json // the accepted change list
+  approvedBy  String // userId of whoever approved it
   createdAt   DateTime @default(now())
 
   @@index([goalId, toVersion])
@@ -1103,15 +1136,15 @@ model FieldMap {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  key          String   // slug, unique per user; equals the built-in key when it customises one
-  title        String
-  aliases      String[] @default([])
-  description  String   @default("")
-  competencies Json     // Competency[] — validated by validateMap before every save
-  source       String   // ai | edited | shared
-  basedOn      String?  // built-in map key this started from, if any (keeps its catalogue resources)
+  key              String // slug, unique per user; equals the built-in key when it customises one
+  title            String
+  aliases          String[] @default([])
+  description      String   @default("")
+  competencies     Json // Competency[] — validated by validateMap before every save
+  source           String // ai | edited | shared
+  basedOn          String? // built-in map key this started from, if any (keeps its catalogue resources)
   sharedFromUserId String?
-  sources      Json?    // syllabi/pages the AI draft was grounded on: [{title, url}]
+  sources          Json? // syllabi/pages the AI draft was grounded on: [{title, url}]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1145,17 +1178,42 @@ model FieldResource {
 /// Sharing a field's topic list with a friend. The snapshot is taken when
 /// it is sent; accepting writes exactly that list into the friend's library.
 model FieldMapShare {
-  id         String    @id @default(uuid())
-  fromUserId String
-  from       User      @relation("FieldMapShareFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
-  toUserId   String
-  to         User      @relation("FieldMapShareTo", fields: [toUserId], references: [id], onDelete: Cascade)
-  fieldKey   String
-  title      String
-  snapshot   Json      // { map, resources } exactly as the sender had it
-  status     String    @default("pending") // pending | accepted | declined
-  createdAt  DateTime  @default(now())
+  id          String    @id @default(uuid())
+  fromUserId  String
+  from        User      @relation("FieldMapShareFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId    String
+  to          User      @relation("FieldMapShareTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  fieldKey    String
+  title       String
+  snapshot    Json // { map, resources } exactly as the sender had it
+  status      String    @default("pending") // pending | accepted | declined
+  createdAt   DateTime  @default(now())
   respondedAt DateTime?
 
   @@index([toUserId, status])
+}
+
+// One row per AI request attempt (including failed ones, which some
+// providers still bill), so the real cost of each feature and each user is
+// known instead of guessed. costInr is estimated from the provider's price
+// list at call time; reportedCost is what the provider said, when it says.
+model AiCall {
+  id               String   @id @default(uuid())
+  userId           String? // null outside a signed-in request (scripts, tests)
+  purpose          String // what the call was for, e.g. "plan.draft", "lesson"
+  provider         String // aicredits | groq
+  model            String
+  ok               Boolean
+  status           Int?
+  error            String?
+  promptTokens     Int?
+  completionTokens Int?
+  reasoningTokens  Int? // hidden "thinking" tokens, billed as output
+  costInr          Float?
+  reportedCost     Float?
+  durationMs       Int
+  createdAt        DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
 }

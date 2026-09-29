@@ -56,7 +56,7 @@ export async function POST() {
       let suggestions: CaptureSuggestion[];
       if (hasAnyAIProviderConfigured()) {
         try {
-          const { content } = await callAIContent(buildSuggestMessages(batch, topics), { temperature: 0.2, jsonMode: true });
+          const { content } = await callAIContent(buildSuggestMessages(batch, topics), { purpose: 'capture.suggest', temperature: 0.2, jsonMode: true });
           suggestions = parseSuggestions(content, batch, topics);
         } catch (e) {
           console.warn('Capture suggestions: AI unavailable, using keyword matching:', e instanceof Error ? e.message : e);

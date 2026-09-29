@@ -10,10 +10,14 @@ import {
 } from '@/data/competencies';
 import type { Budget, ResourceFormat } from '@/data/resources';
 import { inferTarget } from '@/lib/program/intake';
-import { TARGET_LABEL } from '@/lib/program/why';
+import { TARGET_LABEL, targetLabel } from '@/lib/program/why';
 import { SHAPE_LABEL, describeRequirements, resourceBadges } from '@/lib/program/describe';
 import type { Adjustments } from '@/lib/program/adapt';
 import type { CurrentLevel, Intake, ProgramDraft } from '@/lib/program/types';
+import type { GoalQuestion } from '@/lib/program/questions';
+import type { Archetype } from '@/lib/program/fieldGuide';
+import ManualAiPanel, { postManual } from '@/components/ManualAiPanel';
+import { useAiMode } from '@/lib/useAiMode';
 
 /**
  * Build a learning plan: goal → (topic list review for new fields) → draft →
@@ -52,13 +56,26 @@ const DONE_EXAMPLES: Record<string, string> = {
   networking: 'e.g. explain what happens when I type a URL, in depth',
 };
 
-type Stage = 'intake' | 'review_map' | 'draft';
+type Stage = 'intake' | 'manual_questions' | 'questions' | 'manual_map' | 'review_map' | 'draft';
 const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 type Mark = 'strong' | 'weak' | undefined;
 
 export default function BuildProgramPage() {
   const router = useRouter();
   const [stage, setStage] = useState<Stage>('intake');
+  // "Use my own ChatGPT/Claude": saved per learner; also offered for one plan when our AI fails.
+  const { manual: manualMode, setMode } = useAiMode();
+  const [manualHere, setManualHere] = useState(false);
+  const useManual = manualMode || manualHere;
+  const [aiFailed, setAiFailed] = useState(false);
+  /** Our AI failed: carry on with the learner's own chat from the step they were on. */
+  const switchToManual = () => {
+    setManualHere(true);
+    setAiFailed(false);
+    setError(null);
+    setStage(stage === 'intake' && !questions.length ? 'manual_questions' : 'manual_map');
+    window.scrollTo({ top: 0 });
+  };
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +92,15 @@ export default function BuildProgramPage() {
   const [budget, setBudget] = useState<Budget>('free_only');
   const [bookTitle, setBookTitle] = useState('');
   const [marks, setMarks] = useState<Record<string, Mark>>({});
+
+  // Goal-specific questions (fields without a reviewed list): answers shape the topic list.
+  const [questions, setQuestions] = useState<GoalQuestion[]>([]);
+  const [picked, setPicked] = useState<Record<string, string[]>>({});
+  const [other, setOther] = useState<Record<string, string>>({});
+  const [archetype, setArchetype] = useState<Archetype | null>(null);
+  const answerList = () => questions
+    .map((q) => ({ question: q.question, answer: [...(picked[q.id] ?? []), ...(other[q.id]?.trim() ? [other[q.id].trim()] : [])].join('; ') }))
+    .filter((a) => a.answer);
 
   // Results
   const [customMap, setCustomMap] = useState<CompetencyMap | null>(null);
@@ -108,6 +134,8 @@ export default function BuildProgramPage() {
   const intakeBody = (): Partial<Intake> & Record<string, unknown> => ({
     goal, path: serious ? 'serious' : 'quick', currentLevel: level, hoursPerWeek: hours,
     target: effectiveTarget, budget,
+    ...(archetype ? { archetype } : {}),
+    ...(answerList().length ? { answers: answerList() } : {}),
     ...(serious ? {
       why: why || undefined,
       doneMeans: doneMeans || undefined,
@@ -121,18 +149,79 @@ export default function BuildProgramPage() {
     } : {}),
   });
 
+  // A drafted topic list takes 30-60 seconds: say what's happening meanwhile.
+  const DRAFT_STEPS = ['Reading your answers…', 'Choosing what a good teacher would cover…', 'Ordering topics so each builds on the last…', 'Splitting topics into lessons you can do in one sitting…', 'Almost there…'];
+  const draftingSteps = () => {
+    let n = 0;
+    setBusy(DRAFT_STEPS[0]);
+    const t = setInterval(() => { n = Math.min(n + 1, DRAFT_STEPS.length - 1); setBusy(DRAFT_STEPS[n]); }, 9000);
+    return () => clearInterval(t);
+  };
+
+  /** Fields without a reviewed list: ask the goal's questions first. */
+  const start = async () => {
+    if (matched || libraryMatch) return requestDraft();
+    if (useManual) {
+      setError(null);
+      setStage('manual_questions');
+      window.scrollTo({ top: 0 });
+      return;
+    }
+    setBusy('Thinking about what to ask you…');
+    setError(null);
+    try {
+      const res = await fetch('/api/programs/questions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status >= 500 || res.status === 429) setAiFailed(true);
+        throw new Error(data.error || 'Could not reach the server.');
+      }
+      setArchetype(data.archetype ?? null);
+      if (Array.isArray(data.questions) && data.questions.length) {
+        setQuestions(data.questions);
+        setStage('questions');
+        setBusy(null);
+        window.scrollTo({ top: 0 });
+        return;
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not reach the server.');
+      setBusy(null);
+      return;
+    }
+    setBusy(null);
+    return requestDraft();
+  };
+
   const requestDraft = async (mapOverride?: CompetencyMap, targetOverride?: TargetLevel) => {
-    setBusy(mapOverride ? 'Building your plan from your topic list…' : 'Building your plan…');
+    // Copy-paste mode: a new field's topic list comes from the learner's own chat.
+    if (useManual && !mapOverride && !matched && !libraryMatch) {
+      setError(null);
+      setStage('manual_map');
+      window.scrollTo({ top: 0 });
+      return;
+    }
+    setAiFailed(false);
+    const stop = mapOverride || useManual ? null : draftingSteps();
+    if (mapOverride || useManual) setBusy('Building your plan…');
+    if (mapOverride) setBusy('Building your plan from your topic list…');
     setError(null);
     try {
       const res = await fetch('/api/programs/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...intakeBody(), ...(targetOverride ? { target: targetOverride } : {}), ...(mapOverride ? { customMap: mapOverride } : {}) }),
+        body: JSON.stringify({ ...intakeBody(), ...(useManual ? { mode: 'manual' } : {}), ...(targetOverride ? { target: targetOverride } : {}), ...(mapOverride ? { customMap: mapOverride } : {}) }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not build a plan.');
-      if (data.stage === 'review_map') {
+      if (!res.ok) {
+        if (!useManual && res.status >= 500) setAiFailed(true);
+        throw new Error(data.error || 'Could not build a plan.');
+      }
+      if (data.stage === 'manual_prompt') {
+        setStage('manual_map');
+      } else if (data.stage === 'review_map') {
         setCustomMap(data.map);
         setMapReviewed(!!data.reviewed);
         setMapSources(Array.isArray(data.sources) ? data.sources : []);
@@ -148,6 +237,7 @@ export default function BuildProgramPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not reach the server.');
     } finally {
+      stop?.();
       setBusy(null);
     }
   };
@@ -263,6 +353,14 @@ export default function BuildProgramPage() {
         </fieldset>
 
         <label className="flex cursor-pointer items-center gap-3 rounded-xl border-[1.5px] border-line px-4 py-3.5">
+          <input type="checkbox" checked={manualMode} onChange={(e) => setMode(e.target.checked ? 'manual' : 'app')} className="h-5 w-5 accent-[var(--ink)]" />
+          <span className="flex flex-col">
+            <span className="font-semibold">Use my own ChatGPT, Claude or Gemini (free)</span>
+            <span className="text-[0.85rem] text-fg-secondary">We give you a prompt to paste into your chat, and you paste its reply back. Remembered for next time.</span>
+          </span>
+        </label>
+
+        <label className="flex cursor-pointer items-center gap-3 rounded-xl border-[1.5px] border-line px-4 py-3.5">
           <input type="checkbox" checked={serious} onChange={(e) => setSerious(e.target.checked)} className="h-5 w-5 accent-[var(--ink)]" />
           <span className="flex flex-col">
             <span className="font-semibold">Build me a serious plan</span>
@@ -333,8 +431,16 @@ export default function BuildProgramPage() {
         )}
 
         {error && <p role="alert" className="m-0 text-danger">{error}</p>}
+        {aiFailed && !useManual && (
+          <p className="m-0 text-[0.92rem]">
+            Our AI is busy right now.{' '}
+            <button type="button" className="font-semibold underline underline-offset-2" onClick={switchToManual}>
+              Use your own ChatGPT or Claude instead
+            </button>
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-3 border-t border-line pt-6">
-          <button type="button" onClick={() => requestDraft()} disabled={goal.trim().length < 3 || !!busy} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
+          <button type="button" onClick={start} disabled={goal.trim().length < 3 || !!busy} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
             {busy ?? 'Build my plan'}
           </button>
           <span className="text-[0.85rem] text-fg-muted">Nothing is saved until you approve the plan.</span>
@@ -346,13 +452,123 @@ export default function BuildProgramPage() {
     );
   }
 
+  // ------------------------------------------------------ copy-paste steps
+  if (stage === 'manual_questions' || stage === 'manual_map') {
+    const isQuestions = stage === 'manual_questions';
+    return (
+      <div className="mx-auto flex max-w-[760px] flex-col gap-6">
+        <button type="button" onClick={() => setStage(isQuestions || !questions.length ? 'intake' : 'questions')} className="flex items-center gap-1.5 self-start text-[0.9rem] text-fg-secondary hover:text-fg">
+          <Icon name="arrowLeft" size={16} /> {isQuestions || !questions.length ? 'Your goal' : 'Your answers'}
+        </button>
+        <ManualAiPanel
+          key={stage}
+          title={isQuestions ? 'Step 1 of 2: a few questions about you' : `${questions.length ? 'Step 2 of 2' : 'Your topic list'}: what to learn, in order`}
+          what={isQuestions ? 'a few questions about your goal (so the plan fits you)' : 'your topic list, with the lessons inside each topic'}
+          getPrompt={async () => {
+            const r = isQuestions
+              ? await postManual<{ prompt: string }>('/api/programs/questions', { goal })
+              : await postManual<{ prompt: string }>('/api/programs/draft', { ...intakeBody(), step: 'prompt' });
+            if (!r.ok) throw new Error(r.problems[0]);
+            return r.data.prompt;
+          }}
+          importReply={async (reply) => {
+            if (isQuestions) {
+              const r = await postManual<{ archetype: Archetype; questions: GoalQuestion[] }>('/api/programs/questions', { goal, step: 'import', reply });
+              if (!r.ok) return r;
+              setArchetype(r.data.archetype ?? null);
+              setQuestions(r.data.questions);
+              setStage('questions');
+              window.scrollTo({ top: 0 });
+              return { ok: true };
+            }
+            const r = await postManual<{ map: CompetencyMap }>('/api/programs/draft', { ...intakeBody(), step: 'import', reply });
+            if (!r.ok) return r;
+            setCustomMap(r.data.map);
+            setMapReviewed(false);
+            setMapSources([]);
+            setStage('review_map');
+            window.scrollTo({ top: 0 });
+            return { ok: true };
+          }}
+        />
+        {isQuestions && (
+          <button type="button" onClick={() => setStage('manual_map')} className="self-start text-[0.9rem] font-medium text-fg-muted hover:text-fg">
+            Skip the questions (the plan will be less personal)
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // ------------------------------------------------------------- questions
+  if (stage === 'questions') {
+    const toggle = (q: GoalQuestion, o: string) => setPicked((p) => {
+      const cur = p[q.id] ?? [];
+      const on = cur.includes(o);
+      return { ...p, [q.id]: q.multi ? (on ? cur.filter((x) => x !== o) : [...cur, o]) : (on ? [] : [o]) };
+    });
+    const answered = answerList().length;
+    return (
+      <div className="mx-auto flex max-w-[760px] flex-col gap-8">
+        <button type="button" onClick={() => setStage('intake')} className="flex items-center gap-1.5 self-start text-[0.9rem] text-fg-secondary hover:text-fg">
+          <Icon name="arrowLeft" size={16} /> Your goal
+        </button>
+        <header className="flex flex-col gap-2">
+          <h1 className="m-0 font-serif text-[2.2rem] font-normal leading-tight">A few questions first</h1>
+          <p className="m-0 text-fg-secondary">
+            Your answers decide what goes into the plan: the examples, what comes first and what you can skip. Pick what fits, or write your own.
+          </p>
+        </header>
+        {questions.map((q, i) => (
+          <fieldset key={q.id} className="m-0 flex flex-col gap-3 border-0 p-0">
+            <legend className="mb-3 p-0 text-[1.05rem] font-semibold">
+              {i + 1}. {q.question}
+              {q.multi && <span className="ml-2 text-[0.82rem] font-normal text-fg-muted">pick any</span>}
+            </legend>
+            <div className="flex flex-wrap gap-2">
+              {q.options.map((o) => {
+                const on = (picked[q.id] ?? []).includes(o);
+                return (
+                  <button key={o} type="button" aria-pressed={on} onClick={() => toggle(q, o)}
+                    className={`min-h-10 rounded-lg px-3.5 py-2 text-left text-[0.9rem] font-medium ${on ? 'bg-ink text-on-ink' : 'border-[1.5px] border-line text-fg-secondary hover:border-line-hover'}`}>
+                    {o}
+                  </button>
+                );
+              })}
+            </div>
+            <label className="sr-only" htmlFor={`other-${q.id}`}>Your own answer</label>
+            <input id={`other-${q.id}`} className="form-input h-10 py-0 text-[0.92rem]" placeholder="Or in your own words…"
+              value={other[q.id] ?? ''} onChange={(e) => setOther((p) => ({ ...p, [q.id]: e.target.value }))} />
+          </fieldset>
+        ))}
+        {error && <p role="alert" className="m-0 text-danger">{error}</p>}
+        {aiFailed && !useManual && (
+          <p className="m-0 text-[0.92rem]">
+            Our AI is busy right now.{' '}
+            <button type="button" className="font-semibold underline underline-offset-2" onClick={switchToManual}>
+              Use your own ChatGPT or Claude instead
+            </button>
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-6">
+          <button type="button" onClick={() => requestDraft()} disabled={!!busy} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
+            {busy ?? 'Build my plan'}
+          </button>
+          <span className="text-[0.85rem] text-fg-muted">
+            {busy ? 'This takes about a minute.' : answered < questions.length ? `${answered} of ${questions.length} answered. Unanswered ones are fine, the plan is just less personal.` : 'Takes about a minute.'}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   // ------------------------------------------------------------ review map
   if (stage === 'review_map' && customMap) {
     const update = (i: number, patch: Partial<CompetencyMap['competencies'][number]>) =>
       setCustomMap((m) => m && { ...m, competencies: m.competencies.map((c, j) => (j === i ? { ...c, ...patch } : c)) });
     return (
       <div className="mx-auto flex max-w-[760px] flex-col gap-7">
-        <button type="button" onClick={() => setStage('intake')} className="flex items-center gap-1.5 self-start text-[0.9rem] text-fg-secondary hover:text-fg">
+        <button type="button" onClick={() => setStage(questions.length ? 'questions' : 'intake')} className="flex items-center gap-1.5 self-start text-[0.9rem] text-fg-secondary hover:text-fg">
           <Icon name="arrowLeft" size={16} /> Your answers
         </button>
         <header className="flex flex-col gap-2">
@@ -389,6 +605,11 @@ export default function BuildProgramPage() {
                 </button>
               </div>
               <span className="text-[0.85rem] text-fg-muted">{c.group} · {c.summary}</span>
+              {c.lessons && c.lessons.length > 0 && (
+                <ol className="m-0 flex list-decimal flex-col gap-0.5 pl-5 text-[0.82rem] text-fg-secondary">
+                  {c.lessons.map((l) => <li key={l}>{l}</li>)}
+                </ol>
+              )}
             </li>
           ))}
         </ul>
@@ -422,7 +643,7 @@ export default function BuildProgramPage() {
           <span className="text-[0.85rem] font-semibold uppercase tracking-wide text-fg-muted">Draft plan · not saved yet</span>
           <h1 className="m-0 font-serif text-[2.4rem] font-normal leading-tight">{draft.map.title}</h1>
           <p className="m-0 text-[1.05rem] text-fg-secondary">
-            {sentence(TARGET_LABEL[draft.intake.target])} · {draft.hoursPerWeek} h/week · about {draft.totalWeeks} weeks · {draft.phases.length} phases
+            {sentence(targetLabel(draft.intake.target, draft.intake.archetype ?? draft.map.archetype))} · {draft.hoursPerWeek} h/week · about {draft.totalWeeks} weeks · {draft.phases.length} phases
           </p>
           {draft.intake.doneMeans && <p className="m-0 text-[0.95rem]">Finish line: <strong>{draft.intake.doneMeans}</strong></p>}
         </header>
@@ -534,7 +755,7 @@ function FullSyllabus({ draft, busy, onRebuild }: { draft: ProgramDraft; busy: b
             <div className="flex flex-wrap gap-2">
               {higher.map((t) => (
                 <button key={t} type="button" disabled={busy} onClick={() => onRebuild(t)} className="btn btn-secondary h-9 py-0 text-[0.85rem]">
-                  {sentenceCase(TARGET_LABEL[t])} · {competenciesForTarget(draft.map, t).length} topics
+                  {sentenceCase(targetLabel(t, draft.intake.archetype ?? draft.map.archetype))} · {competenciesForTarget(draft.map, t).length} topics
                 </button>
               ))}
             </div>
@@ -547,7 +768,7 @@ function FullSyllabus({ draft, busy, onRebuild }: { draft: ProgramDraft; busy: b
               {draft.map.competencies.filter((c) => c.group === g).map((c) => (
                 <li key={c.key} className="flex items-baseline justify-between gap-3 text-[0.92rem]">
                   <span className={inPlan.has(c.key) ? 'text-fg' : 'text-fg-muted'}>{inPlan.has(c.key) ? '✓' : '○'} {c.title}</span>
-                  {!inPlan.has(c.key) && <span className="shrink-0 text-[0.78rem] text-fg-muted">from “{TARGET_LABEL[c.from]}”</span>}
+                  {!inPlan.has(c.key) && <span className="shrink-0 text-[0.78rem] text-fg-muted">from “{targetLabel(c.from, draft.intake.archetype ?? draft.map.archetype)}”</span>}
                 </li>
               ))}
             </ul>

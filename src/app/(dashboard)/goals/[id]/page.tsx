@@ -1,5 +1,6 @@
 'use client';
 
+import { topicLabelUnderGoal } from '@/lib/statusLabels';
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -195,7 +196,7 @@ export default function GoalDetailPage() {
                 <span className="text-[0.9rem] font-semibold text-fg-muted">Still to prove</span>
                 {unmet.map((c) => (
                   <Link key={c.topicId} href={`/topics/${c.topicId}`} className="flex min-h-[40px] items-center justify-between gap-3 border-b border-line text-[0.95rem] text-fg no-underline last:border-b-0 hover:no-underline">
-                    <span className="flex flex-col py-1.5">{c.label}{c.reason && <span className="text-[0.82rem] text-fg-muted">{c.reason}</span>}</span>
+                    <span className="flex flex-col py-1.5">{topicLabelUnderGoal(c.label, goal.title)}{c.reason && <span className="text-[0.82rem] text-fg-muted">{c.reason}</span>}</span>
                     <Icon name="chevronRight" size={16} className="text-fg-muted" />
                   </Link>
                 ))}

@@ -75,7 +75,7 @@ Return JSON only:
         const result = await callAIContent([
           { role: 'system', content: 'You design practical, well-sequenced curricula for self-learners. Return JSON only.' },
           { role: 'user', content: prompt },
-        ], { jsonMode: true, temperature: 0.3 });
+        ], { purpose: 'topic.curriculum', jsonMode: true, temperature: 0.3 });
 
         const parsed = JSON.parse(result.content);
         const modules = (Array.isArray(parsed.modules) ? parsed.modules : [])
@@ -136,7 +136,7 @@ Return JSON only in this exact format:
         const result = await callAIContent([
           { role: 'system', content: 'You are an expert tutor creating structured concept maps. Return valid JSON only.' },
           { role: 'user', content: prompt },
-        ], { jsonMode: true, temperature: 0.3 });
+        ], { purpose: 'topic.concepts', jsonMode: true, temperature: 0.3 });
 
         const parsed = JSON.parse(result.content);
         return NextResponse.json(parsed);
@@ -210,7 +210,7 @@ Return JSON only:
         const result = await callAIContent([
           { role: 'system', content: 'You grade learner answers accurately and specifically. Return JSON only.' },
           { role: 'user', content: prompt },
-        ], { jsonMode: true, temperature: 0.2 });
+        ], { purpose: 'explain.check', jsonMode: true, temperature: 0.2 });
         parsed = JSON.parse(result.content);
       } catch (aiErr) {
         console.warn('AI call failed for evaluate:', aiErr instanceof Error ? aiErr.message : aiErr);
@@ -280,7 +280,7 @@ Generate a JSON object with EXACTLY these 6 fields:
       const result = await callAIContent([
         { role: 'system', content: 'You are a master educator. Explain clearly, directly, and engagingly. Return valid JSON only.' },
         { role: 'user', content: prompt },
-      ], { jsonMode: true, temperature: 0.4 });
+      ], { purpose: 'socratic', jsonMode: true, temperature: 0.4 });
 
       const parsed = JSON.parse(result.content || '{}');
 
