@@ -9,6 +9,8 @@ import { buildSkeleton } from '@/lib/program/skeleton';
 import { buildAdaptMessages, parseAdjustments, EMPTY_ADJUSTMENTS, type Adjustments } from '@/lib/program/adapt';
 import { buildMapDraftMessages, parseMapDraft } from '@/lib/program/mapDraft';
 import { guessArchetype } from '@/lib/program/fieldGuide';
+import { extractJson, fixPrompt, toChatPrompt } from '@/lib/ai/manual';
+import { logManualImport } from '@/lib/ai/callLog';
 import { composeDraft } from '@/lib/program/generate';
 import { factualWhy } from '@/lib/program/why';
 import { enrichResources } from '@/lib/resources/enrich';
@@ -41,6 +43,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'That topic list has problems.', problems: resolved.problems }, { status: 400 });
     }
 
+    // "Use my own ChatGPT/Claude": the topic list prompt is handed to the learner,
+    // their pasted reply goes through the same parser, and tailoring is skipped
+    // (the skeleton and factual "why" stand on their own).
+    const manual = body.mode === 'manual' ? (body.step === 'import' ? 'import' : 'prompt') : null;
+
+    if (resolved.kind === 'needs_map' && manual) {
+      const archetype = intake.archetype ?? guessArchetype(intake.goal);
+      if (manual === 'prompt') {
+        return NextResponse.json({ stage: 'manual_prompt', prompt: toChatPrompt(buildMapDraftMessages(intake, [], archetype)) });
+      }
+      const found = extractJson(typeof body.reply === 'string' ? body.reply : '');
+      const first = found.ok ? parseMapDraft(JSON.stringify(found.value), intake.goal) : { map: null, problems: [found.problem] };
+      if (!first.map) return NextResponse.json({ error: 'That reply couldn’t be used as a topic list.', problems: first.problems, fixPrompt: fixPrompt(first.problems) }, { status: 422 });
+      await logManualImport('plan.draft', userId);
+      return NextResponse.json({ stage: 'review_map', intake, map: { ...first.map, archetype }, reviewed: false, sources: [] });
+    }
+
     if (resolved.kind === 'needs_map') {
       if (!hasAnyAIProviderConfigured()) {
         return NextResponse.json({ error: 'There is no topic list for this field yet, and drafting one needs the AI, which is not configured.' }, { status: 503 });
@@ -66,7 +85,7 @@ export async function POST(request: Request) {
     const trusted = await trustedResources(db, userId, field);
     let adjustments: Adjustments = EMPTY_ADJUSTMENTS;
     let aiUsed = false;
-    if (hasAnyAIProviderConfigured()) {
+    if (!manual && hasAnyAIProviderConfigured()) {
       const overQuota = await aiQuotaGate(userId);
       if (overQuota) return overQuota;
       const skeleton = buildSkeleton(map, intake, { field, mapQuality, trusted });

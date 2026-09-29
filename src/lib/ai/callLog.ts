@@ -26,7 +26,7 @@ export async function logAttempts(purpose: string, userId: string | null, attemp
       completionTokens: a.completionTokens ?? null,
       reasoningTokens: a.reasoningTokens ?? null,
       // Groq is billed separately (or free tier): no ₹ price for it here.
-      costInr: a.provider === 'aicredits' ? costOf(await priceFor(a.model), a.promptTokens ?? null, a.completionTokens ?? null) : null,
+      costInr: a.provider === 'manual' ? 0 : a.provider === 'aicredits' ? costOf(await priceFor(a.model), a.promptTokens ?? null, a.completionTokens ?? null) : null,
       reportedCost: a.reportedCost ?? null,
       durationMs: Math.round(a.durationMs),
     })));
@@ -59,4 +59,9 @@ export async function assertWithinDailyBudget(): Promise<void> {
     return;
   }
   if (spent >= budget) throw new AiBudgetReachedError(spent, budget);
+}
+
+/** A reply the learner got from their own ChatGPT/Claude and pasted in: ₹0 to us, logged so /usage shows the saving. */
+export async function logManualImport(purpose: string, userId: string | null, via = 'manual'): Promise<void> {
+  await logAttempts(purpose, userId, [{ provider: 'manual', model: via === 'manual' ? 'learner’s own chat' : via, ok: true, durationMs: 0 }]);
 }

@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
+import { useAiMode } from '@/lib/useAiMode';
 
 export default function LogoutButton() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function LogoutButton() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [account, setAccount] = useState<{ email: string | null; name: string | null } | null>(null);
   const [isOwner, setIsOwner] = useState(false);
+  const { manual, mode, setMode } = useAiMode();
 
   useEffect(() => {
     fetch('/api/auth')
@@ -74,6 +76,13 @@ export default function LogoutButton() {
             <Icon name="you" size={16} />
             <span>Friends</span>
           </Link>
+          {mode && (
+            <button type="button" className="avatar-dropdown-item" onClick={() => setMode(manual ? 'app' : 'manual')}
+              title="Plans, lessons and practice days: written by the app's AI, or by your own ChatGPT/Claude (copy-paste, free)">
+              <Icon name="link" size={16} />
+              <span>{manual ? 'AI: my own chat ✓ (switch to app)' : 'AI: app (use my own chat)'}</span>
+            </button>
+          )}
           {isOwner && (
             <Link href="/usage" className="avatar-dropdown-item no-underline hover:no-underline" onClick={() => setOpen(false)}>
               <Icon name="board" size={16} />

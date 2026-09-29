@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Icon } from '@/components/ui';
 import { renderMarkdown } from '@/lib/markdown';
 import { useSpeechToText } from '@/lib/useSpeechToText';
+import { useAiMode } from '@/lib/useAiMode';
 import type { LessonExercise } from '@/lib/program/lessonGuide';
 import type { CheckResult } from '@/lib/program/exerciseCheck';
 
@@ -76,6 +77,14 @@ export function Exercise({ n, ex, subject, done, onDone, onChecked, initialAnswe
   const speech = useSpeechToText();
   const [spoken, setSpoken] = useState(false);
   const typed = ex.type === 'write' || ex.type === 'solve' || ex.type === 'say';
+  // Copy-paste learners mark their own answer against the model answer: no paid check.
+  const { manual: selfCheck } = useAiMode();
+  const selfMark = (verdict: CheckResult['verdict']) => {
+    const r: CheckResult = { verdict, feedback: 'You marked this yourself after comparing with the model answer.', corrected: '' };
+    setResult(r);
+    onChecked?.({ ...r, answer: text });
+    onDone(verdict === 'correct');
+  };
   const text = spoken && speech.transcript ? speech.transcript : answer;
 
   const check = async () => {
@@ -135,9 +144,14 @@ export function Exercise({ n, ex, subject, done, onDone, onChecked, initialAnswe
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        {typed && (
+        {typed && !selfCheck && (
           <button type="button" onClick={check} disabled={!text.trim() || checking || speech.listening} className="btn btn-primary h-10 py-0">
             {checking ? 'Checking…' : 'Check my answer'}
+          </button>
+        )}
+        {typed && selfCheck && !showAnswer && (
+          <button type="button" onClick={() => setShowAnswer(true)} disabled={!text.trim() || speech.listening} className="btn btn-primary h-10 py-0">
+            Compare with the model answer
           </button>
         )}
         {!typed && (
@@ -145,7 +159,7 @@ export function Exercise({ n, ex, subject, done, onDone, onChecked, initialAnswe
             {done ? 'Done ✓' : 'I did it'}
           </button>
         )}
-        {ex.answer && (
+        {ex.answer && !(typed && selfCheck) && (
           <button type="button" onClick={() => setShowAnswer((v) => !v)} className="btn btn-secondary h-10 py-0">
             {showAnswer ? 'Hide' : ex.type === 'do' ? 'What good looks like' : 'Show answer'}
           </button>
@@ -160,9 +174,22 @@ export function Exercise({ n, ex, subject, done, onDone, onChecked, initialAnswe
           {result.corrected && <p className="m-0 text-[0.95rem] leading-relaxed"><span className="text-fg-muted">Better: </span>{result.corrected}</p>}
         </div>
       )}
-      {showAnswer && ex.answer && (
-        <div className="rounded-xl border border-line p-4">
-          <div className="lesson-prose text-[0.98rem]" dangerouslySetInnerHTML={{ __html: renderMarkdown(ex.answer) }} />
+      {showAnswer && (ex.answer || (typed && selfCheck)) && (
+        <div className="flex flex-col gap-3 rounded-xl border border-line p-4">
+          {ex.answer
+            ? <div className="lesson-prose text-[0.98rem]" dangerouslySetInnerHTML={{ __html: renderMarkdown(ex.answer) }} />
+            : <p className="m-0 text-[0.95rem] text-fg-secondary">No model answer for this one: judge it against the task and target above.</p>}
+          {typed && selfCheck && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+              <span className="text-[0.9rem] font-semibold">How did yours compare?</span>
+              {(['correct', 'partly', 'wrong'] as const).map((v) => (
+                <button key={v} type="button" aria-pressed={result?.verdict === v} onClick={() => selfMark(v)}
+                  className={`h-9 rounded-lg px-3 text-[0.85rem] font-medium ${result?.verdict === v ? 'bg-ink text-on-ink' : 'border-[1.5px] border-line text-fg-secondary hover:border-line-hover'}`}>
+                  {v === 'correct' ? 'Got it' : v === 'partly' ? 'Nearly' : 'Not yet'}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </li>

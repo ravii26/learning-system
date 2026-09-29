@@ -6,6 +6,8 @@ import { renderMarkdown } from '@/lib/markdown';
 import type { SessionContent, SessionRating, SessionStep } from '@/lib/program/sessions';
 import type { CheckResult } from '@/lib/program/exerciseCheck';
 import { Exercise } from './LessonPractice';
+import ManualAiPanel, { postManual } from '@/components/ManualAiPanel';
+import { useAiMode } from '@/lib/useAiMode';
 
 /**
  * A practice topic's page: today's session in full (every sentence, drill
@@ -36,6 +38,11 @@ export default function DailySessions({ topicId, topicTitle }: { topicId: string
   const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aiAvailable, setAiAvailable] = useState(true);
+  // "Use my own ChatGPT/Claude": the next days come from the learner's chat.
+  const { manual: manualMode } = useAiMode();
+  const [manualHere, setManualHere] = useState(false);
+  const useManual = manualMode || manualHere;
+  const [showManual, setShowManual] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -54,6 +61,11 @@ export default function DailySessions({ topicId, topicTitle }: { topicId: string
   }, [topicId]);
 
   const prepare = useCallback(async (quiet = false) => {
+    if (useManual) {
+      // Never a paid call in copy-paste mode; the learner asks for the next days themselves.
+      if (!quiet) setShowManual(true);
+      return;
+    }
     if (!quiet) setPreparing(true);
     setError(null);
     try {
@@ -66,7 +78,7 @@ export default function DailySessions({ topicId, topicTitle }: { topicId: string
     } finally {
       setPreparing(false);
     }
-  }, [topicId]);
+  }, [topicId, useManual]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -104,16 +116,48 @@ export default function DailySessions({ topicId, topicTitle }: { topicId: string
               ? 'The next days are written from how your recent sessions went.'
               : `Each day you get a new ${topicTitle.toLowerCase().includes('practice') ? '' : 'practice '}session with everything written out: what to say, drill or play, for how long, and how to know it worked. It builds day by day and brings back what you found hard.`}
           </p>
-          {aiAvailable ? (
-            <button type="button" onClick={() => prepare()} disabled={preparing} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
+          {aiAvailable || useManual ? (
+            <button type="button" onClick={() => prepare()} disabled={preparing || showManual} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
               {preparing ? 'Writing your next sessions… (about a minute)' : sessions.length ? 'Prepare the next days' : 'Prepare my first sessions'}
             </button>
           ) : <p className="m-0 text-[0.9rem] text-fg-muted">Writing sessions needs the AI, which isn’t set up.</p>}
           {error && <p role="alert" className="m-0 text-danger">{error}</p>}
+          {!useManual && (error || !aiAvailable) && (
+            <button type="button" className="text-[0.92rem] font-semibold underline underline-offset-2" onClick={() => { setManualHere(true); setError(null); setShowManual(true); }}>
+              Use your own ChatGPT or Claude instead (free)
+            </button>
+          )}
         </section>
       )}
 
+      {showManual && (
+        <ManualAiPanel
+          title="Your next practice days, from your own chat"
+          what="your next 3 practice days, with every sentence, drill and task written out"
+          getPrompt={async () => {
+            const r = await postManual<{ prompt: string }>(`/api/topics/${topicId}/sessions`, {});
+            if (!r.ok) throw new Error(r.problems[0]);
+            return r.data.prompt;
+          }}
+          importReply={async (reply) => {
+            const r = await postManual<{ sessions: Session[] }>(`/api/topics/${topicId}/sessions`, { step: 'import', reply });
+            if (!r.ok) return r;
+            setSessions(r.data.sessions);
+            setShowManual(false);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return { ok: true };
+          }}
+          onCancel={() => setShowManual(false)}
+        />
+      )}
+
       {today && <Today key={today.id} session={today} topicTitle={topicTitle} onFinish={(p) => finished(today, p)} />}
+
+      {useManual && today && upcoming.length === 0 && !showManual && (
+        <button type="button" onClick={() => setShowManual(true)} className="self-start text-[0.92rem] font-medium text-fg-secondary underline underline-offset-2 hover:text-fg">
+          Get the next days ready from your chat
+        </button>
+      )}
 
       {(upcoming.length > 0 || preparing) && (
         <section aria-labelledby="up-h" className="flex flex-col gap-2">

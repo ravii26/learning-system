@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import type { CompetencyMap } from '@/data/competencies';
 import { callAIContent } from '@/lib/ai/aiClient';
+import { toChatPrompt } from '@/lib/ai/manual';
 import { guessArchetype, isArchetype } from './fieldGuide';
 import { buildSessionMessages, minutesPerSession, parseSessions, SESSION_BATCH, type SessionContext, type SessionHistory } from './sessions';
 import type { Intake } from './types';
@@ -77,22 +78,49 @@ export function ensureUpcomingSessions(db: PrismaClient, userId: string, topicId
   return job;
 }
 
-async function writeUpcomingSessions(db: PrismaClient, userId: string, topicId: string): Promise<{ created: number }> {
+/** The next days to write: where to start, with full context (null when nothing is needed or the topic is gone). */
+async function nextBatch(db: PrismaClient, userId: string, topicId: string, force = false): Promise<SessionContext | null> {
   const [pending, last] = await Promise.all([
     db.practiceSession.count({ where: { userId, topicId, status: 'pending' } }),
     db.practiceSession.findFirst({ where: { userId, topicId }, orderBy: { day: 'desc' }, select: { day: true } }),
   ]);
-  if (pending >= 2) return { created: 0 };
-  const fromDay = (last?.day ?? 0) + 1;
-  const ctx = await loadSessionContext(db, userId, topicId, fromDay);
-  if (!ctx) return { created: 0 };
+  if (pending >= 2 && !force) return null;
+  return loadSessionContext(db, userId, topicId, (last?.day ?? 0) + 1);
+}
 
-  const { content } = await callAIContent(buildSessionMessages(ctx), { purpose: 'practice.sessions', temperature: 0.5, jsonMode: true, tier: 'content', maxTokens: 12000 });
-  const sessions = parseSessions(content, fromDay, ctx.count, ctx.competencies.map((c) => c.key), ctx.minutesPerSession);
-  if (!sessions.length) throw new Error('The AI returned no usable sessions.');
+async function saveSessions(db: PrismaClient, userId: string, topicId: string, ctx: SessionContext, raw: string): Promise<{ created: number }> {
+  const sessions = parseSessions(raw, ctx.fromDay, ctx.count, ctx.competencies.map((c) => c.key), ctx.minutesPerSession);
+  if (!sessions.length) throw new NoUsableSessionsError();
   const res = await db.practiceSession.createMany({
     data: sessions.map((s) => ({ userId, topicId, day: s.day, title: s.title, focus: s.focus, minutes: s.minutes, content: s.content as object })),
     skipDuplicates: true,
   });
   return { created: res.count };
+}
+
+export class NoUsableSessionsError extends Error {
+  constructor() {
+    super('No usable practice days were found. Each day needs a title and at least one step, and must be close to the planned length.');
+    this.name = 'NoUsableSessionsError';
+  }
+}
+
+async function writeUpcomingSessions(db: PrismaClient, userId: string, topicId: string): Promise<{ created: number }> {
+  const ctx = await nextBatch(db, userId, topicId);
+  if (!ctx) return { created: 0 };
+  const { content } = await callAIContent(buildSessionMessages(ctx), { purpose: 'practice.sessions', temperature: 0.5, jsonMode: true, tier: 'content', maxTokens: 12000 });
+  return saveSessions(db, userId, topicId, ctx, content);
+}
+
+/** "Use my own ChatGPT/Claude": the prompt for the next days (always, even if some are still waiting). */
+export async function sessionPrompt(db: PrismaClient, userId: string, topicId: string): Promise<{ prompt: string; fromDay: number } | null> {
+  const ctx = await nextBatch(db, userId, topicId, true);
+  return ctx ? { prompt: toChatPrompt(buildSessionMessages(ctx)), fromDay: ctx.fromDay } : null;
+}
+
+/** Saves the days from a pasted reply. Throws NoUsableSessionsError when nothing in it is usable. */
+export async function importSessions(db: PrismaClient, userId: string, topicId: string, json: unknown): Promise<{ created: number }> {
+  const ctx = await nextBatch(db, userId, topicId, true);
+  if (!ctx) return { created: 0 };
+  return saveSessions(db, userId, topicId, ctx, JSON.stringify(json));
 }

@@ -60,7 +60,7 @@ async function recordFailure(keys: [string, number][]) {
 export async function GET() {
   const userId = getSessionUserId();
   const user = userId
-    ? await db.user.findUnique({ where: { id: userId }, select: { email: true, name: true } })
+    ? await db.user.findUnique({ where: { id: userId }, select: { email: true, name: true, aiMode: true } })
     : null;
   return NextResponse.json({
     authenticated: !!user,

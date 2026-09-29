@@ -7,6 +7,7 @@ import { useToast } from '@/components/ToastProvider';
 import { computePracticeTrend, type RepForTrend } from '@/lib/practiceTrend';
 import { RUBRIC_TEMPLATES, getRubricTemplate } from '@/lib/practiceRubrics';
 import { Button, Field, Input, Select, Sparkline } from '@/components/ui';
+import RepCoach, { type CoachResult } from './RepCoach';
 
 /**
  * Practice mode's home (project plan's Example D — English/communication:
@@ -66,6 +67,9 @@ export default function PracticePage() {
   const [recordingUrl, setRecordingUrl] = useState('');
   const [durationSeconds, setDurationSeconds] = useState<string>('');
   const [submittingRep, setSubmittingRep] = useState(false);
+  // What the learner said and the coach's feedback, saved with the rep.
+  const [coach, setCoach] = useState<CoachResult | null>(null);
+  const [coachKey, setCoachKey] = useState(0);
 
   const [artifactTitle, setArtifactTitle] = useState('');
   const [artifactKind, setArtifactKind] = useState('project');
@@ -194,13 +198,17 @@ export default function PracticePage() {
           promptConceptId: prompt.conceptId,
           rubricScores: scores, // inverted dimensions come from the template, server-side
           recordingUrl: recordingUrl.trim() || undefined,
-          durationSeconds: durationSeconds ? Number(durationSeconds) : undefined,
+          durationSeconds: durationSeconds ? Number(durationSeconds) : coach?.seconds ?? undefined,
+          transcript: coach?.transcript || undefined,
+          aiFeedback: coach?.feedback ? JSON.stringify(coach.feedback) : undefined,
         }),
       });
       if (res.ok) {
         toast.success('Rep saved');
         setRecordingUrl('');
         setDurationSeconds('');
+        setCoach(null);
+        setCoachKey((k) => k + 1); // a fresh box for the next rep
         await fetchTopicData(selectedTopicId);
         const promptRes = await fetch('/api/practice-prompt');
         if (promptRes.ok) setPrompt(await promptRes.json());
@@ -302,8 +310,21 @@ export default function PracticePage() {
                 Today’s rep{prompt?.conceptTitle ? ` · from “${prompt.conceptTitle}”, which you’re reviewing` : ''}
               </span>
               <p className="m-0 font-serif text-[1.9rem] font-medium leading-snug">{prompt?.promptText ?? 'Loading a prompt…'}</p>
-              <p className="m-0 text-[0.95rem] text-fg-secondary">Do it first — out loud or written, about two minutes. Then score yourself honestly.</p>
+              <p className="m-0 text-[0.95rem] text-fg-secondary">Speak (or type) your answer, about two minutes, then get feedback. Or do it anywhere and just score yourself below.</p>
             </div>
+
+            {prompt && selectedTopicId && (
+              <RepCoach
+                key={`${selectedTopicId}-${coachKey}-${prompt.promptText}`}
+                topicId={selectedTopicId}
+                promptText={prompt.promptText}
+                template={template}
+                onFeedback={(r) => {
+                  setCoach(r.transcript ? r : null);
+                  if (r.feedback) setScores((prev) => ({ ...prev, ...r.feedback!.scores }));
+                }}
+              />
+            )}
 
             <form onSubmit={handleSubmitRep} className="flex flex-col gap-5">
               {template.dimensions.map((dim) => (

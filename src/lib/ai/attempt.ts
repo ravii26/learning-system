@@ -1,6 +1,6 @@
 /** One request to a provider, as the clients report it for cost logging (see aiClient.ts). */
 export interface AttemptLog {
-  provider: 'aicredits' | 'gemini' | 'groq';
+  provider: 'aicredits' | 'gemini' | 'groq' | 'manual';
   model: string;
   ok: boolean;
   status?: number;

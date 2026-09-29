@@ -8,6 +8,9 @@ import {
 import { db } from '@/lib/db';
 import { buildLessonContext, type LessonContext } from '@/lib/lessonContext';
 import { normalizeLesson } from '@/lib/lessonNormalize';
+import { extractJson, fixPrompt, toChatPrompt } from '@/lib/ai/manual';
+import { logManualImport } from '@/lib/ai/callLog';
+import type { AIMessage } from '@/lib/ai/aiClient';
 import { competencyFromModuleId, type CompetencyMap } from '@/data/competencies';
 import { guessArchetype, isArchetype, type Archetype } from '@/lib/program/fieldGuide';
 import { EXERCISES_JSON, LESSON_GUIDE } from '@/lib/program/lessonGuide';
@@ -112,7 +115,7 @@ export async function POST(request: Request) {
   const auth = requireAuth();
   if (auth instanceof NextResponse) return auth;
   const peek = (await request.clone().json().catch(() => ({}))) as Record<string, unknown>;
-  const key = peek.topicId && peek.moduleId && !peek.regenerate ? `${auth.userId}:${peek.topicId}:${peek.moduleId}` : null;
+  const key = peek.topicId && peek.moduleId && !peek.regenerate && !peek.mode ? `${auth.userId}:${peek.topicId}:${peek.moduleId}` : null;
   if (!key) return writeLesson(request);
   const running = writing.get(key);
   if (running) return (await running).clone();
@@ -126,9 +129,6 @@ async function writeLesson(request: Request) {
   if (auth instanceof NextResponse) return auth;
 
   const { userId } = auth;
-
-  const overQuota = await aiQuotaGate(userId);
-  if (overQuota) return overQuota;
 
   // Parse the request body exactly once.
   let body: Record<string, any>;
@@ -165,6 +165,14 @@ async function writeLesson(request: Request) {
     );
   }
 
+  // "Use my own ChatGPT/Claude": step "prompt" returns the prompt, step
+  // "import" takes the pasted reply through the same checks and save.
+  const manual = body.mode === 'manual' ? (body.step === 'import' ? 'import' : 'prompt') : null;
+  if (!manual) {
+    const overQuota = await aiQuotaGate(userId);
+    if (overQuota) return overQuota;
+  }
+
   /*
    * Persistence is opt-in via topicId + moduleId.
    *
@@ -172,7 +180,7 @@ async function writeLesson(request: Request) {
    */
   const canPersist = Boolean(topicId && moduleId);
 
-  if (canPersist && !regenerate) {
+  if (canPersist && !regenerate && manual !== 'import') {
     try {
       const cached = await db.generatedLesson.findFirst({
         where: {
@@ -192,57 +200,6 @@ async function writeLesson(request: Request) {
       console.error('Failed to load cached lesson:', error);
       // Do not fail lesson generation just because cache lookup failed.
     }
-  }
-
-  /*
-   * Honest fallback.
-   *
-   * This intentionally does NOT pretend to be an AI-generated lesson.
-   * A fake lesson is worse than telling the user that generation is unavailable.
-   */
-  if (!hasAnyAIProviderConfigured()) {
-    return NextResponse.json({
-      title: moduleTitle,
-
-      summary: `AI lesson generation is unavailable for "${moduleTitle}" because no AI provider is configured.`,
-
-      keyTakeaways: [
-        `Find a precise definition of "${moduleTitle}" in the context of ${topicTitle || 'your subject'
-        }.`,
-        `Work through at least one concrete example of "${moduleTitle}".`,
-        `Explain "${moduleTitle}" from memory and identify what you cannot explain clearly.`,
-      ],
-
-      explanation: `### AI generation unavailable
-
-A complete lesson for **${moduleTitle}** cannot be generated because no AI provider is currently configured.
-
-This response is intentionally not pretending to teach the topic with generic filler.
-
-To study it independently:
-
-1. Find a reliable explanation of **${moduleTitle}**.
-2. Work through a concrete example rather than only reading the definition.
-3. Close the source and explain the concept in your own words.
-4. Try one problem or implementation involving the concept.
-5. Write down anything you could not explain or implement.
-6. Return and regenerate this lesson once an AI provider is configured.`,
-
-      codeOrExample: `// AI generation is unavailable.
-//
-// Study "${moduleTitle}" using a concrete example,
-// then return once an AI provider is configured.`,
-
-      commonMistakes: [
-        `Do not rely on memorizing the definition of "${moduleTitle}".`,
-        'Do not move on until you can explain the concept using a concrete example.',
-      ],
-
-      quiz: [],
-
-      fallback: true,
-      reason: 'AI provider not configured',
-    });
   }
 
   /*
@@ -812,8 +769,7 @@ ${EXERCISES_JSON}
 }
 `;
 
-  try {
-    const userPrompt = `
+  const userPrompt = `
 Create the lesson for:
 
 Topic:
@@ -854,24 +810,78 @@ Do not use motivational filler.
 Do not merely describe what the student should learn.
 Actually teach the concept.
 `;
+  const messages: AIMessage[] = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt },
+  ];
+  if (manual === 'prompt') return NextResponse.json({ prompt: toChatPrompt(messages) });
 
-    const { content: rawContent, provider } = await callAIContent(
-      [
-        {
-          role: 'system',
-          content: systemPrompt,
-        },
-        {
-          role: 'user',
-          content: userPrompt,
-        },
+  /*
+   * Honest fallback.
+   *
+   * This intentionally does NOT pretend to be an AI-generated lesson.
+   * A fake lesson is worse than telling the user that generation is unavailable.
+   */
+  if (!manual && !hasAnyAIProviderConfigured()) {
+    return NextResponse.json({
+      title: moduleTitle,
+
+      summary: `AI lesson generation is unavailable for "${moduleTitle}" because no AI provider is configured.`,
+
+      keyTakeaways: [
+        `Find a precise definition of "${moduleTitle}" in the context of ${topicTitle || 'your subject'
+        }.`,
+        `Work through at least one concrete example of "${moduleTitle}".`,
+        `Explain "${moduleTitle}" from memory and identify what you cannot explain clearly.`,
       ],
-      {
+
+      explanation: `### AI generation unavailable
+
+A complete lesson for **${moduleTitle}** cannot be generated because no AI provider is currently configured.
+
+This response is intentionally not pretending to teach the topic with generic filler.
+
+To study it independently:
+
+1. Find a reliable explanation of **${moduleTitle}**.
+2. Work through a concrete example rather than only reading the definition.
+3. Close the source and explain the concept in your own words.
+4. Try one problem or implementation involving the concept.
+5. Write down anything you could not explain or implement.
+6. Return and regenerate this lesson once an AI provider is configured.`,
+
+      codeOrExample: `// AI generation is unavailable.
+//
+// Study "${moduleTitle}" using a concrete example,
+// then return once an AI provider is configured.`,
+
+      commonMistakes: [
+        `Do not rely on memorizing the definition of "${moduleTitle}".`,
+        'Do not move on until you can explain the concept using a concrete example.',
+      ],
+
+      quiz: [],
+
+      fallback: true,
+      reason: 'AI provider not configured',
+    });
+  }
+
+  try {
+    let rawContent: string;
+    let provider: string;
+    if (manual === 'import') {
+      const found = extractJson(typeof body.reply === 'string' ? body.reply : '');
+      if (!found.ok) return NextResponse.json({ problems: [found.problem], fixPrompt: fixPrompt([found.problem]) }, { status: 422 });
+      rawContent = JSON.stringify(found.value);
+      provider = 'manual';
+    } else {
+      ({ content: rawContent, provider } = await callAIContent(messages, {
         purpose: 'lesson', temperature: 0.35,
         tier: 'content',
         maxTokens: 9000,
-      }
-    );
+      }));
+    }
 
     let parsed: any;
 
@@ -909,6 +919,10 @@ Actually teach the concept.
     // list fields, and returns null if the core teaching content is missing.
     const normalized = normalizeLesson(parsed);
 
+    if (!normalized && manual) {
+      const problems = ['The lesson needs at least a "summary" and an "explanation".'];
+      return NextResponse.json({ problems, fixPrompt: fixPrompt(problems) }, { status: 422 });
+    }
     if (!normalized) {
       console.error('AI returned structurally invalid lesson:', parsed);
 
@@ -972,6 +986,7 @@ Actually teach the concept.
       }
     }
 
+    if (manual) await logManualImport('lesson', userId, provider);
     return NextResponse.json(normalized);
   } catch (error) {
     console.error('Lesson generation error:', error);
