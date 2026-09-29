@@ -14,7 +14,7 @@ import { ARCHETYPE_GUIDE, LEVEL_WORDS, guessArchetype, isArchetype, type Archety
 
 const KINDS: CompetencyKind[] = ['concept', 'algorithm', 'design', 'build', 'skill'];
 const IMPORTANCES: Importance[] = ['core', 'supporting', 'optional'];
-export const MAX_DRAFT_COMPETENCIES = 40;
+export const MAX_DRAFT_COMPETENCIES = 100;
 export const MIN_GOOD_DRAFT = 15;
 export const MAX_LESSONS = 8;
 
@@ -45,7 +45,7 @@ const MAP_JSON_SHAPE = `{
 function mapRules(archetype: Archetype, target: TargetLevel): string {
   const w = LEVEL_WORDS[archetype];
   return `Rules:
-- 20 to ${MAX_DRAFT_COMPETENCIES} competencies in learning order, grouped into 4-7 sections.
+- 20 to 50 competencies in learning order, grouped into 4-7 sections.
 - SPECIFIC, never vague. Every title names the actual thing a teacher would teach that week. Banned as titles: "Basics", "Fundamentals", "Introduction to X", "Advanced X", "X Techniques", "X Skills", "Deep dives", "Project 1", "Second project", "Understanding X", "Mastering X". Test: if a title could appear in the plan for a different field, rewrite it.
 - "summary" says what the learner can do afterwards, measurably when possible ("introduce yourself for 90 seconds without long pauses", "switch between G and C 30 times a minute", "solve 10 two-pointer problems").
 - "lessons": 1 to ${MAX_LESSONS} concrete lesson titles inside this competency, in order, each one 30-60 minute sitting (about 1 lesson per hour of work the topic needs). For "skill" topics, lessons are the specific drills/exercises to practise. For "build" topics, lessons are the steps of the project.
