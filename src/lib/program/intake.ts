@@ -9,7 +9,7 @@ const BUDGETS: Budget[] = ['free_only', 'free_preferred', 'any'];
 const FORMATS: ResourceFormat[] = ['read', 'watch', 'do'];
 
 const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.replace(/\s+/g, ' ').trim().slice(0, max) : undefined);
-const keys = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.length <= 80).slice(0, 60) : []);
+const keys = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.length <= 80).slice(0, 100) : []);
 
 /** Quick start without a stated target: infer it from the goal's own words. */
 /** Reads the goal and "done" text together: "get a high paying job" is as telling as "interview". */
