@@ -116,13 +116,16 @@ export default function BuildProgramPage() {
   useEffect(() => {
     fetch('/api/library').then((r) => (r.ok ? r.json() : null)).then((d) => d && setLibrary(d.mine ?? [])).catch(() => {});
   }, []);
+  const [ownList, setOwnList] = useState(false);
   const libraryMatch = useMemo(() => {
-    if (goal.trim().length <= 2 || !library.length) return null;
+    if (ownList || goal.trim().length <= 2 || !library.length) return null;
     const hit = matchMap(goal, library.map((l) => ({ key: l.key, title: l.title, aliases: l.aliases, description: '', competencies: [] })));
     return hit ? library.find((l) => l.key === hit.key) ?? null : null;
-  }, [goal, library]);
+  }, [goal, library, ownList]);
   const builtInMatch = useMemo(() => (goal.trim().length > 2 ? matchMap(goal) : null), [goal]);
-  const matched = libraryMatch ? null : builtInMatch;
+  const hasList = !!(builtInMatch || (goal.trim().length > 2 && library.length && matchMap(goal, library.map((l) => ({ key: l.key, title: l.title, aliases: l.aliases, description: '', competencies: [] })))));
+  // "Make my own list": ignore any existing list and draft a fresh one for this goal.
+  const matched = ownList || libraryMatch ? null : builtInMatch;
   const effectiveTarget = target ?? inferTarget(goal);
   // What the learner's own words ask for (goal + "done"), to catch a level picked too low.
   const impliedTarget = inferTarget(`${goal} ${doneMeans}`);
@@ -134,6 +137,7 @@ export default function BuildProgramPage() {
   const intakeBody = (): Partial<Intake> & Record<string, unknown> => ({
     goal, path: serious ? 'serious' : 'quick', currentLevel: level, hoursPerWeek: hours,
     target: effectiveTarget, budget,
+    ...(ownList ? { fresh: true } : {}),
     ...(archetype ? { archetype } : {}),
     ...(answerList().length ? { answers: answerList() } : {}),
     ...(serious ? {
@@ -299,7 +303,14 @@ export default function BuildProgramPage() {
                 ? <>Using <strong>your</strong> topic list for <strong>{libraryMatch.title}</strong> from your library ({libraryMatch.topics} topics).</>
                 : matched
                   ? <>We have a reviewed topic list for <strong>{matched.title}</strong>: your plan is built on it.</>
-                  : <>No list for this yet: the AI will draft one, an expert pass will review it, and you’ll check it before anything is built.</>}
+                  : ownList
+                    ? <>Making your own list: the AI will ask a few questions and draft one for you to edit and approve.</>
+                    : <>No list for this yet: the AI will draft one, an expert pass will review it, and you’ll check it before anything is built.</>}
+              {(hasList || ownList) && (
+                <>{' '}<button type="button" className="font-semibold underline underline-offset-2" onClick={() => setOwnList((v) => !v)}>
+                  {ownList ? 'Use the existing list instead' : 'Not what you want? Make my own list'}
+                </button></>
+              )}
             </p>
           )}
         </div>

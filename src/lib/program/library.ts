@@ -58,7 +58,7 @@ const qualityOf = (row: FieldMapRow): 'curated' | 'approved_draft' => (row.based
  * a field they picked, or one matched from the goal — their library first,
  * then built-in lists. None → the AI drafts one for review.
  */
-export async function resolveFieldForUser(db: Db, userId: string, body: { field?: unknown; customMap?: unknown }, goal: string): Promise<ResolvedField> {
+export async function resolveFieldForUser(db: Db, userId: string, body: { field?: unknown; customMap?: unknown; fresh?: unknown }, goal: string): Promise<ResolvedField> {
   if (body.customMap) {
     const { map, problems } = sanitizeMap(body.customMap, goal);
     if (!map) return { kind: 'invalid', problems };
@@ -71,6 +71,8 @@ export async function resolveFieldForUser(db: Db, userId: string, body: { field?
   if (byKey) return { kind: 'map', map: rowToMap(byKey), field: byKey.key, mapQuality: qualityOf(byKey), origin: 'library' };
   if (chosen && getMap(chosen)) return { kind: 'map', map: getMap(chosen)!, field: chosen, mapQuality: 'curated', origin: 'builtin' };
 
+  // The learner declined the matched list: have a new one drafted for this goal.
+  if (body.fresh === true) return { kind: 'needs_map' };
   const mine = matchMap(goal, rows.map(rowToMap));
   if (mine) {
     const row = rows.find((r) => r.key === mine.key)!;
