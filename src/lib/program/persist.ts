@@ -1,7 +1,6 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { DEPTH_FOR_TARGET, lessonsOf, moduleIdFor, type Competency } from '@/data/competencies';
 import { ensureAreaSkillId } from '@/lib/areaSkill';
-import { syncTopicListsAndMirror } from '@/lib/topicListSync';
 import { estimateHours } from './skeleton';
 import { targetLabel } from './why';
 import type { Adjustments } from './adapt';
@@ -139,16 +138,44 @@ export async function persistProgram(tx: Tx, { userId, draft, adjustments }: Per
           },
         },
       });
-      await syncTopicListsAndMirror(tx, userId, topic.id, {
-        curriculum: item.shape === 'practice' || item.shape === 'exploration' ? [] : modules,
-        resources,
-      });
-      // resourceSync only knows the legacy fields; stamp the trust fields per URL.
-      for (const r of item.resources) {
-        await tx.resource.updateMany({
-          where: { topicId: topic.id, url: r.url },
-          // catalogue: checked when curated; search: checked on approval; ai: a search link, not a resource page.
-          data: { source: r.source, catalogKey: r.catalogKey, quality: r.quality, pricing: r.pricing, role: r.role, linkStatus: r.source === 'ai' ? 'unchecked' : 'ok', linkCheckedAt: r.source === 'search' ? new Date() : null },
+      if (item.shape !== 'practice' && item.shape !== 'exploration' && modules.length > 0) {
+        await tx.curriculumItem.createMany({
+          data: modules.map((m) => ({
+            userId,
+            topicId: topic.id,
+            legacyId: m.id,
+            order: m.order,
+            title: m.title,
+            estimatedMinutes: m.estimatedMinutes,
+            completed: false,
+            completedAt: null,
+            notes: '',
+            removed: false,
+          })),
+        });
+      }
+
+      if (item.resources.length > 0) {
+        await tx.resource.createMany({
+          data: item.resources.map((r, i) => ({
+            userId,
+            topicId: topic.id,
+            legacyId: r.catalogKey || `res-${i + 1}`,
+            order: i + 1,
+            title: r.title,
+            type: r.type,
+            url: r.url,
+            purpose: r.role,
+            status: 'NOT_STARTED',
+            source: r.source,
+            catalogKey: r.catalogKey,
+            quality: r.quality,
+            pricing: r.pricing,
+            role: r.role,
+            linkStatus: r.source === 'ai' ? 'unchecked' : 'ok',
+            linkCheckedAt: r.source === 'search' ? new Date() : null,
+            notes: '',
+          })),
         });
       }
       await tx.activityLog.create({ data: { userId, topicId: topic.id, fieldChanged: 'status', oldValue: null, newValue: status } });
