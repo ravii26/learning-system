@@ -8,6 +8,9 @@ import { persistProgram } from '@/lib/program/persist';
 import { recomputeGoalReadiness } from '@/lib/goalReadinessRecompute';
 import { checkinDueAt } from '@/lib/program/checkinServer';
 import { reverifyFound } from '@/lib/resources/enrich';
+import { isUsable, verifyLink } from '@/lib/resources/verifyLink';
+
+export const maxDuration = 60;
 
 /** Your active programs, with whether a weekly check-in is due or waiting — for the Today card. */
 export async function GET() {
@@ -58,7 +61,10 @@ export async function POST(request: Request) {
     const base = { map: resolved.map, field: resolved.field, mapQuality: resolved.mapQuality, intake: parsed.intake };
     const trusted = await trustedResources(db, userId, resolved.field);
     const adjustments = sanitizeClientAdjustments(body.adjustments, base);
-    adjustments.foundResources = await reverifyFound(adjustments.foundResources ?? []);
+    adjustments.foundResources = await reverifyFound(
+      adjustments.foundResources ?? [],
+      (u) => verifyLink(u, { timeoutMs: 2500 }).then((r) => isUsable(r.status))
+    );
     const removedItemIds = Array.isArray(body.removedItemIds)
       ? body.removedItemIds.filter((x): x is string => typeof x === 'string').slice(0, 50)
       : [];
@@ -83,6 +89,7 @@ export async function POST(request: Request) {
     return NextResponse.json(result, { status: 201 });
   } catch (e) {
     console.error('Failed to create program:', e);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    const message = e instanceof Error ? e.message : 'Internal Server Error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
