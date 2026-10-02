@@ -280,7 +280,7 @@ export default function LearnNowModal({
               <textarea
                 className="form-input"
                 placeholder="Jot down formulas, code templates, draft answers, or recall outlines here..."
-                style={{ width: '100%', height: '140px', resize: 'none', background: 'var(--bg-sunk)', fontFamily: 'monospace', fontSize: '0.85rem' }}
+                style={{ width: '100%', minHeight: '160px', height: '180px', resize: 'vertical', background: 'var(--bg-sunk)', fontFamily: 'monospace', fontSize: '0.85rem' }}
                 value={scratchpad}
                 onChange={(e) => setScratchpad(e.target.value)}
               />
