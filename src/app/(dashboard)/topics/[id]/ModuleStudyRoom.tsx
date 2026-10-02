@@ -4,12 +4,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { CourseModule, ModuleEvidence } from './page';
 import { renderMarkdown } from '@/lib/markdown';
-import RichTextEditor from './RichTextEditor';
 import { Accordion, Icon, KnowledgeMark } from '@/components/ui';
 import ProblemLog from './ProblemLog';
 import LessonPractice from './LessonPractice';
 import ManualAiPanel, { postManual } from '@/components/ManualAiPanel';
 import { useAiMode } from '@/lib/useAiMode';
+import ModuleNotesDrawer from './ModuleNotesDrawer';
 
 interface ModuleStudyRoomProps {
   topicId: string;
@@ -55,6 +55,19 @@ export default function ModuleStudyRoom({
   const [lesson, setLesson] = useState<any | null>(null);
   const [loadingLesson, setLoadingLesson] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [notesDrawerOpen, setNotesDrawerOpen] = useState(false);
+
+  // Global Alt+N shortcut to toggle notes drawer
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        setNotesDrawerOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
   // "Use my own ChatGPT/Claude": a lesson not written yet comes from the learner's chat.
   const { mode: aiMode, manual: manualMode } = useAiMode();
   const [manualHere, setManualHere] = useState(false);
@@ -292,26 +305,28 @@ export default function ModuleStudyRoom({
       {/* Secondary: collapsed by default so the lesson stays the focus. The
           headers carry a one-line summary, so nothing important is hidden. */}
       <section aria-label="Your work on this module" className="flex flex-col gap-2">
-        <Accordion title="Your notes" hint={hasModuleNotes ? 'Saved' : 'Explain it in your own words'} defaultOpen={hasModuleNotes}>
+        <Accordion title="Your notes" hint={hasModuleNotes ? 'Saved' : 'Empty'} defaultOpen={hasModuleNotes}>
           <div className="flex flex-col gap-2.5">
             <span className="text-[0.8rem] text-fg-muted">Saved as you type · shown again with this module’s review cards</span>
-            {/* Keyed by module: the editor captures its save callback when it's
-                created, so a save still pending after you switch modules lands
-                on the module you typed it in. */}
-            <RichTextEditor
-              key={module.id}
-              content={module.notes || ''}
-              onChange={(html) => saveModuleNotes(module.id, html)}
-              placeholder={`Explain ${module.title} back in your own words.`}
-              minHeight={150}
-            />
-            {notes && notes.replace(/<[^>]*>/g, '').trim() && (
-              <details className="text-[0.85rem] text-fg-secondary">
-                <summary className="cursor-pointer font-semibold">Older topic-wide notes</summary>
-                <div className="mt-2">
-                  <RichTextEditor content={notes} onChange={onSaveNotes} placeholder="" minHeight={100} />
-                </div>
-              </details>
+            <button
+              type="button"
+              onClick={() => setNotesDrawerOpen(true)}
+              className="btn btn-secondary flex items-center justify-center gap-2 h-9 w-full text-[0.85rem] font-medium"
+            >
+              <Icon name="notebook" size={15} />
+              <span>Open Notes Drawer</span>
+            </button>
+            {hasModuleNotes ? (
+              <div
+                onClick={() => setNotesDrawerOpen(true)}
+                className="cursor-pointer max-h-36 overflow-hidden rounded-lg border border-line bg-surface p-3 text-[0.82rem] text-fg-secondary hover:border-line-hover transition-colors line-clamp-4"
+                title="Click to open full notes drawer"
+                dangerouslySetInnerHTML={{ __html: module.notes || '' }}
+              />
+            ) : (
+              <p className="text-[0.82rem] text-fg-muted italic m-0">
+                No notes yet. Click above to open the notes drawer (or press Alt+N).
+              </p>
             )}
           </div>
         </Accordion>
@@ -377,7 +392,21 @@ export default function ModuleStudyRoom({
                 </>
               )}
             </div>
-            {finishButton(true)}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setNotesDrawerOpen(true)}
+                className="btn btn-secondary h-9 gap-2 px-3 text-[0.85rem] font-medium"
+                title="Open notes drawer (Alt+N)"
+              >
+                <Icon name="notebook" size={15} />
+                <span>Notes</span>
+                {hasModuleNotes && (
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" title="Has notes" />
+                )}
+              </button>
+              {finishButton(true)}
+            </div>
           </div>
           <h2 className="m-0 font-serif text-[2.4rem] font-medium leading-[1.1] tracking-[-0.02em]">{module.title}</h2>
           {lesson?.summary && !loadingLesson && (
@@ -716,6 +745,32 @@ export default function ModuleStudyRoom({
           module list; before that column mounts (first paint) they render here. */}
       {sidePanel ? createPortal(sideContent, sidePanel) : sideContent}
       {!module.completed && <div className="flex justify-start">{finishButton(false)}</div>}
+
+      {/* Floating Notes button for quick access while reading */}
+      <button
+        type="button"
+        onClick={() => setNotesDrawerOpen(true)}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full border border-line bg-surface/95 px-4 py-2.5 text-[0.85rem] font-medium text-fg shadow-pop backdrop-blur hover:bg-fill-2 transition-all hover:scale-105"
+        title="Open Notes Drawer (Alt+N)"
+      >
+        <Icon name="notebook" size={16} />
+        <span>Notes</span>
+        {hasModuleNotes && <span className="h-2 w-2 rounded-full bg-emerald-500" />}
+        <kbd className="rounded bg-fill-2 px-1.5 py-0.5 text-[0.68rem] font-mono text-fg-muted">Alt+N</kbd>
+      </button>
+
+      {/* Slide-over Notes Drawer */}
+      <ModuleNotesDrawer
+        open={notesDrawerOpen}
+        onClose={() => setNotesDrawerOpen(false)}
+        moduleId={module.id}
+        moduleOrder={module.order}
+        moduleTitle={module.title}
+        notes={module.notes || ''}
+        onSaveNotes={(html) => saveModuleNotes(module.id, html)}
+        topicWideNotes={notes}
+        onSaveTopicWideNotes={onSaveNotes}
+      />
     </div>
   );
 }
