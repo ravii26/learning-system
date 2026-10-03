@@ -310,7 +310,10 @@ code, pre, kbd {
 .app-content {
   padding: 40px 48px;
   flex-grow: 1;
-  overflow-y: auto;
+  /* clip, not auto: an overflow:auto box becomes the scroll container for
+     position:sticky children, and since this one never scrolls (the window
+     does), sticky bars inside pages silently stopped sticking. */
+  overflow-x: clip;
 }
 
 /* Phones: the sidebar becomes a bottom tab bar (see NavLinks). */

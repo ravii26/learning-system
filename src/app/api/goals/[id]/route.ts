@@ -3,6 +3,8 @@ import type { GoalStatus } from '@prisma/client';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { recomputeGoalReadiness } from '@/lib/goalReadinessRecompute';
+import { applyGoalArea, applyGoalStatus } from '@/lib/goalStatus';
+import { VALID_AREAS } from '@/lib/validations/topic';
 
 const VALID_STATUSES: GoalStatus[] = ['draft', 'active', 'achieved', 'abandoned', 'paused'];
 
@@ -36,7 +38,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-/** Status changes only — title/outcome/roadmap content are set once at creation. */
+/**
+ * Status, type (area) and target date — title/outcome/roadmap content are
+ * set once at creation. Status and type carry down to the goal's topics;
+ * see src/lib/goalStatus.ts for what each status does to them.
+ */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const auth = requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -49,10 +55,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     const body = await request.json();
-    const { status, targetDate } = body as { status?: GoalStatus; targetDate?: string | null };
+    const { status, targetDate, area } = body as { status?: GoalStatus; targetDate?: string | null; area?: string };
 
     if (status !== undefined && !VALID_STATUSES.includes(status as GoalStatus)) {
       return NextResponse.json({ error: `Invalid status: ${status}` }, { status: 400 });
+    }
+    if (area !== undefined && !VALID_AREAS.includes(area)) {
+      return NextResponse.json({ error: `Invalid type: ${area}` }, { status: 400 });
     }
 
     const data: { status?: GoalStatus; achievedAt?: Date | null; targetDate?: Date | null } = {};
@@ -64,8 +73,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       data.targetDate = targetDate ? new Date(targetDate) : null;
     }
 
-    const updated = await db.goal.update({ where: { id: params.id }, data });
-    return NextResponse.json(updated);
+    let topicsMoved = 0;
+    let topicsRetyped = 0;
+    const updated = await db.$transaction(async (tx) => {
+      if (area !== undefined) topicsRetyped = await applyGoalArea(tx, userId, params.id, area);
+      if (status !== undefined && status !== existing.status) topicsMoved = await applyGoalStatus(tx, userId, params.id, status);
+      return tx.goal.update({ where: { id: params.id }, data });
+    }, { timeout: 20_000 }); // a 30-topic plan is ~60 writes
+    return NextResponse.json({ ...updated, topicsMoved, topicsRetyped });
   } catch (e) {
     console.error('Failed to update goal:', e);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

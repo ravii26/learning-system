@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import RoadmapWizard from '../RoadmapWizard';
 import { Icon } from '@/components/ui';
+import { GOAL_STATUS_WORD } from '@/lib/goalStatusWords';
 
 /**
  * Goals: an outcome you want ("pass a backend interview"), broken into the
@@ -22,18 +22,11 @@ interface GoalRow {
   _count?: { links: number };
 }
 
-const STATUS_WORD: Record<string, string> = {
-  draft: 'Draft',
-  active: 'Working on it',
-  achieved: 'Achieved',
-  abandoned: 'Let go',
-  paused: 'Paused',
-};
+const STATUS_WORD: Record<string, string> = GOAL_STATUS_WORD;
 
 export default function GoalsPage() {
   const [goals, setGoals] = useState<GoalRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [wizard, setWizard] = useState(false);
 
   const fetchGoals = useCallback(async () => {
     try {
@@ -56,12 +49,12 @@ export default function GoalsPage() {
         <div className="flex flex-col gap-2">
           <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Goals</h1>
           <p className="m-0 max-w-[560px] text-[1.05rem] text-fg-secondary">
-            An outcome you want, broken into the topics that get you there — and how many of them are ready.
+            An outcome you want, broken into the topics that get you there — and how many of them are ready. Pausing or finishing a goal moves its topics with it.
           </p>
         </div>
-        <button type="button" onClick={() => setWizard(true)} className="btn btn-primary h-11 py-0">
+        <Link href="/learn/program" className="btn btn-primary h-11 py-0 no-underline hover:no-underline">
           <Icon name="plus" size={16} /> Start a goal
-        </button>
+        </Link>
       </header>
 
       {loading ? (
@@ -72,7 +65,7 @@ export default function GoalsPage() {
           <p className="m-0 max-w-[520px] text-[1rem] text-fg-secondary">
             Describe where you want to be — “pass a senior backend interview by June”. You’ll get a roadmap of topics to learn, each tracked on its own.
           </p>
-          <button type="button" onClick={() => setWizard(true)} className="btn btn-secondary">Start a goal</button>
+          <Link href="/learn/program" className="btn btn-secondary no-underline hover:no-underline">Start a goal</Link>
         </section>
       ) : (
         <ul className="m-0 flex list-none flex-col gap-3 p-0">
@@ -108,15 +101,6 @@ export default function GoalsPage() {
         </ul>
       )}
 
-      {wizard && (
-        <RoadmapWizard
-          onClose={() => setWizard(false)}
-          onComplete={() => {
-            setWizard(false);
-            fetchGoals();
-          }}
-        />
-      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { Button, ButtonLink, Icon, KnowledgeStrip, knowledgeSummary, type IconNa
 import { formatDuration } from '@/lib/timeSummary';
 import type { Knowledge } from '@/lib/moduleState';
 import ResurfacedNote from '@/components/ResurfacedNote';
+import { topicLabelUnderGoal } from '@/lib/statusLabels';
 
 /**
  * Today — the front door. It answers "what do I do now?" by deciding for
@@ -24,6 +25,7 @@ interface Topic extends TopicForNextAction {
   area: string;
   mode: string;
   curriculum?: Array<{ id: string; order: number; title: string; completed: boolean }> | null;
+  goal?: { id: string; title: string } | null;
 }
 
 interface TimeWeek {
@@ -303,7 +305,8 @@ export default function TodayPage() {
           <section aria-labelledby="next-h" className="glass-panel flex flex-col gap-6 p-7">
             <div className="flex flex-col gap-2.5">
               <div className="text-[0.9rem] text-fg-muted">
-                Your next session · {pick.topicTitle}
+                Your next session · {topicLabelUnderGoal(pick.topicTitle, pickTopic?.goal?.title)}
+                {pickTopic?.goal ? <> in <Link href={`/goals/${pickTopic.goal.id}`} className="text-fg-muted underline-offset-2 hover:text-fg hover:underline">{pickTopic.goal.title}</Link></> : null}
                 {next ? `, module ${next.index + 1} of ${next.total}` : ''}
               </div>
               <h2 id="next-h" className="m-0 font-serif text-[2.1rem] font-medium leading-[1.15] tracking-[-0.01em]">
@@ -479,7 +482,10 @@ export default function TodayPage() {
               return (
                 <Link key={t.id} href={`/topics/${t.id}`} className="flex flex-col gap-2 no-underline hover:no-underline">
                   <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-[1rem] font-semibold text-fg">{t.title}</span>
+                    <span className="flex min-w-0 flex-col">
+                      <span className="text-[1rem] font-semibold text-fg">{topicLabelUnderGoal(t.title, t.goal?.title)}</span>
+                      {t.goal && <span className="truncate text-[0.78rem] text-fg-muted">{t.goal.title}</span>}
+                    </span>
                     {states.length > 0 && (
                       <span className="shrink-0 text-[0.8rem] text-fg-muted">
                         {states.filter((s) => s === 'solid').length} of {states.length} solid

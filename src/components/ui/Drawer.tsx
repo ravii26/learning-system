@@ -6,11 +6,13 @@ import React, { useEffect } from 'react';
  * Right-hand slide-over. Closes on Esc, backdrop click, or the Close
  * button; full-width on phones. Renders nothing while closed.
  */
-export function Drawer({ open, onClose, title, label, children }: {
+export function Drawer({ open, onClose, title, label, width = 680, children }: {
   open: boolean;
   onClose: () => void;
   title: React.ReactNode;
   label: string;
+  /** Max width in px; narrow drawers keep the page beside them in view. */
+  width?: number;
   children: React.ReactNode;
 }) {
   useEffect(() => {
@@ -23,12 +25,13 @@ export function Drawer({ open, onClose, title, label, children }: {
   if (!open) return null;
 
   return (
-    <div onClick={onClose} className="fixed inset-0 z-[60] flex justify-end bg-sunk">
+    <div onClick={onClose} className="fixed inset-0 z-[60] flex justify-end bg-black/25">
       <aside
         role="dialog"
         aria-label={label}
         onClick={(e) => e.stopPropagation()}
-        className="flex h-full w-[min(680px,100vw)] flex-col gap-6 overflow-y-auto border-l border-line bg-surface shadow-pop px-6 py-5"
+        style={{ width: `min(${width}px, 100vw)` }}
+        className="flex h-full flex-col gap-6 overflow-y-auto border-l border-line bg-surface shadow-pop px-6 py-5"
       >
         <div className="flex-between">
           <h2 className="text-lg font-bold">{title}</h2>

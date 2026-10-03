@@ -9,6 +9,9 @@ import { Icon, KnowledgeStrip } from '@/components/ui';
 import type { Knowledge } from '@/lib/moduleState';
 import type { ProgramView } from '@/lib/program/load';
 import ProgramPanel from './ProgramPanel';
+import CustomDialog, { type CustomDialogConfig } from '@/components/CustomDialog';
+import { GOAL_STATUSES, GOAL_STATUS_EFFECT, GOAL_STATUS_WORD, type GoalStatusName } from '@/lib/goalStatusWords';
+import { VALID_AREAS } from '@/lib/validations/topic';
 
 /**
  * Goal detail: the roadmap as a dependency-ordered path (GoalLinks,
@@ -45,13 +48,20 @@ interface GoalDetail {
   outcome: string;
   why: string | null;
   status: string;
+  area: string | null;
   targetDate: string | null;
   createdAt: string;
   links: GoalLinkRow[];
   readiness: { met: number; total: number; criteria: ReadinessCriterion[] };
 }
 
-const STATUS_OPTIONS = ['draft', 'active', 'paused', 'achieved', 'abandoned'];
+/** The goal's type; older goals have none saved, so use what most of its topics are. */
+function goalArea(goal: GoalDetail): string {
+  if (goal.area) return goal.area;
+  const count = new Map<string, number>();
+  for (const l of goal.links) if (l.topic) count.set(l.topic.area, (count.get(l.topic.area) ?? 0) + 1);
+  return Array.from(count.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'Other';
+}
 
 export default function GoalDetailPage() {
   const params = useParams<{ id: string }>();
@@ -64,6 +74,8 @@ export default function GoalDetailPage() {
   const [program, setProgram] = useState<ProgramView | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [dialog, setDialog] = useState<CustomDialogConfig>({ isOpen: false, message: '' });
+  const closeDialog = () => setDialog((d) => ({ ...d, isOpen: false }));
   const deleteGoal = async (withTopics: boolean) => {
     setDeleting(true);
     const res = await fetch(`/api/goals/${params.id}${withTopics ? '?withTopics=1' : ''}`, { method: 'DELETE' }).catch(() => null);
@@ -102,16 +114,18 @@ export default function GoalDetailPage() {
     fetchGoal();
   }, [fetchGoal]);
 
-  const handleStatusChange = async (status: string) => {
+  const patchGoal = async (body: { status?: string; area?: string }) => {
     setUpdatingStatus(true);
     try {
       const res = await fetch(`/api/goals/${params.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
-        toast.success('Goal updated');
+        const r = await res.json();
+        const n = body.area ? r.topicsRetyped : r.topicsMoved;
+        toast.success(n > 0 ? `Goal updated · ${n} topic${n === 1 ? '' : 's'} ${body.area ? 'changed to ' + body.area : 'moved'}` : 'Goal updated');
         await fetchGoal();
       } else {
         toast.error('Failed to update goal');
@@ -121,6 +135,31 @@ export default function GoalDetailPage() {
     } finally {
       setUpdatingStatus(false);
     }
+  };
+
+  // Status changes move the goal's topics, so say what will happen first.
+  const handleStatusChange = (status: GoalStatusName) => {
+    setDialog({
+      isOpen: true,
+      type: 'confirm',
+      title: `Mark this goal “${GOAL_STATUS_WORD[status]}”?`,
+      message: GOAL_STATUS_EFFECT[status],
+      confirmLabel: GOAL_STATUS_WORD[status],
+      onConfirm: () => { closeDialog(); patchGoal({ status }); },
+      onCancel: closeDialog,
+    });
+  };
+
+  const handleAreaChange = (area: string) => {
+    setDialog({
+      isOpen: true,
+      type: 'confirm',
+      title: `Change this goal’s type to ${area}?`,
+      message: `Every topic in this goal becomes ${area}. You can still change a single topic afterwards from its settings.`,
+      confirmLabel: `Make it ${area}`,
+      onConfirm: () => { closeDialog(); patchGoal({ area }); },
+      onCancel: closeDialog,
+    });
   };
 
   if (loading) {
@@ -142,7 +181,7 @@ export default function GoalDetailPage() {
 
   const unmet = goal.readiness.criteria.filter((c) => !c.met);
   const orderedLinks = [...goal.links].sort((a, b) => a.order - b.order);
-  const STATUS_WORD: Record<string, string> = { draft: 'Draft', active: 'Working on it', paused: 'Paused', achieved: 'Achieved', abandoned: 'Let go' };
+  const area = goalArea(goal);
   const TOPIC_WORD: Record<string, string> = { active: 'Now', queued: 'Next', inbox: 'Inbox', paused: 'Resting', maintenance: 'Keeping fresh', reference: 'Reference', dropped: 'Let go' };
 
   return (
@@ -162,8 +201,12 @@ export default function GoalDetailPage() {
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="goal-status" className="text-[0.85rem] font-semibold text-fg-secondary">Status</label>
-          <select id="goal-status" value={goal.status} onChange={(e) => handleStatusChange(e.target.value)} disabled={updatingStatus} className="form-input h-10 w-auto py-0">
-            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_WORD[s] ?? s}</option>)}
+          <select id="goal-status" value={goal.status} onChange={(e) => handleStatusChange(e.target.value as GoalStatusName)} disabled={updatingStatus} className="form-input h-10 w-auto min-w-[170px] py-0">
+            {GOAL_STATUSES.map((s) => <option key={s} value={s}>{GOAL_STATUS_WORD[s]}</option>)}
+          </select>
+          <label htmlFor="goal-area" className="mt-1.5 text-[0.85rem] font-semibold text-fg-secondary">Type</label>
+          <select id="goal-area" value={area} onChange={(e) => handleAreaChange(e.target.value)} disabled={updatingStatus} className="form-input h-10 w-auto min-w-[170px] py-0" title="Applies to every topic in this goal">
+            {VALID_AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
           {!confirmDelete ? (
             <button type="button" onClick={() => setConfirmDelete(true)} className="self-start text-[0.85rem] text-fg-muted hover:text-danger">Delete goal…</button>
@@ -236,6 +279,7 @@ export default function GoalDetailPage() {
         </ol>
       </section>
       </>)}
+      <CustomDialog {...dialog} />
     </div>
   );
 }

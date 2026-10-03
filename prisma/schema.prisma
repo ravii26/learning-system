@@ -559,6 +559,13 @@ model Goal {
   outcome    String // the user's own words — verbatim, not rephrased
   why        String?
   status     GoalStatus @default(active)
+  // Tech, Business, Finance, Creative, Personal, Other — the goal's type.
+  // Changing it re-types every topic under the goal; a topic can still be
+  // changed on its own afterwards (see src/lib/goalStatus.ts).
+  area       String?
+  // { topicId: status } captured when the goal leaves `active`, so going
+  // back to `active` restores each topic instead of guessing.
+  topicStatusBefore Json?
   targetDate DateTime?
   startedAt  DateTime?
   achievedAt DateTime?
