@@ -20,6 +20,7 @@ import { formatDuration } from '@/lib/timeSummary';
 import TopicTimeDrawer from './TopicTimeDrawer';
 import PlacementDrawer from './PlacementDrawer';
 import TopicToolsMenu from './TopicToolsMenu';
+import { topicLabelUnderGoal } from '@/lib/statusLabels';
 
 /** Latest quiz/challenge result per module — from /api/topics/[id]/attempts. */
 export interface ModuleEvidence {
@@ -84,6 +85,8 @@ interface Topic {
   curriculum: CourseModule[];
   /** "practice" topics (speaking, instrument, mock tests) are daily sessions, not modules. */
   mode?: string;
+  /** The goal this topic is part of, if any. */
+  goal?: { id: string; title: string } | null;
 }
 
 export default function TopicStudyRoomPage({ params }: { params: { id: string } }) {
@@ -114,6 +117,20 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
   const [confusionsDrawerOpen, setConfusionsDrawerOpen] = useState(false);
   const [resourcesDrawerOpen, setResourcesDrawerOpen] = useState(false);
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
+  const [modulesOpen, setModulesOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+
+  // Alt+N opens/closes this module's notes from anywhere on the page.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        setNotesOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Resources state inside drawer
   const [newResTitle, setNewResTitle] = useState('');
@@ -278,10 +295,10 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
     const updated = curriculum.map((m) =>
       m.id === id
         ? {
-            ...m,
-            completed: !m.completed,
-            completedAt: !m.completed ? new Date().toISOString() : null,
-          }
+          ...m,
+          completed: !m.completed,
+          completedAt: !m.completed ? new Date().toISOString() : null,
+        }
         : m
     );
     await handleSaveCurriculum(updated);
@@ -540,9 +557,9 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
 
   if (loading) {
     return (
-      <div className="mx-auto grid w-full max-w-[1400px] gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <div className="flex flex-col gap-3">{[40, 40, 40, 40, 40].map((h, i) => <div key={i} className="skeleton rounded-md" style={{ height: h }} />)}</div>
-        <div className="flex flex-col gap-5">{[48, 120, 360].map((h) => <div key={h} className="skeleton rounded-md" style={{ height: h }} />)}</div>
+      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-6">
+        {[56, 44].map((h) => <div key={h} className="skeleton rounded-md" style={{ height: h }} />)}
+        <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-5">{[48, 120, 360].map((h) => <div key={h} className="skeleton rounded-md" style={{ height: h }} />)}</div>
       </div>
     );
   }
@@ -561,13 +578,33 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
   const moduleStates: Knowledge[] = curriculum.map((m) => evidence[m.id]?.state ?? 'unseen');
   const chip = 'flex h-10 items-center gap-2 rounded-[10px] border border-line bg-surface px-3 text-[0.875rem] hover:border-line-hover';
 
+  const activeIdx = activeModule ? curriculum.findIndex((m) => m.id === activeModule.id) : -1;
+  const selectModule = (id: string) => {
+    setActiveModuleId(id);
+    setModulesOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const goal = topic.goal ?? null;
+  const iconBtn = 'flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-line bg-surface text-fg-secondary hover:border-line-hover hover:text-fg disabled:opacity-35 disabled:hover:border-line';
+  const activeHasNotes = !!activeModule?.notes && activeModule.notes.replace(/<[^>]*>/g, '').trim().length > 0;
+
   return (
-    <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-8">
-      <header className="flex flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-6">
+      <header className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2.5">
-          <Link href="/plan" className="flex items-center gap-1.5 text-[0.9rem] text-fg-secondary no-underline hover:text-fg hover:no-underline">
-            <Icon name="arrowLeft" size={16} /> Learn
-          </Link>
+          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-[0.9rem] text-fg-secondary">
+            <Link href="/plan" className="flex shrink-0 items-center gap-1.5 text-fg-secondary no-underline hover:text-fg hover:no-underline">
+              <Icon name="arrowLeft" size={16} /> Learn
+            </Link>
+            {goal && (
+              <>
+                <span aria-hidden="true" className="text-fg-muted">/</span>
+                <Link href={`/goals/${goal.id}`} className="max-w-[360px] truncate text-fg-secondary no-underline hover:text-fg hover:no-underline" title="The goal this topic is part of">
+                  {goal.title}
+                </Link>
+              </>
+            )}
+          </nav>
           <span className="flex-1" />
 
           {/* Focus timer (while it runs, reading without touching anything still counts) */}
@@ -601,8 +638,10 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
         {/* The topic is context; the module title below is the page's one heading. */}
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="m-0 text-[1.35rem] font-semibold leading-tight">{title}</h1>
-            <span className="badge">{area}</span>
+            <h1 className="m-0 text-[1.35rem] font-semibold leading-tight">{topicLabelUnderGoal(title, goal?.title)}</h1>
+            <button type="button" onClick={() => setSettingsDrawerOpen(true)} className="badge cursor-pointer hover:border-line-hover" title="Change this topic’s type">
+              {area}
+            </button>
           </div>
           {why && <p className="m-0 max-w-[760px] text-[0.92rem] text-fg-muted">{why}</p>}
         </div>
@@ -634,11 +673,114 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
       {topic?.mode === 'practice' ? (
         <DailySessions topicId={params.id} topicTitle={title} />
       ) : (
-      <div className="grid items-start gap-12 lg:grid-cols-[300px_minmax(0,1fr)]">
-        {/* Left column: modules, then this module's notes / progress / options
-            (ModuleStudyRoom renders those into #module-side-panel). */}
-        <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
-        <nav aria-label="Modules" className="flex flex-col gap-4 rounded-2xl border border-line p-3">
+        <>
+          {/* Module bar: stays on screen while you read, so switching module or
+            jotting a note never needs a scroll back up. The full list lives in
+            a drawer, leaving the page's width to the lesson. */}
+          {activeModule && (
+            <div className="sticky top-0 z-30 -mx-4 border-b border-line bg-canvas/95 px-4 py-2 backdrop-blur md:-mx-12 md:px-12">
+              <div className="mx-auto flex max-w-[1180px] items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModulesOpen(true)}
+                  aria-haspopup="dialog"
+                  className="flex h-10 min-w-0 items-center gap-2.5 rounded-[10px] border border-line bg-surface px-3 text-left text-[0.875rem] hover:border-line-hover"
+                  title="All modules"
+                >
+                  <span className="shrink-0 font-semibold tabular-nums">Module {activeIdx + 1} of {curriculum.length}</span>
+                  <span className="hidden min-w-0 truncate text-fg-secondary sm:inline">{activeModule.title}</span>
+                  <Icon name="chevronRight" size={14} className="shrink-0 rotate-90 text-fg-muted" />
+                </button>
+                <button type="button" className={iconBtn} disabled={activeIdx <= 0} onClick={() => selectModule(curriculum[activeIdx - 1].id)} aria-label="Previous module">
+                  <Icon name="chevronRight" size={16} className="rotate-180" />
+                </button>
+                <button type="button" className={iconBtn} disabled={activeIdx >= curriculum.length - 1} onClick={() => selectModule(curriculum[activeIdx + 1].id)} aria-label="Next module">
+                  <Icon name="chevronRight" size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModulesOpen(true)}
+                  title={knowledgeSummary(moduleStates)}
+                  className="hidden h-10 min-w-0 flex-1 items-center overflow-hidden rounded-[10px] border border-line bg-surface px-2.5 hover:border-line-hover lg:flex"
+                >
+                  <KnowledgeStrip states={moduleStates} current={activeIdx} size="box" />
+                </button>
+                <span className="flex-1 lg:hidden" />
+                <button
+                  type="button"
+                  onClick={() => setNotesOpen(true)}
+                  className="btn btn-secondary h-10 shrink-0 gap-2 px-3 py-0 text-[0.875rem]"
+                  title="Your notes for this module (Alt+N)"
+                >
+                  <Icon name="notebook" size={15} />
+                  <span>Notes</span>
+                  {activeHasNotes && <span className="h-2 w-2 rounded-full bg-ink" aria-label="has notes" />}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex min-w-0 flex-col gap-6">
+            {activeModule ? (
+              <ModuleStudyRoom
+                topicId={params.id}
+                topicTitle={title}
+                topicArea={area}
+                module={activeModule}
+                evidence={evidence[activeModule.id]}
+                onEvidenceChanged={fetchEvidence}
+                notes={notes}
+                onSaveNotes={handleSaveNotes}
+                onModuleNotesSaved={(moduleId, html) =>
+                  setCurriculum((prev) => prev.map((m) => (m.id === moduleId ? { ...m, notes: html } : m)))
+                }
+                onToggleCompleted={handleToggleModuleCompleted}
+                notesOpen={notesOpen}
+                onNotesOpenChange={setNotesOpen}
+                onAddBookmark={async (res) => {
+                  const newRes: Resource = {
+                    id: `r${Math.random().toString(36).substring(2, 9)}`,
+                    title: res.title,
+                    type: res.type,
+                    url: res.url,
+                    purpose: res.purpose,
+                    status: 'NOT_STARTED',
+                    notes: '',
+                  };
+                  const updated = [...resources, newRes];
+                  setResources(updated);
+                  try {
+                    await fetch(`/api/topics/${params.id}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ resources: updated }),
+                    });
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }}
+              />
+            ) : (
+              <section className="flex flex-col items-start gap-4 py-10">
+                <h2 className="m-0 font-serif text-[2rem] font-normal">Where do you want to get to?</h2>
+                <p className="m-0 max-w-[520px] text-[1rem] leading-relaxed text-fg-secondary">
+                  Build a roadmap for {title}: a short list of modules in the order to learn them. Trim what you don’t need, and skip what you already know with the placement check.
+                </p>
+                <span className="flex flex-wrap gap-2">
+                  <button type="button" onClick={handleGenerateCurriculum} disabled={generatingModules} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
+                    {generatingModules ? 'Building your roadmap…' : 'Build a roadmap'}
+                  </button>
+                  <button type="button" onClick={() => setModulesOpen(true)} className="btn btn-secondary h-12 px-5 py-0 text-[1rem]">Add modules yourself</button>
+                </span>
+              </section>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── SLIDE-OVER DRAWER: Modules ───────────────────────────────── */}
+      <Drawer open={modulesOpen} onClose={() => setModulesOpen(false)} title="Modules" label="Modules" width={460}>
+        <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-3 px-1">
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-[0.95rem] font-semibold">
@@ -663,14 +805,14 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                 </span>
               )}
             </div>
-            {curriculum.length > 0 && !editingSyllabus && <KnowledgeStrip states={moduleStates} size="sm" />}
+            {curriculum.length > 0 && !editingSyllabus && <KnowledgeStrip states={moduleStates} current={activeIdx} size="box" />}
             {curriculum.length > 0 && !editingSyllabus && (
               <span className="text-[0.82rem] text-fg-muted">{knowledgeSummary(moduleStates)}</span>
             )}
           </div>
 
           {editingSyllabus ? (
-            <div className="flex max-h-[560px] flex-col gap-2 overflow-y-auto pr-1">
+            <div className="flex flex-col gap-2">
               {draftModules.map((mod, idx) => (
                 <div key={mod.id} className="flex flex-col gap-1.5 rounded-lg border border-line bg-surface p-2">
                   <input
@@ -713,7 +855,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                   Already know some of this? Take the placement check
                 </button>
               )}
-              <ol className="m-0 flex max-h-[62vh] list-none flex-col gap-1 overflow-y-auto p-0">
+              <ol className="m-0 flex list-none flex-col gap-1 p-0">
                 {curriculum.map((mod, modIdx) => {
                   const isSelected = mod.id === activeModule?.id;
                   const ev = evidence[mod.id];
@@ -722,20 +864,19 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                     <li key={mod.id} className={`flex items-center gap-1 rounded-[10px] ${isSelected ? 'bg-sunk' : 'hover:bg-fill-2'}`}>
                       <button
                         type="button"
-                        onClick={() => setActiveModuleId(mod.id)}
+                        onClick={() => selectModule(mod.id)}
                         aria-current={isSelected ? 'step' : undefined}
                         title={ev?.reason ? `${KNOWLEDGE_LABEL[state]}: ${ev.reason}` : KNOWLEDGE_LABEL[state]}
                         className="flex min-h-[52px] min-w-0 flex-1 items-center gap-3 px-2.5 py-2 text-left"
                       >
                         <span
                           aria-hidden="true"
-                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.78rem] font-semibold tabular-nums ${
-                            mod.completed ? 'bg-ink text-on-ink'
-                              : state === 'solid' ? 'bg-k-solid text-on-ink'
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.78rem] font-semibold tabular-nums ${mod.completed ? 'bg-ink text-on-ink'
+                            : state === 'solid' ? 'bg-k-solid text-on-ink'
                               : state === 'learning' ? 'bg-k-learning text-on-ink'
-                              : state === 'fading' ? 'bg-k-fading text-on-ink'
-                              : 'text-fg-muted shadow-[inset_0_0_0_1.5px_var(--k-unseen)]'
-                          }`}
+                                : state === 'fading' ? 'bg-k-fading text-on-ink'
+                                  : 'text-fg-muted shadow-[inset_0_0_0_1.5px_var(--k-unseen)]'
+                            }`}
                         >
                           {mod.completed ? <Icon name="check" size={13} strokeWidth={2.6} /> : modIdx + 1}
                         </span>
@@ -794,62 +935,8 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
               <button type="submit" className="btn btn-secondary h-10 px-3 py-0 text-[0.85rem]">Add</button>
             </form>
           )}
-        </nav>
-        <div id="module-side-panel" className="flex flex-col gap-2" />
         </div>
-
-        <div className="flex min-w-0 flex-col gap-6">
-          {activeModule ? (
-            <ModuleStudyRoom
-              topicId={params.id}
-              topicTitle={title}
-              topicArea={area}
-              module={activeModule}
-              evidence={evidence[activeModule.id]}
-              onEvidenceChanged={fetchEvidence}
-              notes={notes}
-              onSaveNotes={handleSaveNotes}
-              onModuleNotesSaved={(moduleId, html) =>
-                setCurriculum((prev) => prev.map((m) => (m.id === moduleId ? { ...m, notes: html } : m)))
-              }
-              onToggleCompleted={handleToggleModuleCompleted}
-              onAddBookmark={async (res) => {
-                const newRes: Resource = {
-                  id: `r${Math.random().toString(36).substring(2, 9)}`,
-                  title: res.title,
-                  type: res.type,
-                  url: res.url,
-                  purpose: res.purpose,
-                  status: 'NOT_STARTED',
-                  notes: '',
-                };
-                const updated = [...resources, newRes];
-                setResources(updated);
-                try {
-                  await fetch(`/api/topics/${params.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ resources: updated }),
-                  });
-                } catch (e) {
-                  console.error(e);
-                }
-              }}
-            />
-          ) : (
-            <section className="flex flex-col items-start gap-4 py-10">
-              <h2 className="m-0 font-serif text-[2rem] font-normal">Where do you want to get to?</h2>
-              <p className="m-0 max-w-[520px] text-[1rem] leading-relaxed text-fg-secondary">
-                Build a roadmap for {title}: a short list of modules in the order to learn them. Trim what you don’t need, and skip what you already know with the placement check.
-              </p>
-              <button type="button" onClick={handleGenerateCurriculum} disabled={generatingModules} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
-                {generatingModules ? 'Building your roadmap…' : 'Build a roadmap'}
-              </button>
-            </section>
-          )}
-        </div>
-      </div>
-      )}
+      </Drawer>
 
       {/* ── SLIDE-OVER DRAWER: Confusions & Mistakes ─────────────────── */}
       <Drawer

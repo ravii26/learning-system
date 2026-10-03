@@ -37,10 +37,13 @@ export async function GET(request: Request) {
       ];
     }
 
-    const topics = await db.topic.findMany({
+    const rows = await db.topic.findMany({
       where,
       orderBy: { lastTouchedDate: 'desc' },
+      include: { goalLinks: { select: { goal: { select: { id: true, title: true, status: true } } }, orderBy: { order: 'asc' } } },
     });
+    // `goal`: the first goal this topic serves, so lists can say "part of …".
+    const topics = rows.map(({ goalLinks, ...t }) => ({ ...t, goal: goalLinks[0]?.goal ?? null }));
 
     return NextResponse.json(topics);
   } catch (e) {

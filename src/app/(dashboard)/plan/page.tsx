@@ -8,6 +8,8 @@ import { useRouter } from 'next/navigation';
 import PrioritizationPortal from '../PrioritizationPortal';
 import LearnNowModal from '../LearnNowModal';
 import RoadmapWizard from '../RoadmapWizard';
+import { topicLabelUnderGoal } from '@/lib/statusLabels';
+import { GOAL_STATUS_WORD, type GoalStatusName } from '@/lib/goalStatusWords';
 import { Icon, KnowledgeStrip } from '@/components/ui';
 import type { Knowledge } from '@/lib/moduleState';
 
@@ -29,6 +31,17 @@ interface Topic {
   mistakes?: any[];
   mode?: string;
   curriculum?: Array<{ order: number; title: string; completed: boolean }> | null;
+  /** The goal this topic serves, if any (from /api/topics). */
+  goal?: { id: string; title: string; status: string } | null;
+}
+
+interface GoalRow {
+  id: string;
+  title: string;
+  status: GoalStatusName;
+  readinessMet: number;
+  readinessTotal: number;
+  _count?: { links: number };
 }
 
 interface Stats {
@@ -52,7 +65,7 @@ interface Toast {
   exiting?: boolean;
 }
 
-const AREAS = ['All Areas', 'Tech', 'Business', 'Finance', 'Creative', 'Personal', 'Other'];
+const AREAS = ['All types', 'Tech', 'Business', 'Finance', 'Creative', 'Personal', 'Other'];
 const STATUSES = ['inbox', 'queued', 'active', 'paused', 'maintenance', 'reference', 'dropped'];
 
 const EMPTY_STATE_HINTS: Record<string, { icon: string; text: string }> = {
@@ -84,7 +97,9 @@ export default function PlanPage() {
 
   // Search & Filter
   const [search, setSearch] = useState('');
-  const [selectedArea, setSelectedArea] = useState('All Areas');
+  const [selectedArea, setSelectedArea] = useState('All types');
+  const [goals, setGoals] = useState<GoalRow[]>([]);
+  const [selectedGoal, setSelectedGoal] = useState('all');
 
   // View Mode: 'list' (clean, intuitive default) vs 'board' (full Kanban)
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
@@ -132,12 +147,14 @@ export default function PlanPage() {
 
   const fetchData = async () => {
     try {
-      const [topicsRes, statsRes, spacedRes, progressRes] = await Promise.all([
+      const [topicsRes, statsRes, spacedRes, progressRes, goalsRes] = await Promise.all([
         fetch('/api/topics'),
         fetch('/api/stats'),
         fetch('/api/review/spaced'),
         fetch('/api/progress'),
+        fetch('/api/goals').catch(() => null),
       ]);
+      if (goalsRes?.ok) setGoals(await goalsRes.json());
       if (progressRes.ok) {
         const p = await progressRes.json();
         setKnowledge(Object.fromEntries(p.topics.filter((t: any) => t.knowledge).map((t: any) => [t.id, t.knowledge.states])));
@@ -454,8 +471,9 @@ export default function PlanPage() {
     const matchesSearch =
       t.title.toLowerCase().includes(search.toLowerCase()) ||
       (t.notes && t.notes.toLowerCase().includes(search.toLowerCase()));
-    const matchesArea = selectedArea === 'All Areas' || t.area === selectedArea;
-    return matchesSearch && matchesArea;
+    const matchesArea = selectedArea === 'All types' || t.area === selectedArea;
+    const matchesGoal = selectedGoal === 'all' || (selectedGoal === 'none' ? !t.goal : t.goal?.id === selectedGoal);
+    return matchesSearch && matchesArea && matchesGoal;
   });
 
   // Loading skeleton
@@ -538,9 +556,9 @@ export default function PlanPage() {
             className="mt-1.5 h-4 w-4 shrink-0 cursor-pointer accent-[var(--color-accent)]"
           />
         <div className="flex min-w-0 flex-col">
-          <Link href={`/topics/${t.id}`} className="truncate text-[1rem] font-semibold text-fg">{t.title}</Link>
+          <Link href={`/topics/${t.id}`} className="truncate text-[1rem] font-semibold text-fg">{topicLabelUnderGoal(t.title, t.goal?.title)}</Link>
           <span className="truncate text-[0.82rem] text-fg-muted">
-            {t.area} · {KIND[t.mode ?? 'syllabus'] ?? 'Topic'}
+            {t.goal ? `${t.goal.title}` : t.area} · {KIND[t.mode ?? 'syllabus'] ?? 'Topic'}
             {nm ? ` · next: ${nm}` : t.nextAction ? ` · next: ${t.nextAction}` : ''}
           </span>
         </div>
@@ -558,7 +576,6 @@ export default function PlanPage() {
       <header className="flex flex-wrap items-end justify-between gap-5">
         <div className="flex flex-col gap-2">
           <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Learn</h1>
-          <p className="m-0 text-[1.05rem] text-fg-secondary">Two topics in Now. Everything else waits in Next or your Inbox.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => setShowLearnNow(true)} className="btn btn-secondary h-11 py-0">Pick for me</button>
@@ -571,6 +588,31 @@ export default function PlanPage() {
           </Link>
         </div>
       </header>
+
+      {goals.some((g) => g.status !== 'abandoned' && g.status !== 'achieved') && (
+        <section aria-labelledby="goals-h" className="flex flex-col gap-3">
+          <div className="flex items-baseline justify-between">
+            <h2 id="goals-h" className="m-0 text-[1.2rem] font-semibold">Your goals</h2>
+            <Link href="/goals" className="text-[0.88rem] text-fg-secondary">All goals</Link>
+          </div>
+          <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
+            {goals.filter((g) => g.status !== 'abandoned' && g.status !== 'achieved').map((g) => {
+              const count = topics.filter((t) => t.goal?.id === g.id).length;
+              return (
+                <li key={g.id} className={g.status === 'active' ? '' : 'opacity-70'}>
+                  <Link href={`/goals/${g.id}`} className="flex h-full flex-col gap-1.5 rounded-xl border border-line bg-surface px-4 py-3.5 no-underline hover:border-line-hover hover:no-underline">
+                    <span className="line-clamp-2 text-[0.98rem] font-semibold leading-snug text-fg">{g.title}</span>
+                    <span className="text-[0.8rem] text-fg-muted">
+                      {GOAL_STATUS_WORD[g.status] ?? g.status} · {count} topic{count === 1 ? '' : 's'}
+                      {g.readinessTotal > 0 ? ` · ${g.readinessMet} of ${g.readinessTotal} ready` : ''}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <div className="flex flex-wrap items-center gap-2.5">
         <div role="tablist" aria-label="View" className="flex rounded-xl bg-sunk p-1">
@@ -589,7 +631,17 @@ export default function PlanPage() {
         <span className="flex-1" />
         <label htmlFor="learn-search" className="sr-only">Search topics</label>
         <input id="learn-search" className="form-input h-10 w-[220px] py-0 text-[0.9rem]" placeholder="Search topics" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <label htmlFor="learn-area" className="sr-only">Area</label>
+        {goals.length > 0 && (
+          <>
+            <label htmlFor="learn-goal" className="sr-only">Goal</label>
+            <select id="learn-goal" className="form-input h-10 w-auto max-w-[240px] py-0 text-[0.9rem]" value={selectedGoal} onChange={(e) => setSelectedGoal(e.target.value)}>
+              <option value="all">All goals</option>
+              {goals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
+              <option value="none">Not in a goal</option>
+            </select>
+          </>
+        )}
+        <label htmlFor="learn-area" className="sr-only">Type</label>
         <select id="learn-area" className="form-input h-10 w-auto py-0 text-[0.9rem]" value={selectedArea} onChange={(e) => setSelectedArea(e.target.value)}>
           {AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
         </select>
@@ -614,9 +666,9 @@ export default function PlanPage() {
                     <div key={t.id} className="glass-panel flex flex-col gap-4 p-6">
                       <div className="flex flex-col gap-1">
                         <span className="text-[0.82rem] text-fg-muted">
-                          {t.area} · {KIND[t.mode ?? 'syllabus'] ?? 'Topic'} · {idle === 0 ? 'touched today' : `${idle} day${idle === 1 ? '' : 's'} ago`}
+                          {t.goal ? <Link href={`/goals/${t.goal.id}`} className="text-fg-muted underline-offset-2 hover:text-fg hover:underline">{t.goal.title}</Link> : t.area} · {KIND[t.mode ?? 'syllabus'] ?? 'Topic'} · {idle === 0 ? 'touched today' : `${idle} day${idle === 1 ? '' : 's'} ago`}
                         </span>
-                        <Link href={`/topics/${t.id}`} className="font-serif text-[1.6rem] font-medium leading-tight text-fg">{t.title}</Link>
+                        <Link href={`/topics/${t.id}`} className="font-serif text-[1.6rem] font-medium leading-tight text-fg">{topicLabelUnderGoal(t.title, t.goal?.title)}</Link>
                       </div>
                       {states.length > 0 && <KnowledgeStrip states={states} showSummary />}
                       <span className="text-[0.95rem] text-fg-secondary">Next: {nm ?? t.nextAction ?? 'set a next step'}</span>

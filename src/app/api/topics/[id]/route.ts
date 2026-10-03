@@ -54,6 +54,7 @@ export async function GET(
         activityLogs: {
           orderBy: { timestamp: 'desc' },
         },
+        goalLinks: { select: { goal: { select: { id: true, title: true } } }, orderBy: { order: 'asc' }, take: 1 },
       },
     });
 
@@ -61,7 +62,8 @@ export async function GET(
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }
 
-    return NextResponse.json(topic);
+    const { goalLinks, ...rest } = topic;
+    return NextResponse.json({ ...rest, goal: goalLinks[0]?.goal ?? null });
   } catch (e) {
     console.error('Failed to get topic:', e);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

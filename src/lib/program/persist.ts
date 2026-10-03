@@ -38,6 +38,23 @@ export function initialStatus(item: DraftItem, slotsFree: number): 'active' | 'q
   return item.phase === 2 ? 'queued' : 'inbox';
 }
 
+/**
+ * The goal's type (area) from what it is about. Keywords win over the
+ * archetype (a music exam is Creative, not "exam"); unknown stays Other.
+ * The learner can change it on the goal page, which re-types every topic.
+ */
+export function areaForPlan(text: string, archetype: string | undefined, curated: boolean): string {
+  const t = text.toLowerCase();
+  if (/financ|invest|money|stock|trading|accounting|tax|budget|crypto|wealth/.test(t)) return 'Finance';
+  if (/business|marketing|sales|management|startup|entrepreneur|leadership|product manag/.test(t)) return 'Business';
+  if (/design|drawing|paint|music|guitar|piano|\bsing(ing|er)?\b|photograph|film|illustrat|creative writing/.test(t)) return 'Creative';
+  if (curated || archetype === 'technical' || /programm|coding|software|developer|data|machine learning|ai|ml|cloud|devops|security|web|algorithm/.test(t)) return 'Tech';
+  if (archetype === 'professional') return 'Business';
+  if (archetype === 'creative') return 'Creative';
+  if (archetype === 'language' || archetype === 'performance') return 'Personal';
+  return 'Other';
+}
+
 export interface PersistInput {
   userId: string;
   draft: ProgramDraft;
@@ -46,7 +63,7 @@ export interface PersistInput {
 
 export async function persistProgram(tx: Tx, { userId, draft, adjustments }: PersistInput): Promise<{ goalId: string; programId: string }> {
   const intake: Intake = draft.intake;
-  const area = draft.mapQuality === 'curated' ? 'Tech' : 'Other';
+  const area = areaForPlan(`${draft.map.title} ${intake.goal}`, intake.archetype ?? draft.map.archetype, draft.mapQuality === 'curated');
   const skillId = await ensureAreaSkillId(tx, userId, area);
   const comp = (k: string) => draft.map.competencies.find((c) => c.key === k)!;
 
@@ -56,6 +73,7 @@ export async function persistProgram(tx: Tx, { userId, draft, adjustments }: Per
       title: `${draft.map.title}: ${targetLabel(intake.target, intake.archetype ?? draft.map.archetype)}`,
       outcome: intake.doneMeans || intake.goal,
       why: intake.why ?? null,
+      area,
       status: 'active',
       startedAt: new Date(),
       targetDate: intake.deadlineWeeks ? new Date(Date.now() + intake.deadlineWeeks * 7 * 86_400_000) : null,

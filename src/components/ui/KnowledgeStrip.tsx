@@ -29,13 +29,14 @@ export function KnowledgeStrip({ states, current, size = 'md', showSummary = fal
   states: Knowledge[];
   /** Index to outline, e.g. the module you're about to study. */
   current?: number;
-  size?: 'sm' | 'md' | 'lg';
+  /** box: small squares that wrap — reads well for long plans (30+ modules). */
+  size?: 'sm' | 'md' | 'lg' | 'box';
   showSummary?: boolean;
   className?: string;
 }) {
   if (states.length === 0) return null;
   const summary = knowledgeSummary(states);
-  const cell = size === 'lg' ? 'h-6 w-6 rounded-[5px]' : size === 'sm' ? 'h-2 flex-1 rounded-[2px]' : 'h-2.5 w-7 rounded-[3px]';
+  const cell = size === 'lg' ? 'h-6 w-6 rounded-[5px]' : size === 'box' ? 'h-3 w-3 rounded-[3px]' : size === 'sm' ? 'h-2 flex-1 rounded-[2px]' : 'h-2.5 w-7 rounded-[3px]';
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       <div className={cn('flex flex-wrap', size === 'sm' ? 'gap-1' : 'gap-1.5')} role="img" aria-label={summary}>
