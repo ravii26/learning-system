@@ -701,7 +701,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                   type="button"
                   onClick={() => setModulesOpen(true)}
                   title={knowledgeSummary(moduleStates)}
-                  className="hidden h-10 min-w-0 flex-1 items-center overflow-hidden rounded-[10px] border border-line bg-surface px-2.5 hover:border-line-hover lg:flex"
+                  className="hidden min-h-10 min-w-0 flex-1 items-center rounded-[10px] border border-line bg-surface px-3 py-2.5 hover:border-line-hover lg:flex"
                 >
                   <KnowledgeStrip states={moduleStates} current={activeIdx} size="box" />
                 </button>

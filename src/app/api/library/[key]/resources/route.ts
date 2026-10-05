@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireAuth } from '@/lib/apiAuth';
+import { requireOwner } from '@/lib/apiAuth';
 import { getMap } from '@/data/competencies';
 import { isUsable, verifyLink } from '@/lib/resources/verifyLink';
 
@@ -10,7 +10,7 @@ const ROLES = ['primary', 'practice', 'reference', 'supplementary'];
 
 /** Marks a resource as trusted for this field. The link is checked first. */
 export async function POST(request: Request, { params }: { params: { key: string } }) {
-  const auth = requireAuth();
+  const auth = requireOwner();
   if (auth instanceof NextResponse) return auth;
   const { userId } = auth;
 

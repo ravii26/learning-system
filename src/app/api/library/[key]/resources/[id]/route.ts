@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireAuth } from '@/lib/apiAuth';
+import { requireOwner } from '@/lib/apiAuth';
 
 export async function DELETE(_request: Request, { params }: { params: { key: string; id: string } }) {
-  const auth = requireAuth();
+  const auth = requireOwner();
   if (auth instanceof NextResponse) return auth;
   const { userId } = auth;
 
