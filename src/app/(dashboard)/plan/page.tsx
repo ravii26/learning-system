@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 
 // Subcomponents Import
 import PrioritizationPortal from '../PrioritizationPortal';
-import LearnNowModal from '../LearnNowModal';
 import RoadmapWizard from '../RoadmapWizard';
 import { topicLabelUnderGoal } from '@/lib/statusLabels';
 import { GOAL_STATUS_WORD, type GoalStatusName } from '@/lib/goalStatusWords';
@@ -128,10 +127,6 @@ export default function PlanPage() {
   const [showPrioritization, setShowPrioritization] = useState(false);
   const [pendingActiveTopic, setPendingActiveTopic] = useState<Topic | null>(null);
 
-  // Learn Now state
-  const [showLearnNow, setShowLearnNow] = useState(false);
-  const [dueReviewsCount, setDueReviewsCount] = useState(0);
-
   // Drag and Drop State
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
@@ -147,10 +142,9 @@ export default function PlanPage() {
 
   const fetchData = async () => {
     try {
-      const [topicsRes, statsRes, spacedRes, progressRes, goalsRes] = await Promise.all([
+      const [topicsRes, statsRes, progressRes, goalsRes] = await Promise.all([
         fetch('/api/topics'),
         fetch('/api/stats'),
-        fetch('/api/review/spaced'),
         fetch('/api/progress'),
         fetch('/api/goals').catch(() => null),
       ]);
@@ -160,13 +154,11 @@ export default function PlanPage() {
         setKnowledge(Object.fromEntries(p.topics.filter((t: any) => t.knowledge).map((t: any) => [t.id, t.knowledge.states])));
       }
 
-      if (topicsRes.ok && statsRes.ok && spacedRes.ok) {
+      if (topicsRes.ok && statsRes.ok) {
         const topicsData = await topicsRes.json();
         const statsData = await statsRes.json();
-        const spacedData = await spacedRes.json();
         setTopics(topicsData);
         setStats(statsData);
-        setDueReviewsCount(spacedData.dueConcepts?.length || 0);
       }
     } catch (e) {
       console.error('Failed to load dashboard data:', e);
@@ -187,6 +179,12 @@ export default function PlanPage() {
   useEffect(() => {
     fetchData();
     fetchTrash();
+  }, []);
+
+  // The field library is the owner's tool only.
+  const [isOwner, setIsOwner] = useState(false);
+  useEffect(() => {
+    fetch('/api/auth').then((r) => r.json()).then((d) => setIsOwner(d.isOwner === true)).catch(() => {});
   }, []);
 
   const toggleSelected = (id: string) => {
@@ -392,29 +390,6 @@ export default function PlanPage() {
     }
   };
 
-  const handleSessionComplete = async (topicId: string, summary: string, nextAction: string) => {
-    try {
-      const topic = topics.find(t => t.id === topicId);
-      const prevNotes = topic?.notes || '';
-      const newNotes = prevNotes + `\n\n### Learning Reflection (${new Date().toLocaleDateString()})\n` + summary;
-
-      await fetch(`/api/topics/${topicId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          notes: newNotes,
-          nextAction: nextAction,
-          status: 'active',
-        }),
-      });
-
-      await fetchData();
-      router.refresh();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   const submitFallbackActivation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activatingTopic) return;
@@ -578,8 +553,7 @@ export default function PlanPage() {
           <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Learn</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => setShowLearnNow(true)} className="btn btn-secondary h-11 py-0">Pick for me</button>
-          <Link href="/library" className="btn btn-secondary h-11 py-0 no-underline hover:no-underline">Field library</Link>
+          {isOwner && <Link href="/library" className="btn btn-secondary h-11 py-0 no-underline hover:no-underline">Field library</Link>}
           <Link href="/learn/new" className="btn btn-secondary h-11 py-0 no-underline hover:no-underline">
             <Icon name="plus" size={16} /> Add a single topic
           </Link>
@@ -856,17 +830,6 @@ export default function PlanPage() {
           pendingTopic={pendingActiveTopic}
           onConfirmSwap={handleConfirmSwap}
           onClose={() => { setShowPrioritization(false); setPendingActiveTopic(null); }}
-        />
-      )}
-
-      {/* Socratic Learn Now workspace modal */}
-      {showLearnNow && (
-        <LearnNowModal
-          activeTopics={topics.filter(t => t.status === 'active')}
-          dueReviewsCount={dueReviewsCount}
-          mistakesCount={topics.reduce((acc, t) => acc + (t.mistakes?.length || 0), 0)}
-          onSessionComplete={handleSessionComplete}
-          onClose={() => setShowLearnNow(false)}
         />
       )}
 

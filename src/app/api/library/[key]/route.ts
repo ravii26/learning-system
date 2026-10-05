@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireAuth } from '@/lib/apiAuth';
+import { requireOwner } from '@/lib/apiAuth';
 import { getMap } from '@/data/competencies';
 import { CATALOG } from '@/data/resources';
 import { rowToMap, sanitizeEditedMap, saveFieldMap } from '@/lib/program/library';
 
 /** One field: your version if you have one, else the built-in list; plus resources. */
 export async function GET(_request: Request, { params }: { params: { key: string } }) {
-  const auth = requireAuth();
+  const auth = requireOwner();
   if (auth instanceof NextResponse) return auth;
   const { userId } = auth;
 
@@ -39,7 +39,7 @@ export async function GET(_request: Request, { params }: { params: { key: string
  * the built-in one (and everyone else's) is untouched.
  */
 export async function PUT(request: Request, { params }: { params: { key: string } }) {
-  const auth = requireAuth();
+  const auth = requireOwner();
   if (auth instanceof NextResponse) return auth;
   const { userId } = auth;
 
@@ -64,7 +64,7 @@ export async function PUT(request: Request, { params }: { params: { key: string 
 
 /** Removes your version: a customised built-in goes back to the original; your own field is deleted. */
 export async function DELETE(_request: Request, { params }: { params: { key: string } }) {
-  const auth = requireAuth();
+  const auth = requireOwner();
   if (auth instanceof NextResponse) return auth;
   const { userId } = auth;
 

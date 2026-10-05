@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireAuth } from '@/lib/apiAuth';
+import { requireOwner } from '@/lib/apiAuth';
 import { validateMap, type CompetencyMap } from '@/data/competencies';
 import { saveFieldMap } from '@/lib/program/library';
 
@@ -16,7 +16,7 @@ interface Snapshot {
  * (replacing yours for that field).
  */
 export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const auth = requireAuth();
+  const auth = requireOwner();
   if (auth instanceof NextResponse) return auth;
   const { userId } = auth;
 

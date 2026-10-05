@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionUserId } from './auth';
+import { SEED_USER_ID } from './currentUser';
 
 /**
  * Single auth+scoping check for API routes, replacing the checkAuth()
@@ -19,4 +20,12 @@ export function requireAuth(): { userId: string } | NextResponse {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   return { userId };
+}
+
+/** Like requireAuth, but only the owner account gets through (403 otherwise). */
+export function requireOwner(): { userId: string } | NextResponse {
+  const auth = requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  if (auth.userId !== SEED_USER_ID) return NextResponse.json({ error: 'Only the owner can use this.' }, { status: 403 });
+  return auth;
 }

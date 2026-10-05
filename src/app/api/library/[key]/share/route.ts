@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
-import { requireAuth } from '@/lib/apiAuth';
+import { requireOwner } from '@/lib/apiAuth';
 import { getMap } from '@/data/competencies';
 import { areFriends } from '@/lib/friends';
 import { rowToMap } from '@/lib/program/library';
@@ -12,7 +12,7 @@ import { rowToMap } from '@/lib/program/library';
  * exactly this.
  */
 export async function POST(request: Request, { params }: { params: { key: string } }) {
-  const auth = requireAuth();
+  const auth = requireOwner();
   if (auth instanceof NextResponse) return auth;
   const { userId } = auth;
 
