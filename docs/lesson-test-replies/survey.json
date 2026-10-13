@@ -1,0 +1,54 @@
+{
+  "title": "Types of databases",
+  "summary": "Say what each main kind of database is for and which one to look at first for a given need.",
+  "learningObjectives": ["Name the main database categories", "Match a need to a category"],
+  "keyTakeaways": ["Categories differ by what they are for, not by brand", "Most apps start with a relational database"],
+  "explanation": "Databases are easiest to learn by **purpose**. Ask what you need to store and how you will read it, then pick the category.\n\nStart with relational. It covers most apps, and the others are easier to understand once you know it.",
+  "blocks": [
+    {
+      "type": "landscape",
+      "title": "The main kinds of database",
+      "categories": [
+        { "name": "Relational", "summary": "Tables with a fixed schema and joins; strong consistency.", "items": [{ "name": "PostgreSQL", "note": "general purpose" }, { "name": "MySQL", "note": "widely hosted" }] },
+        { "name": "Document", "summary": "Flexible JSON-like records grouped in collections.", "items": [{ "name": "MongoDB", "note": "flexible schemas" }] },
+        { "name": "Key-value", "summary": "Look up a value by key, very fast.", "items": [{ "name": "Redis", "note": "caching and queues" }] },
+        { "name": "Search", "summary": "Full-text search and ranking.", "items": [{ "name": "Elasticsearch", "note": "search at scale" }] }
+      ],
+      "note": "SAMPLE DATA for testing. Tools change; check current docs (written October 2026)."
+    },
+    {
+      "type": "comparison_table",
+      "title": "The categories compared",
+      "options": ["Relational", "Document", "Key-value"],
+      "rows": [
+        { "criterion": "Best for", "cells": [{ "text": "Structured data with relationships" }, { "text": "Varied, nested records" }, { "text": "Fast lookups and caches" }] },
+        { "criterion": "Ease of starting", "cells": [{ "text": "Moderate: needs a schema", "rating": 2 }, { "text": "Easy: schema-free", "rating": 3, "best": true }, { "text": "Very easy", "rating": 3 }] },
+        { "criterion": "How fast the area changes", "cells": [{ "text": "Slowly", "rating": 3, "best": true }, { "text": "Moderately", "rating": 2 }, { "text": "Moderately", "rating": 2 }] }
+      ]
+    },
+    {
+      "type": "matrix_2x2",
+      "title": "Flexibility vs consistency",
+      "xAxis": { "label": "Schema flexibility", "low": "Strict", "high": "Flexible" },
+      "yAxis": { "label": "Consistency guarantees", "low": "Looser", "high": "Stronger" },
+      "points": [
+        { "option": "Relational", "x": 2, "y": 9 },
+        { "option": "Document", "x": 8, "y": 5 },
+        { "option": "Key-value", "x": 6, "y": 3 }
+      ]
+    }
+  ],
+  "codeOrExample": "",
+  "commonMistakes": ["Learning a trendy database before the relational basics", "Treating a cache as the source of truth"],
+  "quiz": [
+    { "question": "You need to cache session data with very fast lookups by key. Which category?", "options": ["Relational", "Document", "Key-value", "Search"], "correctIndex": 2, "explanation": "Key-value stores are built for fast lookup by key." },
+    { "question": "Which category should most beginners learn first?", "options": ["Key-value", "Relational", "Search", "Document"], "correctIndex": 1, "explanation": "Relational covers most apps and makes the others easier to understand." },
+    { "question": "Orders and customers with many relationships and money involved fit best in:", "options": ["Relational", "Key-value", "Search", "A cache"], "correctIndex": 0, "explanation": "Joins and strong consistency suit related, important data." }
+  ],
+  "recommendedResources": [{ "title": "PostgreSQL documentation tutorial", "type": "docs", "searchQuery": "PostgreSQL tutorial documentation", "whyRecommended": "Official, maintained, and a good first relational database." }],
+  "socraticChallenge": { "scenario": "A newcomer is told to learn five databases to be employable.", "question": "Where should they start and why?", "idealAnswer": "Start with relational (PostgreSQL), because it covers most needs and makes the other categories easier to place." },
+  "exercises": [{ "type": "solve", "instruction": "Pick a category", "prompt": "A blog stores posts with comments and authors. Which category and why?", "answer": "Relational: posts, comments and authors are related and benefit from joins and constraints." }],
+  "reviewCards": [{ "concept": "Key-value", "prompt": "What is a key-value store for, and when would you look there?", "answer": "Fast lookups by key, such as caching and sessions." }],
+  "estimatedDifficulty": "beginner",
+  "prerequisites": []
+}

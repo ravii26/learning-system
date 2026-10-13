@@ -21,6 +21,7 @@ import TopicTimeDrawer from './TopicTimeDrawer';
 import PlacementDrawer from './PlacementDrawer';
 import TopicToolsMenu from './TopicToolsMenu';
 import { topicLabelUnderGoal } from '@/lib/statusLabels';
+import { LESSON_KIND_LABEL, guessLessonKind, type LessonKind } from '@/lib/lessonKinds';
 
 /** Latest quiz/challenge result per module — from /api/topics/[id]/attempts. */
 export interface ModuleEvidence {
@@ -41,6 +42,8 @@ export interface CourseModule {
   completed: boolean;
   completedAt: string | null;
   notes: string;
+  /** What the lesson must leave you able to do; absent = a concept lesson. */
+  kind?: LessonKind;
 }
 
 interface Resource {
@@ -284,6 +287,34 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
       });
     } catch (e) {
       console.error('Failed to save curriculum:', e);
+    }
+  };
+
+  // A "Collect ideas" topic has no lessons. This gives it one, so it can be studied as well as noted in.
+  const handleTurnIntoLessons = async () => {
+    if (!topic) return;
+    const lesson: CourseModule = {
+      id: Math.random().toString(36).substring(2, 9),
+      order: 1,
+      title: topic.title,
+      estimatedMinutes: 30,
+      completed: false,
+      completedAt: null,
+      notes: '',
+      ...(guessLessonKind(topic.title) !== 'concept' ? { kind: guessLessonKind(topic.title) } : {}),
+    };
+    try {
+      const res = await fetch(`/api/topics/${params.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'syllabus', curriculum: [lesson], nextAction: `Study: ${lesson.title}` }),
+      });
+      if (!res.ok) throw new Error('save failed');
+      setTopic({ ...topic, mode: 'syllabus' });
+      setCurriculum([lesson]);
+      toast.success('Added a lesson. Your notes and captured ideas stay here too.');
+    } catch {
+      toast.error('Couldn’t add a lesson. Try again.');
     }
   };
 
@@ -668,6 +699,19 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
             <button type="button" className="btn btn-secondary h-10 py-0" onClick={tracker.dismissAway}>No</button>
           </span>
         </div>
+      )}
+
+      {topic?.mode === 'accretion' && (
+        <section aria-labelledby="ideas-h" className="flex flex-col items-start gap-3 rounded-xl border border-line p-6">
+          <h2 id="ideas-h" className="m-0 text-[1.15rem] font-semibold">This topic collects ideas</h2>
+          <p className="m-0 max-w-[60ch] text-[0.95rem] text-fg-secondary">
+            Right now it only holds notes. Add a lesson to learn it properly: a written lesson with exercises, a quiz and review cards
+            {guessLessonKind(topic.title) !== 'concept' ? `, shaped as “${LESSON_KIND_LABEL[guessLessonKind(topic.title)].toLowerCase()}”` : ''}.
+          </p>
+          <button type="button" onClick={handleTurnIntoLessons} className="btn btn-primary h-11 px-5 py-0">
+            Add a lesson
+          </button>
+        </section>
       )}
 
       {topic?.mode === 'practice' ? (

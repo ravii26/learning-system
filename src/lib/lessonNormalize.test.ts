@@ -29,10 +29,10 @@ describe('normalizeLesson', () => {
     expect(out.commonMistakes).toEqual(['x']);
   });
 
-  it('keeps only complete review cards, capped at 5', () => {
-    const cards = Array.from({ length: 7 }, (_, i) => ({ concept: `c${i}`, prompt: `p${i}`, answer: `a${i}` }));
+  it('keeps only complete review cards, capped at 12 (a memorise lesson asks for up to 12)', () => {
+    const cards = Array.from({ length: 14 }, (_, i) => ({ concept: `c${i}`, prompt: `p${i}`, answer: `a${i}` }));
     const out = normalizeLesson({ ...base, reviewCards: [{ prompt: 'no answer' }, ...cards] })!;
-    expect(out.reviewCards).toHaveLength(5);
+    expect(out.reviewCards).toHaveLength(12);
     expect((out.reviewCards as any[])[0]).toEqual({ concept: 'c0', prompt: 'p0', answer: 'a0' });
   });
 
@@ -40,6 +40,16 @@ describe('normalizeLesson', () => {
     expect(normalizeLesson({ ...base, socraticChallenge: { scenario: 's' } })!.socraticChallenge).toBeUndefined();
     expect(normalizeLesson({ ...base, socraticChallenge: { scenario: 's', question: 'q', idealAnswer: 'a' } })!.socraticChallenge)
       .toEqual({ scenario: 's', question: 'q', idealAnswer: 'a' });
+  });
+
+  it('leaves lessons without blocks exactly as they were, and keeps only drawable blocks', () => {
+    expect(normalizeLesson(base)!.blocks).toBeUndefined();
+    const out = normalizeLesson({
+      ...base,
+      blocks: [{ type: 'pros_cons', items: [{ option: 'A', pros: ['p'] }] }, { type: 'pros_cons', items: [] }, 'junk'],
+    })!;
+    expect(out.blocks).toHaveLength(1);
+    expect(normalizeLesson({ ...base, blocks: 'not a list' })!.blocks).toBeUndefined();
   });
 
   it('normalizes resource types and fills a missing searchQuery from the title', () => {

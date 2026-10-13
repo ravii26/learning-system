@@ -1,0 +1,45 @@
+{
+  "title": "Backend developer roadmap",
+  "summary": "Follow an ordered path from first programs to a deployed API, with a milestone to check at each phase.",
+  "learningObjectives": ["Know the order of the phases and why", "Define a checkable milestone for each phase"],
+  "keyTakeaways": ["Each phase unlocks the next", "Milestones are things you build, not things you read"],
+  "explanation": "This path assumes about **6 hours a week**. Double the hours and the durations roughly halve; halve them and they double.\n\nWhat is left out on purpose: container orchestration, advanced distributed systems and deep performance tuning. They matter later, not first.",
+  "blocks": [
+    {
+      "type": "timeline",
+      "title": "A realistic path",
+      "phases": [
+        { "label": "Programming basics", "duration": "Weeks 1-6", "goal": "Write small programs in one language without copying", "milestones": ["Build a command-line to-do app", "Read and write files"] },
+        { "label": "Web and HTTP", "duration": "Weeks 7-12", "goal": "Build a simple API and call it", "milestones": ["Create a REST API with 4 endpoints", "Test it with a client"] },
+        { "label": "Databases", "duration": "Weeks 13-20", "goal": "Store and query data with SQL", "milestones": ["Design a 3-table schema", "Write a join and an index"] },
+        { "label": "Deploy and operate", "duration": "Weeks 21-28", "goal": "Ship the API to a server and keep it running", "milestones": ["Deploy with a public URL", "Add logging and a health check"] }
+      ],
+      "note": "Durations assume about 6 hours a week; scale them to your own pace. SAMPLE DATA for testing."
+    },
+    {
+      "type": "decision_flow",
+      "title": "Which starting language fits you?",
+      "start": "q1",
+      "nodes": [
+        { "id": "q1", "question": "Do you already know JavaScript?", "yes": "node", "no": "q2" },
+        { "id": "q2", "question": "Do you prefer a gentle, readable language?", "yes": "py", "no": "java" },
+        { "id": "node", "outcome": "Node.js: reuse what you know" },
+        { "id": "py", "outcome": "Python: readable, large community" },
+        { "id": "java", "outcome": "Java: strict, common in large companies" }
+      ]
+    }
+  ],
+  "codeOrExample": "",
+  "commonMistakes": ["Skipping fundamentals to chase a framework", "Following tutorials without building anything of your own"],
+  "quiz": [
+    { "question": "Why do databases come after the web and HTTP phase here?", "options": ["They are easier", "An API needs somewhere to keep data, so you build the API first", "They are optional", "Because of job listings"], "correctIndex": 1, "explanation": "The order follows dependency: you need an API before you know what to store." },
+    { "question": "What does a good milestone look like?", "options": ["Understand REST", "Watch a course", "Deploy an API with a public URL", "Read two books"], "correctIndex": 2, "explanation": "A milestone is something you can build and check." },
+    { "question": "You are two weeks behind. What is the best response?", "options": ["Skip a phase", "Keep the order and extend the dates", "Quit", "Start a new path"], "correctIndex": 1, "explanation": "The order is the point; adjust the pace, not the sequence." }
+  ],
+  "recommendedResources": [{ "title": "MDN: Server-side website programming", "type": "docs", "searchQuery": "MDN server-side website programming first steps", "whyRecommended": "A maintained introduction to how the backend works." }],
+  "socraticChallenge": { "scenario": "You have 3 hours a week instead of 6.", "question": "How would you adjust the path?", "idealAnswer": "Keep the same order, double the durations, and keep one build-something milestone per phase." },
+  "exercises": [{ "type": "write", "instruction": "Plan your first four weeks", "prompt": "Write what you will build in weeks 1 to 4 at your own pace.", "answer": "A small command-line project with a named finish line, for example a to-do app that saves to a file by the end of week 4." }],
+  "reviewCards": [{ "concept": "Phase order", "prompt": "Why does the database phase come after building a simple API?", "answer": "Because the API shows what data you need to store." }],
+  "estimatedDifficulty": "beginner",
+  "prerequisites": []
+}

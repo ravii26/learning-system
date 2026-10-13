@@ -3,6 +3,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { CourseModule, ModuleEvidence } from './page';
 import { renderMarkdown } from '@/lib/markdown';
+import { normalizeBlocks } from '@/lib/lessonBlocks';
+import { LESSON_KIND_LABEL, lessonKindOf } from '@/lib/lessonKinds';
+import { LessonBlocks } from '@/components/lesson/LessonBlocks';
 import { Accordion, Icon, KnowledgeMark } from '@/components/ui';
 import ProblemLog from './ProblemLog';
 import LessonPractice from './LessonPractice';
@@ -63,6 +66,10 @@ export default function ModuleStudyRoom({
   const { mode: aiMode, manual: manualMode } = useAiMode();
   const [manualHere, setManualHere] = useState(false);
   const [manualPrompt, setManualPrompt] = useState<string | null>(null);
+  // Rewriting one section of a decision lesson: running now (AI), or open in the copy-paste panel.
+  const [redoing, setRedoing] = useState<number | null>(null);
+  const [redoManual, setRedoManual] = useState<number | null>(null);
+  const [redoError, setRedoError] = useState<string | null>(null);
 
   // Socratic Challenge Interactive State
   const [challengeAnswer, setChallengeAnswer] = useState('');
@@ -131,6 +138,23 @@ export default function ModuleStudyRoom({
     // Only on module change or once the mode is known; switching mode later is explicit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadLesson, aiMode === null]);
+
+  const blockUrl = `/api/topics/${topicId}/modules/${module.id}/block`;
+  const redoSection = async (index: number) => {
+    setRedoError(null);
+    if (manualMode || manualHere) { setRedoManual(index); return; }
+    setRedoing(index);
+    try {
+      const res = await fetch(blockUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ index }) });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.blocks)) setLesson((l: any) => ({ ...l, blocks: data.blocks }));
+      else setRedoError(data.error || 'Couldn’t rewrite that section.');
+    } catch {
+      setRedoError('Couldn’t reach the server.');
+    } finally {
+      setRedoing(null);
+    }
+  };
 
   // Evaluate Socratic Challenge Answer
   const handleEvaluateChallenge = async () => {
@@ -410,6 +434,14 @@ export default function ModuleStudyRoom({
           </div>
         ) : (
           <>
+            {lesson && !lesson.fallback && lessonKindOf(lesson.kind) !== lessonKindOf(module.kind) && (
+              <p className="m-0 rounded-xl border border-solid border-line px-4 py-3 text-[0.95rem]">
+                This lesson was written as “{LESSON_KIND_LABEL[lessonKindOf(lesson.kind)].toLowerCase()}”, but it is now set to “{LESSON_KIND_LABEL[lessonKindOf(module.kind)].toLowerCase()}”.{' '}
+                <button type="button" className="font-semibold underline underline-offset-2" onClick={() => loadLesson(true, useManual)}>
+                  Regenerate it to match
+                </button>
+              </p>
+            )}
             {lesson?.fallback && !useManual && (
               <p className="m-0 rounded-xl border border-line px-4 py-3 text-[0.95rem]">
                 Our AI couldn’t write this lesson right now.{' '}
@@ -436,6 +468,29 @@ export default function ModuleStudyRoom({
 
                 {lesson.explanation && (
                   <div className="lesson-prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(lesson.explanation) }} />
+                )}
+
+                <LessonBlocks blocks={normalizeBlocks(lesson.blocks)} onRedo={redoSection} redoing={redoing} />
+                {redoError && <p role="alert" className="m-0 text-[0.95rem] text-danger">{redoError}</p>}
+                {redoManual !== null && (
+                  <ManualAiPanel
+                    key={`redo-${redoManual}`}
+                    title="Redo this section in your own chat"
+                    what="a new version of this one section"
+                    getPrompt={async () => {
+                      const r = await postManual<{ prompt: string }>(blockUrl, { index: redoManual, step: 'prompt' });
+                      if (!r.ok) throw new Error(r.problems[0]);
+                      return r.data.prompt;
+                    }}
+                    importReply={async (reply) => {
+                      const r = await postManual<{ blocks: unknown[] }>(blockUrl, { index: redoManual, step: 'import', reply });
+                      if (!r.ok) return r;
+                      setLesson((l: any) => ({ ...l, blocks: r.data.blocks }));
+                      setRedoManual(null);
+                      return { ok: true };
+                    }}
+                    onCancel={() => setRedoManual(null)}
+                  />
                 )}
 
                 {lesson.codeOrExample && (

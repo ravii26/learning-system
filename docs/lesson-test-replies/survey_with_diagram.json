@@ -1,0 +1,56 @@
+{
+  "title": "How a SaaS subscription works",
+  "summary": "Say what the states of a subscription are and what moves an account between them.",
+  "learningObjectives": ["Name the states of a subscription", "Explain what triggers each change"],
+  "keyTakeaways": ["A failed payment should not lock an account instantly", "Cancelling usually keeps access until the period ends"],
+  "explanation": "A subscription is easiest to understand as a **lifecycle**: a small set of states and the events that move an account between them.\n\nThe diagram below is a SAMPLE lifecycle for testing the layout. Real products differ.",
+  "blocks": [
+    {
+      "type": "landscape",
+      "title": "The parts of a subscription system",
+      "categories": [
+        { "name": "Billing", "summary": "Charges the customer and handles renewals.", "items": [{ "name": "Stripe", "note": "payments and subscriptions" }] },
+        { "name": "Access control", "summary": "Decides what the customer can use right now.", "items": [{ "name": "Feature flags", "note": "turn features on or off per plan" }] }
+      ]
+    },
+    {
+      "type": "state_diagram",
+      "title": "How a subscription changes state",
+      "states": [
+        { "id": "free", "label": "Free trial", "detail": "60 days from creation", "col": 0, "row": 0, "start": true },
+        { "id": "trial", "label": "Trial, card on file", "detail": "Charged when the trial ends", "col": 1, "row": 0 },
+        { "id": "active", "label": "Active", "detail": "Renews automatically", "col": 2, "row": 0, "style": "main" },
+        { "id": "locked", "label": "Locked", "detail": "Owner is sent to Billing", "col": 0, "row": 1, "style": "restricted" },
+        { "id": "grace", "label": "Grace", "detail": "Renewal failed, 3 days to fix the card", "col": 1, "row": 1, "style": "temporary" },
+        { "id": "cancelled", "label": "Cancelled", "detail": "Usable until the period ends", "col": 2, "row": 1 }
+      ],
+      "transitions": [
+        { "from": "free", "to": "trial", "label": "subscribes" },
+        { "from": "trial", "to": "free", "label": "cancelled: days kept" },
+        { "from": "trial", "to": "active", "label": "trial ends, first charge" },
+        { "from": "free", "to": "locked", "label": "60 days pass, no card" },
+        { "from": "grace", "to": "locked", "label": "3 days pass" },
+        { "from": "active", "to": "grace", "label": "renewal fails" },
+        { "from": "grace", "to": "active", "label": "card fixed" },
+        { "from": "active", "to": "cancelled", "label": "cancel" },
+        { "from": "cancelled", "to": "active", "label": "undo" },
+        { "from": "cancelled", "to": "locked", "label": "period ends" },
+        { "from": "locked", "to": "active", "label": "subscribes again, first charge now" }
+      ],
+      "note": "SAMPLE lifecycle for testing the diagram. Real products differ; check the docs (written October 2026)."
+    }
+  ],
+  "codeOrExample": "",
+  "commonMistakes": ["Locking an account the moment a payment fails", "Forgetting that a cancelled account should keep access until the period ends"],
+  "quiz": [
+    { "question": "A renewal payment fails. In the sample lifecycle, what happens first?", "options": ["Locked at once", "Grace, with time to fix the card", "Cancelled", "Back to free trial"], "correctIndex": 1, "explanation": "A failed renewal moves the account to Grace, which gives the owner time to fix the card." },
+    { "question": "What returns a cancelled account to Active?", "options": ["The period ending", "An undo", "A failed payment", "A new trial"], "correctIndex": 1, "explanation": "While the period has not ended, undoing the cancellation restores Active." },
+    { "question": "Which state is reached only when time runs out without a payment method?", "options": ["Grace", "Active", "Locked", "Trial"], "correctIndex": 2, "explanation": "Locked follows a free trial with no card, an unfixed grace period, or a cancelled period ending." }
+  ],
+  "recommendedResources": [{ "title": "Stripe Billing documentation: subscription lifecycle", "type": "docs", "searchQuery": "Stripe billing subscription lifecycle documentation", "whyRecommended": "The official description of subscription states." }],
+  "socraticChallenge": { "scenario": "A customer's card expires the day before renewal.", "question": "Which states does the account pass through, and what should the owner see at each?", "idealAnswer": "Active, then Grace after the failed renewal (with a clear prompt to update the card), then back to Active if fixed, or Locked after the grace period." },
+  "exercises": [{ "type": "write", "instruction": "Trace a path", "prompt": "List the states an account passes through if it cancels and then changes its mind.", "answer": "Active, Cancelled, then back to Active when the cancellation is undone before the period ends." }],
+  "reviewCards": [{ "concept": "Grace period", "prompt": "Why have a grace state instead of locking at the first failed payment?", "answer": "Most failed payments are fixable, such as an expired card, so the owner gets time to fix it without losing access." }],
+  "estimatedDifficulty": "beginner",
+  "prerequisites": []
+}

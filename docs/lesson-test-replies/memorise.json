@@ -1,0 +1,53 @@
+{
+  "title": "The first ten elements of the periodic table",
+  "summary": "Recall the names and symbols of hydrogen to neon, in order, from memory.",
+  "learningObjectives": ["Name the first ten elements in order", "Give each element's symbol"],
+  "keyTakeaways": ["Chunk the ten into two groups of five", "Test yourself instead of rereading", "Review after one day, three days and a week"],
+  "explanation": "Ten items is easy to hold if you **chunk** them: hydrogen to boron, then carbon to neon. Learn one chunk, test yourself, then the next.\n\nThe memory aids below are only aids. Cover the right-hand side and say each answer before checking. Review again after a day, then three days, then a week.",
+  "blocks": [
+    {
+      "type": "memory_list",
+      "title": "Elements 1 to 10",
+      "items": [
+        { "term": "1 Hydrogen (H)", "meaning": "The lightest element.", "hook": "H for the first letter of Hydrogen." },
+        { "term": "2 Helium (He)", "meaning": "A light, unreactive gas used in balloons.", "hook": "He sounds like the start of 'helium'." },
+        { "term": "3 Lithium (Li)", "meaning": "A light metal used in batteries.", "hook": "Li for Lithium, which charges your phone." },
+        { "term": "4 Beryllium (Be)", "meaning": "A light, stiff metal.", "hook": "Be as in the first two letters." },
+        { "term": "5 Boron (B)", "meaning": "A non-metal found in borax.", "hook": "B for Boron." },
+        { "term": "6 Carbon (C)", "meaning": "The element that life is built on.", "hook": "C for Carbon, in charcoal and diamonds." },
+        { "term": "7 Nitrogen (N)", "meaning": "Makes up most of the air.", "hook": "N for Nitrogen." },
+        { "term": "8 Oxygen (O)", "meaning": "The gas we breathe.", "hook": "O for Oxygen, shaped like a breath." },
+        { "term": "9 Fluorine (F)", "meaning": "A very reactive gas.", "hook": "F for Fluorine, the F in fluoride toothpaste." },
+        { "term": "10 Neon (Ne)", "meaning": "A gas used in bright signs.", "hook": "Ne for Neon lights." }
+      ],
+      "note": "Hooks are memory aids, not facts. Cover the right side and recall each one."
+    }
+  ],
+  "codeOrExample": "",
+  "commonMistakes": ["Rereading the list instead of testing yourself", "Learning all ten in one go with no breaks", "Mixing up the symbols He and Be"],
+  "quiz": [
+    { "question": "What is the symbol for element 7?", "options": ["O", "N", "F", "C"], "correctIndex": 1, "explanation": "Element 7 is nitrogen, symbol N." },
+    { "question": "Which element is number 4?", "options": ["Boron", "Lithium", "Beryllium", "Carbon"], "correctIndex": 2, "explanation": "Beryllium is number 4, symbol Be." },
+    { "question": "Which element is the gas we breathe?", "options": ["Nitrogen", "Oxygen", "Neon", "Helium"], "correctIndex": 1, "explanation": "Oxygen, number 8, is the gas we breathe." }
+  ],
+  "recommendedResources": [{ "title": "Royal Society of Chemistry periodic table", "type": "docs", "searchQuery": "Royal Society of Chemistry periodic table", "whyRecommended": "An authoritative, free reference to check each element." }],
+  "socraticChallenge": { "scenario": "You keep mixing up elements 4 and 5.", "question": "How would you separate them in memory?", "idealAnswer": "Give each a distinct hook, test them back to back, and review the pair more often until they stay apart." },
+  "exercises": [
+    { "type": "say", "instruction": "Recall", "prompt": "Say all ten elements in order from memory, then check.", "answer": "Hydrogen, helium, lithium, beryllium, boron, carbon, nitrogen, oxygen, fluorine, neon." },
+    { "type": "write", "instruction": "Symbols", "prompt": "Write the symbol for each of the ten elements from memory.", "answer": "H, He, Li, Be, B, C, N, O, F, Ne." }
+  ],
+  "reviewCards": [
+    { "concept": "Element 1", "prompt": "Which element is number 1, and what is its symbol?", "answer": "Hydrogen, H." },
+    { "concept": "Element 2", "prompt": "Which element is number 2, and what is its symbol?", "answer": "Helium, He." },
+    { "concept": "Element 3", "prompt": "Which element is number 3, and what is its symbol?", "answer": "Lithium, Li." },
+    { "concept": "Element 4", "prompt": "Which element is number 4, and what is its symbol?", "answer": "Beryllium, Be." },
+    { "concept": "Element 5", "prompt": "Which element is number 5, and what is its symbol?", "answer": "Boron, B." },
+    { "concept": "Element 6", "prompt": "Which element is number 6, and what is its symbol?", "answer": "Carbon, C." },
+    { "concept": "Element 7", "prompt": "Which element is number 7, and what is its symbol?", "answer": "Nitrogen, N." },
+    { "concept": "Element 8", "prompt": "Which element is number 8, and what is its symbol?", "answer": "Oxygen, O." },
+    { "concept": "Element 9", "prompt": "Which element is number 9, and what is its symbol?", "answer": "Fluorine, F." },
+    { "concept": "Element 10", "prompt": "Which element is number 10, and what is its symbol?", "answer": "Neon, Ne." }
+  ],
+  "estimatedDifficulty": "beginner",
+  "prerequisites": []
+}

@@ -19,6 +19,18 @@ describe('extractJson: replies the way chat apps really send them', () => {
   it('escaped quotes inside strings', () => expect(val('{"s":"he said \\"hi\\" {not json}"}')).toEqual({ s: 'he said "hi" {not json}' }));
   it('first fence is prose, second is the JSON', () =>
     expect(val('```\nnot json\n```\nand\n```json\n{"ok":1}\n```')).toEqual({ ok: 1 }));
+  it('code fences INSIDE the JSON strings do not cut the reply short', () => {
+    const lesson = { title: 'T', summary: 'S', explanation: 'See:\n```js\nconst a = {};\n```\nDone.', codeOrExample: '```python\nstore = {}\nprint(store)\n```', quiz: [{ question: 'q', options: ['a', 'b'], correctIndex: 0 }], reviewCards: [{ prompt: 'p', answer: 'a' }] };
+    const reply = `Sure! Here it is:\n\`\`\`json\n${JSON.stringify(lesson, null, 2)}\n\`\`\`\nHope that helps.`;
+    expect(val(reply)).toEqual(lesson);
+    // the same, with no outer fence at all
+    expect(val(JSON.stringify(lesson))).toEqual(lesson);
+  });
+  it('a stray {braces} in prose before the fenced JSON does not win over the real reply', () => {
+    const lesson = { a: 1, nested: { b: 2 } };
+    const reply = `I used {curly} words here.\n\`\`\`json\n${JSON.stringify(lesson)}\n\`\`\``;
+    expect(val(reply)).toEqual(lesson);
+  });
   it('Windows line endings and a BOM', () => expect(val('﻿```json\r\n{"a":1}\r\n```')).toEqual({ a: 1 }));
 
   it('cut-off JSON says so', () => {

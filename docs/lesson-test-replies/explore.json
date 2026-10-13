@@ -1,0 +1,38 @@
+{
+  "title": "How bees see the world",
+  "summary": "Get a feel for how a bee's vision differs from ours, and why that matters for flowers.",
+  "learningObjectives": ["Name a few ways bee vision differs from human vision"],
+  "keyTakeaways": ["Bees see ultraviolet light", "Bees do not see red the way we do", "Flowers have patterns we cannot see"],
+  "explanation": "Imagine a garden through different eyes. A bee's eyes are made of thousands of tiny lenses, and they respond to a **different slice of light** than ours.\n\nThe most surprising difference is ultraviolet. Many flowers carry markings that are invisible to us but stand out to bees, a bit like landing lights on a runway. This is a light, curious tour, not a test.",
+  "blocks": [
+    {
+      "type": "key_ideas",
+      "title": "Ideas worth knowing",
+      "ideas": [
+        { "idea": "Bees can see ultraviolet light", "why": "Flowers that look plain to us can show bold patterns to a bee." },
+        { "idea": "Bees are not good at seeing red", "why": "Red flowers look dark or dull to them, which is why many bee-visited flowers are yellow, blue or purple." },
+        { "idea": "Bees have compound eyes", "why": "Thousands of tiny lenses build up a picture that is detailed in motion but not sharp like ours." },
+        { "idea": "Bees use the pattern of polarised light in the sky", "why": "It helps them find direction even when the sun is hidden." }
+      ],
+      "wonder": ["What would a garden look like if you could only see ultraviolet?", "Why might flowers have evolved patterns that only their visitors can see?"],
+      "note": "A starting point; follow your curiosity from here."
+    }
+  ],
+  "codeOrExample": "",
+  "commonMistakes": ["Thinking bees see the world just like us but in other colours", "Assuming all insects see the same way"],
+  "quiz": [
+    { "question": "Which kind of light can bees see that people cannot?", "options": ["Infrared", "Ultraviolet", "X-rays", "Radio waves"], "correctIndex": 1, "explanation": "Bees see ultraviolet, which people cannot." },
+    { "question": "Why might a red flower look dull to a bee?", "options": ["Bees are colour-blind to everything", "Bees do not see red the way we do", "Red flowers have no nectar", "Bees avoid bright colours"], "correctIndex": 1, "explanation": "Bees lack the red sensitivity people have, so red looks dark to them." }
+  ],
+  "recommendedResources": [{ "title": "Royal Entomological Society: bees", "type": "docs", "searchQuery": "bee vision ultraviolet flowers research", "whyRecommended": "A reliable place to read further about insect vision." }],
+  "socraticChallenge": { "scenario": "You photograph a plain-looking yellow flower and an ultraviolet camera shows a dark centre.", "question": "What might that pattern be for?", "idealAnswer": "It likely guides bees towards the nectar, like a landing target that only they can see." },
+  "exercises": [
+    { "type": "write", "instruction": "Explain it", "prompt": "In two sentences, explain to a friend why some flowers have patterns we cannot see.", "answer": "Bees see ultraviolet light, so the patterns guide them to nectar, even though we cannot see them." }
+  ],
+  "reviewCards": [
+    { "concept": "Bee vision", "prompt": "Which part of the spectrum can bees see that people cannot?", "answer": "Ultraviolet." },
+    { "concept": "Flower patterns", "prompt": "Why do some flowers have ultraviolet markings?", "answer": "They guide bees to the nectar." }
+  ],
+  "estimatedDifficulty": "beginner",
+  "prerequisites": []
+}

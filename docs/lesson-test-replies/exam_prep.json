@@ -1,0 +1,48 @@
+{
+  "title": "Percentage questions in an aptitude test",
+  "summary": "Recognise the common ways percentage questions are asked and answer them quickly without falling into the usual traps.",
+  "learningObjectives": ["Spot the pattern in a percentage question", "Avoid the base-change trap"],
+  "keyTakeaways": ["Always ask 'percent of what?'", "A rise of x% then a fall of x% does not return to the start", "Convert percentages to fractions to calculate faster"],
+  "explanation": "Most percentage questions reduce to a few patterns. Spend your first seconds working out **which pattern it is**, then use a shortcut for it.\n\nThis is a SAMPLE lesson for testing the layout, so the sections are generic. For a real exam, check its official syllabus and notices.",
+  "blocks": [
+    {
+      "type": "landscape",
+      "title": "What this topic covers",
+      "categories": [
+        { "name": "Basic percentages", "summary": "Finding a percentage of a number and the reverse.", "items": [{ "name": "Percent of a number", "note": "20% of 150" }, { "name": "What percent is A of B", "note": "30 out of 120" }] },
+        { "name": "Changes over time", "summary": "Increases, decreases and repeated changes.", "items": [{ "name": "Percentage increase and decrease", "note": "price rises then falls" }, { "name": "Successive changes", "note": "two discounts in a row" }] },
+        { "name": "Applications", "summary": "Real-life uses of percentages.", "items": [{ "name": "Profit and loss", "note": "on cost price" }, { "name": "Discounts", "note": "on marked price" }] }
+      ],
+      "note": "A typical structure for practice. Verify the real syllabus before relying on it."
+    },
+    {
+      "type": "question_patterns",
+      "title": "How percentage questions are usually asked",
+      "patterns": [
+        { "name": "Successive change", "asked": "A price rises by 20% and then falls by 20%. What is the net change?", "trap": "Assuming the two cancel out to zero.", "tip": "Multiply the factors: 1.2 × 0.8 = 0.96, a 4% fall." },
+        { "name": "Percent of the wrong base", "asked": "A is 25% more than B. By what percent is B less than A?", "trap": "Answering 25% instead of switching the base.", "tip": "Write B = 100, A = 125, then compare 25 with 125." },
+        { "name": "Reverse percentage", "asked": "After a 20% discount the price is 400. What was the original price?", "trap": "Adding 20% of 400 back.", "tip": "The sale price is 80% of the original: 400 ÷ 0.8 = 500." }
+      ],
+      "note": "General patterns, not real past questions. Check the official syllabus and notices."
+    }
+  ],
+  "codeOrExample": "",
+  "commonMistakes": ["Using the wrong base when the question reverses the comparison", "Adding percentages that apply to different bases", "Not checking whether the question asks for a change or a final value"],
+  "quiz": [
+    { "question": "A price rises 10% then falls 10%. Compared with the start it is:", "options": ["The same", "1% lower", "1% higher", "10% lower"], "correctIndex": 1, "explanation": "1.1 × 0.9 = 0.99, so it is 1% lower." },
+    { "question": "After a 25% discount an item costs 300. The original price was:", "options": ["375", "400", "325", "450"], "correctIndex": 1, "explanation": "The sale price is 75% of the original: 300 ÷ 0.75 = 400." },
+    { "question": "A is 50% more than B. B is what percent less than A?", "options": ["50%", "33.3%", "25%", "66.7%"], "correctIndex": 1, "explanation": "If B = 100, A = 150; the gap of 50 is 33.3% of 150." }
+  ],
+  "recommendedResources": [{ "title": "Khan Academy: percentages", "type": "course", "searchQuery": "Khan Academy percentages", "whyRecommended": "Free, structured practice with worked answers." }],
+  "socraticChallenge": { "scenario": "You have 90 seconds for a percentage question and have spent 60 without a method.", "question": "Do you keep going or skip?", "idealAnswer": "Skip and return if there is time; note the pattern that stalled you, then practise that pattern separately." },
+  "exercises": [
+    { "type": "solve", "instruction": "Solve in under a minute", "prompt": "A shirt is marked up 40% on cost and sold at a 10% discount. What is the profit percent on cost?", "answer": "1.4 × 0.9 = 1.26, so the profit is 26% on cost." },
+    { "type": "solve", "instruction": "Reverse percentage", "prompt": "A salary rises 20% to 7,200. What was it before?", "answer": "7,200 ÷ 1.2 = 6,000." }
+  ],
+  "reviewCards": [
+    { "concept": "Base", "prompt": "What is the first question to ask in any percentage problem?", "answer": "Percent of what, that is, which number is the base." },
+    { "concept": "Successive change", "prompt": "How do you combine two successive percentage changes?", "answer": "Multiply their factors, for example 1.2 × 0.8." }
+  ],
+  "estimatedDifficulty": "intermediate",
+  "prerequisites": ["Basic fractions and decimals"]
+}

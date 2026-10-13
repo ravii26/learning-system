@@ -1,0 +1,93 @@
+{
+  "title": "Choosing a tech stack for a new web app",
+  "summary": "Pick a stack for a small web product and defend the choice with cost, upkeep, lock-in and outlook.",
+  "learningObjectives": ["Compare stacks on criteria that matter for your project", "Explain what each choice locks you into"],
+  "keyTakeaways": ["Settle team skills, budget and scale before comparing tools", "Hosting that scales with usage also scales your bill", "Exit cost is part of the price"],
+  "explanation": "Start with constraints, not tools. Three things decide most stack choices: **what your team already knows**, **how much you can spend each month**, and **how fast you expect to grow**.\n\nThe table below compares three common options on the criteria that usually matter. Read it by row: which option wins *for the constraint you care about most*?\n\nThe cost bars show how each option's bill changes as you grow. They are rough estimates to show shape, not quotes.",
+  "blocks": [
+    {
+      "type": "comparison_table",
+      "title": "Three stacks side by side",
+      "options": ["Next.js on Vercel", "Rails on a VPS", "Django on a PaaS"],
+      "rows": [
+        { "criterion": "Learning curve", "cells": [{ "text": "React plus server concepts to learn", "rating": 2 }, { "text": "Conventions do most of the work", "rating": 3, "best": true }, { "text": "Gentle, batteries included", "rating": 3 }] },
+        { "criterion": "Hiring pool", "cells": [{ "text": "Very large", "rating": 3, "best": true }, { "text": "Smaller, experienced", "rating": 2 }, { "text": "Large", "rating": 3 }] },
+        { "criterion": "Upgrade and maintenance burden", "cells": [{ "text": "Fast-moving, frequent changes", "rating": 1 }, { "text": "Stable, slow churn", "rating": 3, "best": true }, { "text": "Stable", "rating": 2 }] },
+        { "criterion": "Lock-in", "cells": [{ "text": "Platform features pull you in", "rating": 1 }, { "text": "Portable, you own the server", "rating": 3, "best": true }, { "text": "Moderate", "rating": 2 }] },
+        { "criterion": "Cost as traffic grows", "cells": [{ "text": "Usage-based, can spike", "rating": 1 }, { "text": "Flat until the server is full", "rating": 3, "best": true }, { "text": "Mid, steps up by plan", "rating": 2 }] }
+      ],
+      "note": "SAMPLE DATA for testing. Prices and outlook change; verify before relying on them (written October 2026)."
+    },
+    {
+      "type": "pros_cons",
+      "title": "Where each option wins and hurts",
+      "items": [
+        { "option": "Next.js on Vercel", "pros": ["Best UI ecosystem and hiring", "Deploys in minutes"], "cons": ["Bill grows with traffic", "Frequent framework changes"] },
+        { "option": "Rails on a VPS", "pros": ["Few moving parts, cheap, portable", "Very productive for CRUD apps"], "cons": ["You run the server: patches, backups", "Smaller hiring pool"] },
+        { "option": "Django on a PaaS", "pros": ["Admin panel and auth built in", "Hosting handled for you"], "cons": ["PaaS plans step up in price", "Less flexible than a VPS"] }
+      ]
+    },
+    {
+      "type": "cost_chart",
+      "title": "Cost as you grow",
+      "unit": "USD per month, rough estimate",
+      "scenarios": [
+        { "label": "Hobby", "assumption": "a few hundred visits a month" },
+        { "label": "Startup", "assumption": "about 10k users" },
+        { "label": "At scale", "assumption": "about 1M users" }
+      ],
+      "series": [
+        { "option": "Next.js on Vercel", "values": [0, 60, 900] },
+        { "option": "Rails on a VPS", "values": [6, 40, 350] },
+        { "option": "Django on a PaaS", "values": [7, 55, 500] }
+      ],
+      "note": "SAMPLE NUMBERS for layout testing only. Check each vendor's pricing page (written October 2026)."
+    },
+    {
+      "type": "matrix_2x2",
+      "title": "Ease of start vs long-term control",
+      "xAxis": { "label": "Ease of start", "low": "Harder", "high": "Easier" },
+      "yAxis": { "label": "Long-term control", "low": "Less", "high": "More" },
+      "points": [
+        { "option": "Next.js on Vercel", "x": 8, "y": 3 },
+        { "option": "Rails on a VPS", "x": 5, "y": 9 },
+        { "option": "Django on a PaaS", "x": 7, "y": 5 }
+      ]
+    },
+    {
+      "type": "decision_flow",
+      "title": "Which one should you pick?",
+      "start": "q1",
+      "nodes": [
+        { "id": "q1", "question": "Does your team already know one of these well?", "yes": "keep", "no": "q2" },
+        { "id": "q2", "question": "Do you need server-rendered pages for search traffic?", "yes": "next", "no": "q3" },
+        { "id": "q3", "question": "Do you want the fewest moving parts and a flat bill?", "yes": "rails", "no": "django" },
+        { "id": "keep", "outcome": "Use it. Switching has a real cost." },
+        { "id": "next", "outcome": "Next.js on Vercel" },
+        { "id": "rails", "outcome": "Rails on a VPS" },
+        { "id": "django", "outcome": "Django on a PaaS" }
+      ]
+    }
+  ],
+  "codeOrExample": "",
+  "commonMistakes": ["Choosing by hype instead of team skills", "Ignoring what leaving the platform later would cost", "Comparing monthly price at hobby size and assuming it holds at scale"],
+  "quiz": [
+    { "question": "A two-person team that only knows Python must ship an MVP in a month. Which fits best?", "options": ["Rails on a VPS", "Django on a PaaS", "Next.js on Vercel", "A custom Go service"], "correctIndex": 1, "explanation": "Team skills dominate at this size. Django matches their language and the PaaS removes server work." },
+    { "question": "Which cost risk is specific to usage-based hosting?", "options": ["A fixed bill even when idle", "A surprise bill after a traffic spike", "Needing to patch the OS", "Paying per developer seat only"], "correctIndex": 1, "explanation": "Usage-based pricing scales automatically with traffic, which is great at launch and painful during a spike." },
+    { "question": "What does vendor lock-in mostly cost you?", "options": ["Nothing if the vendor is large", "A higher price today", "The effort of rewriting platform-specific code to leave", "Slower page loads"], "correctIndex": 2, "explanation": "Lock-in is paid when you leave, as migration work, not when you sign up." }
+  ],
+  "recommendedResources": [
+    { "title": "Vercel pricing page", "type": "docs", "searchQuery": "Vercel pricing", "whyRecommended": "The official source for current usage-based costs." },
+    { "title": "Rails Guides", "type": "docs", "searchQuery": "Ruby on Rails guides getting started", "whyRecommended": "The official, maintained introduction." }
+  ],
+  "socraticChallenge": { "scenario": "Your side project has 200 users and a $0 bill. A post goes viral and traffic jumps 50x.", "question": "Which of the three stacks is most exposed, and what would you have set up beforehand?", "idealAnswer": "The usage-based host is most exposed to a bill spike; set spend caps and alerts. The VPS risks downtime rather than cost; the PaaS steps up plan tiers. Decide which risk you can tolerate." },
+  "exercises": [
+    { "type": "solve", "instruction": "Decide for this scenario", "prompt": "A solo founder with 3 months of runway, knows JavaScript, needs SEO pages. Pick a stack and name the main risk you accept.", "answer": "Next.js on Vercel. Accepted risk: a bill that grows with traffic, mitigated with spend alerts.", "hint": "Match the founder's skills first." }
+  ],
+  "reviewCards": [
+    { "concept": "Lock-in", "prompt": "Why is lock-in a cost even when the platform is cheap today?", "answer": "Because leaving later means rewriting platform-specific code, so the exit is part of the price." },
+    { "concept": "Usage-based pricing", "prompt": "When does usage-based hosting beat a fixed-price server, and when does it hurt?", "answer": "It wins at low or unpredictable traffic; it hurts during sustained high traffic or spikes." }
+  ],
+  "estimatedDifficulty": "beginner",
+  "prerequisites": []
+}

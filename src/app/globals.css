@@ -212,6 +212,16 @@ button {
   outline-offset: 2px;
 }
 
+/* Tailwind's preflight is switched off in this app (see tailwind.config.ts), and preflight is what
+   gives "border border-line" a border style, so on its own that draws nothing. The lesson sections and
+   the learn pages put it back for themselves. Placed before the legacy classes and the utilities so
+   both still win over it. */
+.lesson-blocks *,
+.learn-flow * {
+  border-width: 0;
+  border-style: solid;
+}
+
 code, pre, kbd {
   font-family: var(--font-mono);
 }
