@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useModalFocus } from '@/lib/useModalFocus';
 
 export interface CustomDialogConfig {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export default function CustomDialog({
 }: CustomDialogConfig) {
   const [inputValue, setInputValue] = React.useState(promptValue);
   const [mounted, setMounted] = useState(false);
+  const panelRef = useModalFocus<HTMLDivElement>(isOpen && mounted, () => onCancel?.());
 
   useEffect(() => {
     setMounted(true);
@@ -36,17 +38,6 @@ export default function CustomDialog({
   React.useEffect(() => {
     setInputValue(promptValue);
   }, [promptValue, isOpen]);
-
-  React.useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && onCancel) {
-        onCancel();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onCancel]);
 
   if (!isOpen || !mounted) return null;
 
@@ -101,6 +92,11 @@ export default function CustomDialog({
     >
       <div
         className="glass-panel"
+        ref={panelRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label={getTitle()}
         style={{
           width: '100%',
           maxWidth: '440px',

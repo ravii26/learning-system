@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useModalFocus } from '@/lib/useModalFocus';
 
 /**
  * In-app replacements for window.confirm / alert / prompt, callable from
@@ -57,6 +58,12 @@ export function DialogHost() {
   const confirmRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const current = queue[0];
+  const panelRef = useModalFocus<HTMLDivElement>(!!current, () => {
+    if (!current) return;
+    current.resolve(current.kind === 'confirm' ? false : current.kind === 'prompt' ? null : undefined);
+    queue = queue.slice(1);
+    force((n) => n + 1);
+  });
 
   useEffect(() => {
     notify = () => force((n) => n + 1);
@@ -91,11 +98,12 @@ export function DialogHost() {
       style={{ background: 'var(--bg-overlay)', animation: 'fadeIn 0.15s ease-out' }}
       onMouseDown={(e) => e.target === e.currentTarget && cancel()}
       onKeyDown={(e) => {
-        if (e.key === 'Escape') cancel();
         if (e.key === 'Enter' && current.kind === 'prompt') ok();
       }}
     >
       <div
+        ref={panelRef}
+        tabIndex={-1}
         role={current.kind === 'alert' ? 'alertdialog' : 'dialog'}
         aria-modal="true"
         aria-labelledby="app-dialog-title"

@@ -284,7 +284,7 @@ export default function PracticePage() {
             {creatingTopic ? 'Starting…' : 'Start practising'}
           </Button>
           <p className="m-0 text-[0.875rem] text-fg-muted">
-            Practice doesn’t take one of your two Now slots. For subjects with material to cover, <Link href="/learn/new" className="underline underline-offset-2">start a course</Link> instead.
+            Practice doesn’t take one of your two Now slots. For subjects with material to cover, <Link href="/learn/start" className="underline underline-offset-2">start learning</Link> instead.
           </p>
         </form>
       ) : (

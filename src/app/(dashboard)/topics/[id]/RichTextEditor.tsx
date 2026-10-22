@@ -8,33 +8,44 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
+import { createNoteAutosave, type SaveStatus } from '@/lib/noteAutosave';
 
 interface RichTextEditorProps {
   content: string;
-  onChange: (html: string) => void;
+  onChange: (html: string) => void | Promise<void>;
+  draftKey?: string;
   placeholder?: string;
   autoSaveMs?: number;
   showSaveStatus?: boolean;
   minHeight?: number;
 }
 
-type SaveStatus = 'saved' | 'saving' | 'unsaved';
-
 export default function RichTextEditor({
   content,
   onChange,
+  draftKey,
   placeholder = 'Start writing...',
   autoSaveMs = 1500,
   showSaveStatus = true,
   minHeight = 180,
 }: RichTextEditorProps) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFirstMount = useRef(true);
+  const changeRef = useRef(onChange);
+  changeRef.current = onChange;
+  const [autosave] = useState(() => createNoteAutosave(async (html) => {
+    await changeRef.current(html);
+    try {
+      if (draftKey && sessionStorage.getItem(draftKey) === html) sessionStorage.removeItem(draftKey);
+    } catch { /* Storage may be disabled. */ }
+  }, setSaveStatus, autoSaveMs, draftKey));
 
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
+        link: false,
+        underline: false,
         heading: { levels: [1, 2, 3] },
         codeBlock: { HTMLAttributes: { class: 'rte-code-block' } },
       }),
@@ -54,28 +65,41 @@ export default function RichTextEditor({
     },
     onUpdate: ({ editor }) => {
       if (isFirstMount.current) return;
-      setSaveStatus('unsaved');
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-      debounceTimer.current = setTimeout(() => {
-        setSaveStatus('saving');
-        onChange(editor.getHTML());
-        setTimeout(() => setSaveStatus('saved'), 400);
-      }, autoSaveMs);
+      const html = editor.getHTML();
+      try { if (draftKey) sessionStorage.setItem(draftKey, html); } catch { /* Storage may be disabled. */ }
+      autosave.update(html);
     },
   });
 
   // Sync external content on first load
   useEffect(() => {
-    if (editor && content && editor.isEmpty) {
-      editor.commands.setContent(content);
+    if (!editor) return;
+    let restored = false;
+    try {
+      const draft = draftKey ? sessionStorage.getItem(draftKey) : null;
+      if (draft !== null) {
+        restored = true;
+        editor.commands.setContent(draft, { emitUpdate: false });
+        autosave.update(draft);
+      }
+    } catch { /* Storage may be disabled. */ }
+    if (!restored && editor && content && editor.isEmpty) {
+      editor.commands.setContent(content, { emitUpdate: false });
     }
     isFirstMount.current = false;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor]);
 
   useEffect(() => {
-    return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
-  }, []);
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (autosave.hasPending()) { event.preventDefault(); event.returnValue = ''; }
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', beforeUnload);
+      void autosave.flush();
+    };
+  }, [autosave]);
 
   const setLink = useCallback(async () => {
     if (!editor) return;
@@ -104,7 +128,8 @@ export default function RichTextEditor({
   }) => (
     <button
       type="button"
-      onMouseDown={(e) => { e.preventDefault(); onClick(); }}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
       title={title}
       className={`rte-tool-btn${active ? ' rte-tool-btn--active' : ''}`}
     >
@@ -137,11 +162,12 @@ export default function RichTextEditor({
         <ToolBtn title="Link" active={editor.isActive('link')} onClick={setLink}><Icon name="link" size={15} /></ToolBtn>
 
         {showSaveStatus && (
-          <span className="rte-save-status">
+          <span className="rte-save-status" role="status" aria-live="polite">
             <span className={`rte-save-dot rte-save-dot--${saveStatus}`} />
             {saveStatus === 'saved' && 'Saved'}
             {saveStatus === 'saving' && 'Saving...'}
             {saveStatus === 'unsaved' && 'Unsaved'}
+            {saveStatus === 'error' && <button type="button" onClick={() => void autosave.flush()}>Not saved · Retry</button>}
           </span>
         )}
       </div>

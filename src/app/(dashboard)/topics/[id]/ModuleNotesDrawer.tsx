@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useModalFocus } from '@/lib/useModalFocus';
 import { Icon } from '@/components/ui/Icon';
 import RichTextEditor from './RichTextEditor';
 
 interface ModuleNotesDrawerProps {
+  topicId: string;
   open: boolean;
   onClose: () => void;
   moduleId: string;
@@ -17,6 +19,7 @@ interface ModuleNotesDrawerProps {
 }
 
 export default function ModuleNotesDrawer({
+  topicId,
   open,
   onClose,
   moduleId,
@@ -29,46 +32,28 @@ export default function ModuleNotesDrawer({
 }: ModuleNotesDrawerProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Close on Escape key
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, onClose]);
-
-  // Lock background body scrolling while drawer is open
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [open]);
+  const panelRef = useModalFocus(open, onClose);
 
   if (!open) return null;
 
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-[70] flex justify-end bg-black/45 backdrop-blur-[2px] transition-opacity"
+      className="fixed inset-0 z-[210] flex justify-end bg-black/45 backdrop-blur-[2px] transition-opacity"
       aria-modal="true"
       role="dialog"
       aria-label={`Notes for ${moduleTitle}`}
     >
       <aside
+        ref={panelRef}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className={`flex h-full flex-col border-l border-line bg-surface shadow-2xl transition-all duration-200 ease-out overflow-hidden ${
           isExpanded ? 'w-[min(1080px,100vw)]' : 'w-[min(640px,100vw)]'
         }`}
       >
         {/* Header */}
-        <header className="flex items-center justify-between border-b border-line px-6 py-4 bg-base/50">
+        <header className="flex shrink-0 items-center justify-between border-b border-line px-6 py-4 bg-base/50">
           <div className="flex items-center gap-3 min-w-0">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-fill-2 text-fg">
               <Icon name="notebook" size={18} />
@@ -109,16 +94,17 @@ export default function ModuleNotesDrawer({
         </header>
 
         {/* Sub-header info bar */}
-        <div className="flex items-center justify-between border-b border-line bg-surface px-6 py-2 text-[0.78rem] text-fg-muted">
-          <span>Saved automatically as you type · Synced with module reviews</span>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-6 py-2 text-[0.78rem] text-fg-muted">
+          <span>Changes save automatically · Check the editor for save status</span>
           <span className="font-mono text-[0.72rem]">Esc to close</span>
         </div>
 
         {/* Editor Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-6">
           <div className="flex-1 flex flex-col">
             <RichTextEditor
               key={moduleId}
+              draftKey={`learning-os:notes:${topicId}:${moduleId}`}
               content={notes || ''}
               onChange={onSaveNotes}
               placeholder={`Explain ${moduleTitle} in your own words. Jot down key formulas, core takeaways, mental models, or code templates...`}
@@ -134,6 +120,7 @@ export default function ModuleNotesDrawer({
               </summary>
               <div className="mt-3">
                 <RichTextEditor
+                  draftKey={`learning-os:notes:${topicId}`}
                   content={topicWideNotes}
                   onChange={onSaveTopicWideNotes || (() => {})}
                   placeholder="Older topic notes..."
@@ -145,7 +132,7 @@ export default function ModuleNotesDrawer({
         </div>
 
         {/* Footer */}
-        <footer className="flex items-center justify-between border-t border-line bg-base/50 px-6 py-3.5">
+        <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-base/50 px-6 py-3.5">
           <span className="text-[0.8rem] text-fg-muted">
             Tip: Press <kbd className="rounded bg-fill-2 px-1.5 py-0.5 font-mono text-[0.7rem] text-fg-secondary">Alt + N</kbd> anytime to toggle notes.
           </span>

@@ -73,7 +73,6 @@ export default function TodayPage() {
   const [captureTitle, setCaptureTitle] = useState('');
   const [capturing, setCapturing] = useState(false);
   const [quickStartTitle, setQuickStartTitle] = useState('');
-  const [quickStarting, setQuickStarting] = useState(false);
   const [showAlternatives, setShowAlternatives] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -168,47 +167,7 @@ export default function TodayPage() {
     e.preventDefault();
     const title = quickStartTitle.trim();
     if (!title) return;
-    setQuickStarting(true);
-    try {
-      const create = (status: 'active' | 'queued') =>
-        fetch('/api/topics', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title,
-            area: 'Tech',
-            status,
-            depthTarget: 'Proficiency',
-            why: `I want to learn ${title}`,
-            nextAction: `Start studying ${title}`,
-            currentStage: 'Fundamentals',
-            mode: 'syllabus',
-          }),
-        });
-      let res = await create('active');
-      let queued = false;
-      // Both "Now" slots taken: still create it and open it — just in Next.
-      if (res.status === 400) {
-        const data = await res.clone().json().catch(() => ({}));
-        if (/active limit/i.test(data.error || '')) {
-          res = await create('queued');
-          queued = true;
-        }
-      }
-      if (res.ok) {
-        const created = await res.json();
-        toast.success(queued ? `"${title}" added to Next — both Now slots are full. Building its roadmap…` : `Building a roadmap for "${title}"…`);
-        setQuickStartTitle('');
-        router.push(`/topics/${created.id}?autostart=1`);
-      } else {
-        const data = await res.json().catch(() => ({}));
-        toast.error(data.error || 'Couldn’t create the topic');
-      }
-    } catch {
-      toast.error('Couldn’t reach the server');
-    } finally {
-      setQuickStarting(false);
-    }
+    router.push(`/learn/start?${new URLSearchParams({ title })}`);
   };
 
   if (loading) {
@@ -277,7 +236,7 @@ export default function TodayPage() {
           <section aria-labelledby="first-h" className="glass-panel flex flex-col gap-4 p-7">
             <h2 id="first-h" className="m-0 font-serif text-[1.8rem] font-medium leading-tight">What do you want to learn?</h2>
             <p className="m-0 text-[0.95rem] text-fg-secondary">
-              Type a subject — a technology, a field, a skill. You’ll get a roadmap you can trim, and you can skip anything you already know.
+              Type a subject, a skill, or a question. Preview your first lesson, or choose a series or a full plan.
             </p>
             <form onSubmit={handleQuickStart} className="flex flex-col gap-2.5 sm:flex-row">
               <label htmlFor="learn-new-input" className="sr-only">Subject to learn</label>
@@ -288,11 +247,11 @@ export default function TodayPage() {
                 placeholder="e.g. System design, Investing, Spoken English"
                 value={quickStartTitle}
                 onChange={(e) => setQuickStartTitle(e.target.value)}
-                disabled={quickStarting}
+
                 autoFocus
               />
-              <Button type="submit" variant="primary" size="lg" disabled={quickStarting || !quickStartTitle.trim()}>
-                {quickStarting ? 'Building…' : 'Build my roadmap'}
+              <Button type="submit" variant="primary" size="lg" disabled={!quickStartTitle.trim()}>
+                Start learning
               </Button>
             </form>
             <p className="m-0 text-[0.85rem] text-fg-muted">
@@ -410,10 +369,10 @@ export default function TodayPage() {
                 placeholder="A subject or skill — you’ll get a roadmap to trim"
                 value={quickStartTitle}
                 onChange={(e) => setQuickStartTitle(e.target.value)}
-                disabled={quickStarting}
+
               />
-              <Button type="submit" disabled={quickStarting || !quickStartTitle.trim()}>
-                {quickStarting ? 'Building…' : 'Start'}
+              <Button type="submit" disabled={!quickStartTitle.trim()}>
+                Start learning
               </Button>
             </div>
           </form>

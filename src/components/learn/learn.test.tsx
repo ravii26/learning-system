@@ -44,10 +44,10 @@ describe('Start learning', () => {
     expect(html).not.toContain('How-to-decide flowchart');
   });
 
-  it('a plain title with no purpose yet asks you to choose one', () => {
+  it('a plain title defaults to an understanding lesson', () => {
     const html = render(<StartLearning initial={{ title: 'Binary search' }} />);
-    expect(html).toContain('Choose what it is for.');
-    expect(html).not.toContain('How big?');
+    expect(html).toContain('Format: Understand it');
+    expect(html).toContain('What you will get');
   });
 
   it('ongoing is offered for practising and shows the daily-practice preview', () => {
@@ -77,10 +77,10 @@ describe('Start learning', () => {
     expect(html).toContain('href="/learn/program?goal=Become+a+data+engineer"');
   });
 
-  it('links to the overview and the older picker, and uses no colour', () => {
+  it('links to the overview without exposing the older picker, and uses no colour', () => {
     const html = render(<StartLearning />);
     expect(html).toContain('href="/learn/all"');
-    expect(html).toContain('href="/learn/new"');
+    expect(html).not.toContain('href="/learn/new"');
     expect(html).not.toMatch(/class="[^"]*\b(text|bg|border)-(success|warning|primary|accent)\b/);
   });
 });

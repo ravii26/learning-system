@@ -45,7 +45,7 @@ export function StartLearning({ initial }: { initial?: StartLearningInitial } = 
 
   // Until you choose a purpose yourself, the title suggests one.
   const suggested = guessIntent(title);
-  const intent = (pickedIntent ? intentByKey(pickedIntent) : undefined) ?? suggested;
+  const intent = (pickedIntent ? intentByKey(pickedIntent) : undefined) ?? suggested ?? (title.trim() ? intentByKey('understand') : undefined);
   const sizes = intent ? sizesFor(intent) : [];
   const size: SizeKey = sizes.includes(pickedSize) ? pickedSize : 'lesson';
 
@@ -94,7 +94,9 @@ export function StartLearning({ initial }: { initial?: StartLearningInitial } = 
       <div className="flex flex-col gap-3">
         <label htmlFor="what" className="font-serif text-[2.4rem] font-normal leading-tight">What do you want to learn?</label>
         <input id="what" className="form-input h-14 text-[1.2rem]" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Choosing a tech stack, Spanish verbs, Build a URL shortener" autoFocus />
-        <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
+        <details>
+          <summary className="cursor-pointer text-fg-secondary">Customize your goal and subject area</summary>
+        <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_180px]">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="why" className="text-[0.9rem] font-semibold text-fg-secondary">Why now? <span className="font-normal text-fg-muted">optional</span></label>
             <input id="why" className="form-input h-11 py-0" value={why} onChange={(e) => setWhy(e.target.value)} placeholder="e.g. a decision I need to make this month" />
@@ -106,10 +108,13 @@ export function StartLearning({ initial }: { initial?: StartLearningInitial } = 
             </select>
           </div>
         </div>
+        </details>
       </div>
 
       <fieldset className="m-0 flex flex-col gap-3 border-0 p-0">
-        <legend className="mb-3 p-0 text-[1.15rem] font-semibold">What for?</legend>
+        <legend className="mb-3 p-0 text-[1.15rem] font-semibold">{intent ? `Format: ${intent.label}` : 'Start with a topic above'}</legend>
+        <details>
+        <summary className="cursor-pointer text-fg-secondary">Change format</summary>
         <div className="grid gap-2.5 sm:grid-cols-2">
           {INTENTS.map((i) => (
             <button key={i.key} type="button" aria-pressed={intent?.key === i.key} onClick={() => { setPickedIntent(i.key); setBp(null); }} className={choice(intent?.key === i.key)}>
@@ -118,6 +123,7 @@ export function StartLearning({ initial }: { initial?: StartLearningInitial } = 
             </button>
           ))}
         </div>
+        </details>
         {!pickedIntent && suggested && title.trim() && (
           <p className="m-0 text-[0.9rem] text-fg-muted">That reads like “{suggested.label}”, so we picked it. Change it if not.</p>
         )}
@@ -143,7 +149,7 @@ export function StartLearning({ initial }: { initial?: StartLearningInitial } = 
           <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5 text-[0.98rem] leading-relaxed">
             {plan.preview.map((line, i) => <li key={i}>{line}</li>)}
           </ul>
-          {size === 'lesson' && <BlueprintPicker allowed={KIND_BLOCKS[kind]} value={sectionChoice} onChange={(value) => setBp({ kind, value })} />}
+          {size === 'lesson' && <details><summary className="cursor-pointer text-fg-secondary">Customize lesson sections</summary><BlueprintPicker allowed={KIND_BLOCKS[kind]} value={sectionChoice} onChange={(value) => setBp({ kind, value })} /></details>}
         </section>
       )}
 
@@ -168,8 +174,6 @@ export function StartLearning({ initial }: { initial?: StartLearningInitial } = 
           <Link href="/learn/all" className="underline underline-offset-2">See everything you are learning</Link>
           {' · '}
           <Link href="/learn/program" className="underline underline-offset-2">Already know your goal? Go to the plan builder</Link>
-          {" · "}
-          <Link href="/learn/new" className="underline underline-offset-2">Use the older picker</Link>
         </span>
       </div>
     </div>

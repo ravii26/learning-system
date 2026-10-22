@@ -462,7 +462,7 @@ export default function BuildProgramPage() {
           <span className="text-[0.85rem] text-fg-muted">Nothing is saved until you approve the plan.</span>
         </div>
         <p className="m-0 text-[0.85rem] text-fg-muted">
-          Just want to add one topic? <Link href="/learn/new">Add a single topic</Link>
+          Just want to add one topic? <Link href="/learn/start">Add a single topic</Link>
         </p>
       </div>
     );

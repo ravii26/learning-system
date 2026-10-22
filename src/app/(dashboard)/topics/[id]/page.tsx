@@ -7,6 +7,7 @@ import Link from 'next/link';
 // Modular Components
 import SocraticCoach from './SocraticCoach';
 import ModuleStudyRoom from './ModuleStudyRoom';
+import { readStudySession, writeStudySession } from '@/lib/studySession';
 import DailySessions from './DailySessions';
 import ConfusionMistakeBank from './ConfusionMistakeBank';
 import RichTextEditor from './RichTextEditor';
@@ -113,6 +114,9 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
 
   // Active Selected Module
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
+  useEffect(() => {
+    if (activeModuleId) writeStudySession(`topic:${params.id}`, activeModuleId);
+  }, [params.id, activeModuleId]);
   const [newModuleTitle, setNewModuleTitle] = useState('');
   const [generatingModules, setGeneratingModules] = useState(false);
 
@@ -214,8 +218,10 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
         // from Where you stand), else the first unfinished, else the first.
         if (!activeModuleId && sortedCurriculum.length > 0) {
           const linked = searchParams.get('module');
+          const resumed = readStudySession<string>(`topic:${params.id}`);
           const target =
             (linked && sortedCurriculum.find((m: CourseModule) => m.id === linked)) ||
+            (resumed && sortedCurriculum.find((m: CourseModule) => m.id === resumed)) ||
             sortedCurriculum.find((m: CourseModule) => !m.completed) ||
             sortedCurriculum[0];
           setActiveModuleId(target.id);
@@ -228,7 +234,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
     } finally {
       setLoading(false);
     }
-  }, [params.id, activeModuleId]);
+  }, [params.id, activeModuleId, searchParams]);
 
   useEffect(() => {
     fetchTopic();
@@ -242,6 +248,9 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
       autoStartedRef.current = true;
       handleGenerateCurriculum();
     }
+  // Generation is deliberately tied to the autostart transition; the handler
+  // is declared below and changes with editable topic fields.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, topic, curriculum.length, searchParams]);
 
   // Focus Timer Tick
@@ -466,15 +475,12 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
   // Auto-Save Notes
   const handleSaveNotes = async (html: string) => {
     setNotes(html);
-    try {
-      await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes: html }),
-      });
-    } catch (e) {
-      console.error('Failed to auto-save notes:', e);
-    }
+    const res = await fetch(`/api/topics/${params.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: html }),
+    });
+    if (!res.ok) throw new Error('Could not save topic notes');
   };
 
   // Resource Handlers
@@ -767,6 +773,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           <div className="flex min-w-0 flex-col gap-6">
             {activeModule ? (
               <ModuleStudyRoom
+                key={activeModule.id}
                 topicId={params.id}
                 topicTitle={title}
                 topicArea={area}

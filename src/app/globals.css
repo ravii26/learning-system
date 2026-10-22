@@ -203,7 +203,7 @@ input, select, textarea, button {
 
 button {
   cursor: pointer;
-  border: none;
+  border: 0 solid;
   background: none;
 }
 
@@ -212,12 +212,9 @@ button {
   outline-offset: 2px;
 }
 
-/* Tailwind's preflight is switched off in this app (see tailwind.config.ts), and preflight is what
-   gives "border border-line" a border style, so on its own that draws nothing. The lesson sections and
-   the learn pages put it back for themselves. Placed before the legacy classes and the utilities so
-   both still win over it. */
-.lesson-blocks *,
-.learn-flow * {
+/* Supply the border defaults normally provided by preflight. Zero width
+   keeps borders opt-in; later legacy rules and utilities choose their width. */
+*, ::before, ::after {
   border-width: 0;
   border-style: solid;
 }

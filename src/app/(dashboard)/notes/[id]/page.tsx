@@ -100,7 +100,7 @@ export default function NoteDetailPage() {
     }
   };
 
-  const handleSave = async (nextBody?: string) => {
+  const handleSave = async (nextBody?: string, reportFailure = false) => {
     if (isNew || !note) return;
     setSaving(true);
     try {
@@ -113,9 +113,11 @@ export default function NoteDetailPage() {
         await fetchNote();
       } else {
         toast.error('Failed to save');
+        if (reportFailure) throw new Error('Failed to save');
       }
     } catch {
       toast.error('Connection error');
+      if (reportFailure) throw new Error('Could not save note');
     } finally {
       setSaving(false);
     }
@@ -202,8 +204,10 @@ export default function NoteDetailPage() {
       ) : (
         <div className="flex flex-col gap-2">
           <RichTextEditor
+            key={note?.id}
+            draftKey={`learning-os:notebook:${note?.id}`}
             content={body}
-            onChange={(html) => { setBody(html); handleSave(html); }}
+            onChange={(html) => { setBody(html); return handleSave(html, true); }}
             placeholder="Write the note…"
             minHeight={260}
           />

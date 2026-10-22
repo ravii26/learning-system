@@ -12,6 +12,7 @@ import LessonPractice from './LessonPractice';
 import ManualAiPanel, { postManual } from '@/components/ManualAiPanel';
 import { useAiMode } from '@/lib/useAiMode';
 import ModuleNotesDrawer from './ModuleNotesDrawer';
+import { readStudySession, writeStudySession } from '@/lib/studySession';
 
 interface ModuleStudyRoomProps {
   topicId: string;
@@ -88,10 +89,30 @@ export default function ModuleStudyRoom({
   const [quizSelections, setQuizSelections] = useState<Record<number, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizResult, setQuizResult] = useState<string | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const draftKey = `lesson:${topicId}:${module.id}`;
+  const lessonSignature = JSON.stringify([lesson?.quiz, lesson?.socraticChallenge, lesson?.exercises]);
+  useEffect(() => {
+    if (loadingLesson || !lesson || draftReady) return;
+    const draft = readStudySession<{ signature: string; tab: typeof activeTab; answer: string; selections: Record<number, number> }>(draftKey);
+    if (draft?.signature === lessonSignature) {
+      if (['guide', 'practice', 'media', 'challenge', 'quiz'].includes(draft.tab)) setActiveTab(draft.tab);
+      if (typeof draft.answer === 'string') setChallengeAnswer(draft.answer);
+      if (draft.selections && typeof draft.selections === 'object') setQuizSelections(draft.selections);
+    }
+    setDraftReady(true);
+    // A manual import can supply the first lesson without changing loadingLesson.
+  }, [loadingLesson, draftKey, lessonSignature, draftReady, lesson]);
+  useEffect(() => {
+    if (draftReady && !loadingLesson && lesson) {
+      writeStudySession(draftKey, { signature: lessonSignature, tab: activeTab, answer: challengeAnswer, selections: quizSelections });
+    }
+  }, [draftReady, loadingLesson, draftKey, lessonSignature, activeTab, challengeAnswer, quizSelections, lesson]);
 
   // Fetch or Generate Full Comprehensive Lesson
   const loadLesson = useCallback(async (forceRegenerate = false, viaManual = false) => {
     setLoadingLesson(true);
+    setDraftReady(false);
     setManualPrompt(null);
     setEvaluation(null);
     setChallengeAnswer('');
@@ -199,9 +220,11 @@ export default function ModuleStudyRoom({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes: html }),
       });
-      if (res.ok) onModuleNotesSaved?.(moduleId, html);
+      if (!res.ok) throw new Error('Could not save module notes');
+      onModuleNotesSaved?.(moduleId, html);
     } catch (err) {
       console.error('Failed to save module notes:', err);
+      throw err;
     }
   };
 
@@ -751,6 +774,8 @@ export default function ModuleStudyRoom({
 
       {/* Slide-over Notes Drawer */}
       <ModuleNotesDrawer
+        key={module.id}
+        topicId={topicId}
         open={notesDrawerOpen}
         onClose={() => setNotesDrawerOpen(false)}
         moduleId={module.id}
