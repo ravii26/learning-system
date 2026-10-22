@@ -8,6 +8,7 @@
  */
 import { isValidQuizQuestion } from './reviewCards';
 import { normalizeExercises } from './program/lessonGuide';
+import { normalizeBlocks } from './lessonBlocks';
 
 const strList = (v: unknown, max = 12): string[] =>
   (Array.isArray(v) ? v : [])
@@ -43,12 +44,16 @@ export function normalizeLesson(raw: unknown): Record<string, unknown> | null {
     .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
     .map((c) => ({ concept: text(c.concept), prompt: text(c.prompt), answer: text(c.answer) }))
     .filter((c) => c.prompt && c.answer)
-    .slice(0, 5);
+    // Most lessons ask for 3 to 5; a memorise lesson asks for up to 12.
+    .slice(0, 12);
 
   const sc = l.socraticChallenge && typeof l.socraticChallenge === 'object' ? (l.socraticChallenge as Record<string, unknown>) : null;
   const socraticChallenge = sc && text(sc.question) && text(sc.idealAnswer)
     ? { scenario: text(sc.scenario), question: text(sc.question), idealAnswer: text(sc.idealAnswer) }
     : undefined;
+
+  // Only present when the lesson has some, so existing lessons keep their exact shape.
+  const blocks = normalizeBlocks(l.blocks);
 
   return {
     ...l,
@@ -67,5 +72,8 @@ export function normalizeLesson(raw: unknown): Record<string, unknown> | null {
     reviewCards,
     socraticChallenge,
     exercises: normalizeExercises(l.exercises),
+    ...(blocks.length ? { blocks } : { blocks: undefined }),
+    // Set by the server from the request; a "kind" the model made up is dropped.
+    kind: undefined,
   };
 }

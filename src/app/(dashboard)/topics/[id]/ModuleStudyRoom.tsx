@@ -3,12 +3,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { CourseModule, ModuleEvidence } from './page';
 import { renderMarkdown } from '@/lib/markdown';
+import { normalizeBlocks } from '@/lib/lessonBlocks';
+import { LESSON_KIND_LABEL, lessonKindOf } from '@/lib/lessonKinds';
+import { LessonBlocks } from '@/components/lesson/LessonBlocks';
 import { Accordion, Icon, KnowledgeMark } from '@/components/ui';
 import ProblemLog from './ProblemLog';
 import LessonPractice from './LessonPractice';
 import ManualAiPanel, { postManual } from '@/components/ManualAiPanel';
 import { useAiMode } from '@/lib/useAiMode';
 import ModuleNotesDrawer from './ModuleNotesDrawer';
+import { readStudySession, writeStudySession } from '@/lib/studySession';
 
 interface ModuleStudyRoomProps {
   topicId: string;
@@ -63,6 +67,10 @@ export default function ModuleStudyRoom({
   const { mode: aiMode, manual: manualMode } = useAiMode();
   const [manualHere, setManualHere] = useState(false);
   const [manualPrompt, setManualPrompt] = useState<string | null>(null);
+  // Rewriting one section of a decision lesson: running now (AI), or open in the copy-paste panel.
+  const [redoing, setRedoing] = useState<number | null>(null);
+  const [redoManual, setRedoManual] = useState<number | null>(null);
+  const [redoError, setRedoError] = useState<string | null>(null);
 
   // Socratic Challenge Interactive State
   const [challengeAnswer, setChallengeAnswer] = useState('');
@@ -81,10 +89,30 @@ export default function ModuleStudyRoom({
   const [quizSelections, setQuizSelections] = useState<Record<number, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizResult, setQuizResult] = useState<string | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const draftKey = `lesson:${topicId}:${module.id}`;
+  const lessonSignature = JSON.stringify([lesson?.quiz, lesson?.socraticChallenge, lesson?.exercises]);
+  useEffect(() => {
+    if (loadingLesson || !lesson || draftReady) return;
+    const draft = readStudySession<{ signature: string; tab: typeof activeTab; answer: string; selections: Record<number, number> }>(draftKey);
+    if (draft?.signature === lessonSignature) {
+      if (['guide', 'practice', 'media', 'challenge', 'quiz'].includes(draft.tab)) setActiveTab(draft.tab);
+      if (typeof draft.answer === 'string') setChallengeAnswer(draft.answer);
+      if (draft.selections && typeof draft.selections === 'object') setQuizSelections(draft.selections);
+    }
+    setDraftReady(true);
+    // A manual import can supply the first lesson without changing loadingLesson.
+  }, [loadingLesson, draftKey, lessonSignature, draftReady, lesson]);
+  useEffect(() => {
+    if (draftReady && !loadingLesson && lesson) {
+      writeStudySession(draftKey, { signature: lessonSignature, tab: activeTab, answer: challengeAnswer, selections: quizSelections });
+    }
+  }, [draftReady, loadingLesson, draftKey, lessonSignature, activeTab, challengeAnswer, quizSelections, lesson]);
 
   // Fetch or Generate Full Comprehensive Lesson
   const loadLesson = useCallback(async (forceRegenerate = false, viaManual = false) => {
     setLoadingLesson(true);
+    setDraftReady(false);
     setManualPrompt(null);
     setEvaluation(null);
     setChallengeAnswer('');
@@ -132,6 +160,23 @@ export default function ModuleStudyRoom({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadLesson, aiMode === null]);
 
+  const blockUrl = `/api/topics/${topicId}/modules/${module.id}/block`;
+  const redoSection = async (index: number) => {
+    setRedoError(null);
+    if (manualMode || manualHere) { setRedoManual(index); return; }
+    setRedoing(index);
+    try {
+      const res = await fetch(blockUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ index }) });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.blocks)) setLesson((l: any) => ({ ...l, blocks: data.blocks }));
+      else setRedoError(data.error || 'Couldn’t rewrite that section.');
+    } catch {
+      setRedoError('Couldn’t reach the server.');
+    } finally {
+      setRedoing(null);
+    }
+  };
+
   // Evaluate Socratic Challenge Answer
   const handleEvaluateChallenge = async () => {
     if (!challengeAnswer.trim()) return;
@@ -175,9 +220,11 @@ export default function ModuleStudyRoom({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes: html }),
       });
-      if (res.ok) onModuleNotesSaved?.(moduleId, html);
+      if (!res.ok) throw new Error('Could not save module notes');
+      onModuleNotesSaved?.(moduleId, html);
     } catch (err) {
       console.error('Failed to save module notes:', err);
+      throw err;
     }
   };
 
@@ -410,6 +457,14 @@ export default function ModuleStudyRoom({
           </div>
         ) : (
           <>
+            {lesson && !lesson.fallback && lessonKindOf(lesson.kind) !== lessonKindOf(module.kind) && (
+              <p className="m-0 rounded-xl border border-solid border-line px-4 py-3 text-[0.95rem]">
+                This lesson was written as “{LESSON_KIND_LABEL[lessonKindOf(lesson.kind)].toLowerCase()}”, but it is now set to “{LESSON_KIND_LABEL[lessonKindOf(module.kind)].toLowerCase()}”.{' '}
+                <button type="button" className="font-semibold underline underline-offset-2" onClick={() => loadLesson(true, useManual)}>
+                  Regenerate it to match
+                </button>
+              </p>
+            )}
             {lesson?.fallback && !useManual && (
               <p className="m-0 rounded-xl border border-line px-4 py-3 text-[0.95rem]">
                 Our AI couldn’t write this lesson right now.{' '}
@@ -436,6 +491,29 @@ export default function ModuleStudyRoom({
 
                 {lesson.explanation && (
                   <div className="lesson-prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(lesson.explanation) }} />
+                )}
+
+                <LessonBlocks blocks={normalizeBlocks(lesson.blocks)} onRedo={redoSection} redoing={redoing} />
+                {redoError && <p role="alert" className="m-0 text-[0.95rem] text-danger">{redoError}</p>}
+                {redoManual !== null && (
+                  <ManualAiPanel
+                    key={`redo-${redoManual}`}
+                    title="Redo this section in your own chat"
+                    what="a new version of this one section"
+                    getPrompt={async () => {
+                      const r = await postManual<{ prompt: string }>(blockUrl, { index: redoManual, step: 'prompt' });
+                      if (!r.ok) throw new Error(r.problems[0]);
+                      return r.data.prompt;
+                    }}
+                    importReply={async (reply) => {
+                      const r = await postManual<{ blocks: unknown[] }>(blockUrl, { index: redoManual, step: 'import', reply });
+                      if (!r.ok) return r;
+                      setLesson((l: any) => ({ ...l, blocks: r.data.blocks }));
+                      setRedoManual(null);
+                      return { ok: true };
+                    }}
+                    onCancel={() => setRedoManual(null)}
+                  />
                 )}
 
                 {lesson.codeOrExample && (
@@ -696,6 +774,8 @@ export default function ModuleStudyRoom({
 
       {/* Slide-over Notes Drawer */}
       <ModuleNotesDrawer
+        key={module.id}
+        topicId={topicId}
         open={notesDrawerOpen}
         onClose={() => setNotesDrawerOpen(false)}
         moduleId={module.id}

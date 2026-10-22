@@ -21,10 +21,12 @@ vi.mock('@/lib/rateLimit', () => ({ aiQuotaGate: async () => new Response('over 
 vi.mock('@/lib/apiAuth', () => ({ requireAuth: () => ({ userId: 'u1' }) }));
 
 const saved: { lessons: any[]; sessions: any[] } = { lessons: [], sessions: [] };
+/** The kind the module was created with (CurriculumItem.kind); null = no such row. */
+const storedKind: { value: string | null; blueprint: unknown } = { value: null, blueprint: null };
 vi.mock('@/lib/db', () => {
   const db: any = {
     topic: { findFirst: async () => ({ id: 't1', title: 'Guitar practice', why: null, contract: { currentLevel: 'Beginner' } }) },
-    curriculumItem: { findMany: async () => [] },
+    curriculumItem: { findMany: async () => [], findFirst: async () => (storedKind.value ? { kind: storedKind.value, blueprint: storedKind.blueprint } : null) },
     moduleAttempt: { findMany: async () => [] },
     confusion: { findMany: async () => [] },
     mistake: { findMany: async () => [] },
@@ -51,6 +53,8 @@ beforeEach(() => {
   manualLogs.length = 0;
   saved.lessons.length = 0;
   saved.sessions.length = 0;
+  storedKind.value = null;
+  storedKind.blueprint = null;
 });
 
 describe('plan questions', () => {
@@ -93,6 +97,91 @@ describe('lesson', () => {
     expect(manualLogs).toEqual(['lesson']);
     expect(aiCalls).toHaveLength(0);
   });
+  it('a concept lesson is saved without a kind, exactly as before kinds existed', async () => {
+    const { POST } = await import('./generate-lesson/route');
+    const lesson = { title: 'T', summary: 'S', explanation: 'E', kind: 'decision' };
+    await POST(post({ ...body, step: 'import', reply: fence(lesson) }));
+    expect(saved.lessons[0].content.kind).toBeUndefined();
+  });
+
+  describe('decision kind', () => {
+    const decisionBody = { ...body, moduleTitle: 'Choosing a tech stack', topicTitle: 'Web architecture', kind: 'decision' };
+    const decisionLesson = {
+      title: 'Choosing a tech stack',
+      summary: 'Pick a stack and defend it.',
+      explanation: 'Settle constraints first.',
+      blocks: [
+        { type: 'comparison_table', options: ['Next.js', 'Rails'], rows: [{ criterion: 'Cost', cells: [{ text: 'spiky', rating: 1 }, { text: 'steady', rating: 3, best: true }] }] },
+        { type: 'pros_cons', items: [{ option: 'Rails', pros: ['Few parts'], cons: ['You run it'] }] },
+        { type: 'decision_flow', start: 'q', nodes: [{ id: 'q', question: 'SEO?', yes: 'a', no: 'b' }, { id: 'a', outcome: 'Next.js' }, { id: 'b', outcome: 'Rails' }] },
+        { type: 'made_up', foo: 1 },
+      ],
+      quiz: [],
+    };
+
+    it('asks for the decision sections, not the concept ones, without calling paid AI', async () => {
+      const { POST } = await import('./generate-lesson/route');
+      const d = await (await POST(post({ ...decisionBody, step: 'prompt' }))).json();
+      expect(d.prompt).toMatch(/comparison_table/);
+      expect(d.prompt).toMatch(/decision_flow/);
+      expect(d.prompt).toMatch(/NEVER state an exact price/);
+      expect(d.prompt).toMatch(/Choosing a tech stack/);
+      expect(aiCalls).toHaveLength(0);
+    });
+
+    it('a concept request still gets the concept prompt', async () => {
+      const { POST } = await import('./generate-lesson/route');
+      const d = await (await POST(post({ ...body, step: 'prompt' }))).json();
+      expect(d.prompt).not.toMatch(/comparison_table/);
+    });
+
+    it('saves drawable blocks and the kind, and drops a block type it does not know', async () => {
+      const { POST } = await import('./generate-lesson/route');
+      const r = await POST(post({ ...decisionBody, step: 'import', reply: fence(decisionLesson) }));
+      expect(r.status).toBe(200);
+      const content = saved.lessons[0].content;
+      expect(content.kind).toBe('decision');
+      expect(content.blocks.map((b: any) => b.type)).toEqual(['comparison_table', 'pros_cons', 'decision_flow']);
+      expect(aiCalls).toHaveLength(0);
+    });
+
+    it('uses the kind the module was created with when the request does not say', async () => {
+      const { POST } = await import('./generate-lesson/route');
+      storedKind.value = 'decision';
+      const { kind: _omit, ...noKind } = decisionBody;
+      const d = await (await POST(post({ ...noKind, step: 'prompt' }))).json();
+      expect(d.prompt).toMatch(/comparison_table/);
+      await POST(post({ ...noKind, step: 'import', reply: fence(decisionLesson) }));
+      expect(saved.lessons[0].content.kind).toBe('decision');
+    });
+
+    it('asks only for the sections in the module blueprint', async () => {
+      const { POST } = await import('./generate-lesson/route');
+      storedKind.value = 'decision';
+      storedKind.blueprint = ['comparison_table', 'matrix_2x2'];
+      const { kind: _omit, ...noKind } = decisionBody;
+      const d = await (await POST(post({ ...noKind, step: 'prompt' }))).json();
+      expect(d.prompt).toMatch(/"type": "comparison_table"/);
+      expect(d.prompt).toMatch(/"type": "matrix_2x2"/);
+      expect(d.prompt).not.toMatch(/"type": "cost_chart"/);
+      expect(d.prompt).not.toMatch(/"type": "decision_flow"/);
+    });
+
+    it('a module stored as concept stays concept', async () => {
+      const { POST } = await import('./generate-lesson/route');
+      storedKind.value = 'concept';
+      const { kind: _omit, ...noKind } = decisionBody;
+      const d = await (await POST(post({ ...noKind, step: 'prompt' }))).json();
+      expect(d.prompt).not.toMatch(/comparison_table/);
+    });
+
+    it('an unknown kind falls back to a concept lesson', async () => {
+      const { POST } = await import('./generate-lesson/route');
+      const d = await (await POST(post({ ...decisionBody, kind: 'banana', step: 'prompt' }))).json();
+      expect(d.prompt).not.toMatch(/comparison_table/);
+    });
+  });
+
   it('a lesson missing its teaching text is refused and nothing is saved', async () => {
     const { POST } = await import('./generate-lesson/route');
     const r = await POST(post({ ...body, step: 'import', reply: fence({ title: 'x' }) }));

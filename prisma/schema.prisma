@@ -841,6 +841,10 @@ model CurriculumItem {
   completed        Boolean   @default(false)
   completedAt      DateTime?
   notes            String    @default("")
+  // concept | decision — see src/lib/lessonKinds.ts. Decides which sections the lesson has.
+  kind             String    @default("concept")
+  // Which sections a decision lesson should have, e.g. ["comparison_table","cost_chart"]. Null = all. See src/lib/lessonBlocks.ts.
+  blueprint        Json?
 
   removed Boolean @default(false) // soft-removal, same reasoning as Confusion.removed
 

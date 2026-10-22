@@ -9,7 +9,7 @@ import PrioritizationPortal from '../PrioritizationPortal';
 import RoadmapWizard from '../RoadmapWizard';
 import { topicLabelUnderGoal } from '@/lib/statusLabels';
 import { GOAL_STATUS_WORD, type GoalStatusName } from '@/lib/goalStatusWords';
-import { Icon, KnowledgeStrip } from '@/components/ui';
+import { KnowledgeStrip } from '@/components/ui';
 import type { Knowledge } from '@/lib/moduleState';
 
 interface Topic {
@@ -551,15 +551,12 @@ export default function PlanPage() {
       <header className="flex flex-wrap items-end justify-between gap-5">
         <div className="flex flex-col gap-2">
           <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Learn</h1>
+          <p className="m-0 text-[0.95rem] text-fg-muted">One place to begin anything: a lesson, a series or a full plan.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {isOwner && <Link href="/library" className="btn btn-secondary h-11 py-0 no-underline hover:no-underline">Field library</Link>}
-          <Link href="/learn/new" className="btn btn-secondary h-11 py-0 no-underline hover:no-underline">
-            <Icon name="plus" size={16} /> Add a single topic
-          </Link>
-          <Link href="/learn/program" className="btn btn-primary h-11 py-0 no-underline hover:no-underline">
-            Build a learning plan
-          </Link>
+          <Link href="/learn/all" className="btn btn-secondary h-11 py-0 no-underline hover:no-underline">All lessons</Link>
+          <Link href="/learn/start" className="btn btn-primary h-11 py-0 no-underline hover:no-underline">Start learning</Link>
         </div>
       </header>
 

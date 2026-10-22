@@ -203,13 +203,20 @@ input, select, textarea, button {
 
 button {
   cursor: pointer;
-  border: none;
+  border: 0 solid;
   background: none;
 }
 
 :focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
+}
+
+/* Supply the border defaults normally provided by preflight. Zero width
+   keeps borders opt-in; later legacy rules and utilities choose their width. */
+*, ::before, ::after {
+  border-width: 0;
+  border-style: solid;
 }
 
 code, pre, kbd {

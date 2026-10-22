@@ -1,0 +1,47 @@
+{
+  "title": "Build a URL shortener",
+  "summary": "Build a small program that turns a long link into a short code and back, and know when it is done.",
+  "learningObjectives": ["Generate a short code for a URL", "Look up the original from the code", "Handle codes that do not exist"],
+  "keyTakeaways": ["Start with the smallest version that works", "Check after every step", "Storage and code generation are separate concerns"],
+  "explanation": "You will build the core of a URL shortener in plain Python, with no web framework. **Done means**: you can call `shorten(url)` and get a short code, and call `expand(code)` to get the original back.\n\nYou need Python 3 and a text editor. This is a SAMPLE lesson for testing the layout.",
+  "blocks": [
+    {
+      "type": "timeline",
+      "title": "Milestones",
+      "phases": [
+        { "label": "It stores a link", "duration": "20 min", "goal": "A function saves a URL and returns a code", "milestones": ["shorten('https://example.com') returns a code"] },
+        { "label": "It looks one up", "duration": "15 min", "goal": "A function returns the original from a code", "milestones": ["expand(code) returns the original URL", "An unknown code gives a clear message"] },
+        { "label": "It is robust", "duration": "20 min", "goal": "Repeated links and bad input are handled", "milestones": ["The same URL gives the same code", "Empty input is rejected"] }
+      ]
+    },
+    {
+      "type": "steps",
+      "title": "Step by step",
+      "steps": [
+        { "title": "Create the file", "instruction": "Create a file called shortener.py and open it in your editor.", "check": "Running 'python shortener.py' prints nothing and does not error.", "snag": "If 'python' is not found, try 'python3'." },
+        { "title": "Store links in a dictionary", "instruction": "Add an empty dictionary called store that maps a code to a URL.", "check": "Printing store shows {}.", "snag": "A dictionary at the top of the file is lost when the program exits; that is fine for now." },
+        { "title": "Make a code", "instruction": "Write shorten(url) that picks a random 6-character code from letters and digits, saves it in store, and returns it.", "check": "Two calls return two different codes.", "snag": "Codes can collide; loop until you get one that is not already in store." },
+        { "title": "Look it up", "instruction": "Write expand(code) that returns store[code], or None if the code is unknown.", "check": "expand(shorten(u)) == u.", "snag": "store[code] raises an error for an unknown code; use store.get(code)." }
+      ]
+    }
+  ],
+  "codeOrExample": "```python\nimport random\nimport string\n\nstore = {}\n\ndef shorten(url):\n    alphabet = string.ascii_letters + string.digits\n    code = ''.join(random.choice(alphabet) for _ in range(6))\n    while code in store:\n        code = ''.join(random.choice(alphabet) for _ in range(6))\n    store[code] = url\n    return code\n\ndef expand(code):\n    return store.get(code)\n\nif __name__ == '__main__':\n    c = shorten('https://example.com/a/very/long/path')\n    print(c, expand(c))\n```",
+  "commonMistakes": ["Adding a web server before the core works", "Not handling a code that does not exist", "Copying code without running it after each step"],
+  "quiz": [
+    { "question": "Why check the result after every step?", "options": ["To slow down", "To find a mistake while it is still small", "Because the editor requires it", "To make the file longer"], "correctIndex": 1, "explanation": "A fault found right after the step that caused it is much easier to fix." },
+    { "question": "Why use store.get(code) instead of store[code] in expand?", "options": ["It is faster", "It returns None instead of raising an error for an unknown code", "It sorts the keys", "It saves memory"], "correctIndex": 1, "explanation": "get returns None for a missing key, so unknown codes are handled." },
+    { "question": "Two different URLs get the same random code. What should happen?", "options": ["Overwrite the first", "Generate a new code until it is unused", "Return an error to the user", "Append a number to the URL"], "correctIndex": 1, "explanation": "Looping until the code is unused avoids overwriting an existing link." }
+  ],
+  "recommendedResources": [{ "title": "Python documentation: dictionaries", "type": "docs", "searchQuery": "Python docs dictionaries data structures", "whyRecommended": "The official reference for the data structure this project uses." }],
+  "socraticChallenge": { "scenario": "expand() returns None for a code you just created.", "question": "How would you find the fault?", "idealAnswer": "Print the store and the code, check they match exactly, and check shorten saved the code before returning it." },
+  "exercises": [
+    { "type": "do", "instruction": "Extend it", "prompt": "Make shorten return the same code if the same URL is shortened twice.", "answer": "Success: shorten(u) == shorten(u). One way is a second dictionary from URL to code." },
+    { "type": "do", "instruction": "Validate", "prompt": "Make shorten reject an empty string.", "answer": "Success: shorten('') raises ValueError or returns None with a clear message." }
+  ],
+  "reviewCards": [
+    { "concept": "Done", "prompt": "Why define what 'done' looks like before you start a project?", "answer": "It keeps the scope small and tells you when to stop." },
+    { "concept": "Dictionary get", "prompt": "What is the difference between d[key] and d.get(key) for a missing key?", "answer": "d[key] raises an error; d.get(key) returns None." }
+  ],
+  "estimatedDifficulty": "beginner",
+  "prerequisites": ["Basic Python: functions and dictionaries"]
+}

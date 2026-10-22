@@ -15,6 +15,10 @@ import { competencyFromModuleId, type CompetencyMap } from '@/data/competencies'
 import { guessArchetype, isArchetype, type Archetype } from '@/lib/program/fieldGuide';
 import { EXERCISES_JSON, LESSON_GUIDE } from '@/lib/program/lessonGuide';
 import type { Intake } from '@/lib/program/types';
+import { lessonKindOf } from '@/lib/lessonKinds';
+import { buildKindMessages } from '@/lib/kindLessons';
+import { normalizeBlueprint } from '@/lib/lessonBlocks';
+import { KIND_BLOCKS } from '@/lib/lessonKinds';
 
 export const maxDuration = 90;
 
@@ -810,10 +814,31 @@ Do not use motivational filler.
 Do not merely describe what the student should learn.
 Actually teach the concept.
 `;
-  const messages: AIMessage[] = [
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: userPrompt },
-  ];
+  // What the lesson must leave the learner able to do. Unknown or missing is a
+  // concept lesson, which is every lesson written before this existed.
+  // An explicit request wins; otherwise the kind the module was created with.
+  const stored = canPersist
+    ? await db.curriculumItem.findFirst({ where: { topicId, legacyId: moduleId, removed: false }, select: { kind: true, blueprint: true } }).catch(() => null)
+    : null;
+  const kind = lessonKindOf(body.kind ?? stored?.kind);
+  const messages: AIMessage[] = kind !== 'concept'
+    ? buildKindMessages(kind, {
+        topicTitle: topicTitle ?? '',
+        moduleTitle,
+        area,
+        learnerLevel,
+        priorKnowledge,
+        planBlock,
+        coursePosition,
+        weaknesses: normalizedWeaknesses,
+        mistakes: normalizedMistakes,
+        today: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        blueprint: normalizeBlueprint(body.blueprint ?? stored?.blueprint, KIND_BLOCKS[kind]),
+      })
+    : [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ];
   if (manual === 'prompt') return NextResponse.json({ prompt: toChatPrompt(messages) });
 
   /*
@@ -946,6 +971,10 @@ To study it independently:
       });
     }
 
+    // The kind comes from the request, never from the model. Concept lessons
+    // stay exactly as they were saved before kinds existed.
+    const lesson = kind === 'concept' ? normalized : { ...normalized, kind };
+
     /*
      * Persist only verified AI content.
      */
@@ -974,12 +1003,12 @@ To study it independently:
             topicId,
             moduleId,
             moduleTitle,
-            content: normalized as object,
+            content: lesson as object,
             provider,
           },
           update: {
             moduleTitle,
-            content: normalized as object,
+            content: lesson as object,
             provider,
           },
         });
@@ -987,7 +1016,7 @@ To study it independently:
     }
 
     if (manual) await logManualImport('lesson', userId, provider);
-    return NextResponse.json(normalized);
+    return NextResponse.json(lesson);
   } catch (error) {
     console.error('Lesson generation error:', error);
 

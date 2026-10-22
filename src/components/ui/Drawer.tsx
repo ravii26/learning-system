@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
+import { useModalFocus } from '@/lib/useModalFocus';
 
 /**
  * Right-hand slide-over. Closes on Esc, backdrop click, or the Close
@@ -15,19 +16,17 @@ export function Drawer({ open, onClose, title, label, width = 680, children }: {
   width?: number;
   children: React.ReactNode;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  const panelRef = useModalFocus(open, onClose);
 
   if (!open) return null;
 
   return (
-    <div onClick={onClose} className="fixed inset-0 z-[60] flex justify-end bg-black/25">
+    <div onClick={onClose} className="fixed inset-0 z-[200] flex justify-end bg-black/25">
       <aside
+        ref={panelRef}
+        tabIndex={-1}
         role="dialog"
+        aria-modal="true"
         aria-label={label}
         onClick={(e) => e.stopPropagation()}
         style={{ width: `min(${width}px, 100vw)` }}

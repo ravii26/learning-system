@@ -133,6 +133,8 @@ export default function SocraticCoach({
     setDisplayConceptTitle(concept.title);
     setEditedTitleInput(concept.title);
     fetchSocraticData(concept.title);
+    // Reset and fetch only when the selected concept changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [concept.id, concept.title]);
 
   const [stageError, setStageError] = useState<string | null>(null);

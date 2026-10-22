@@ -1,10 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ToastProvider';
 import { Icon } from '@/components/ui';
+import { KIND_BLOCKS, KIND_DEFAULT_BLOCKS, guessLessonKind, isDefaultBlueprint, isLessonKind, type LessonKind } from '@/lib/lessonKinds';
+import type { BlockType } from '@/lib/lessonBlocks';
+import { BlueprintPicker } from '@/components/lesson/BlueprintPicker';
 
 /**
  * Learn something new: name it, say how far you want to go and what kind
@@ -14,7 +17,8 @@ import { Icon } from '@/components/ui';
  */
 
 type Depth = 'know' | 'use' | 'build' | 'interview';
-type Kind = 'syllabus' | 'practice' | 'accretion';
+// The lesson kinds (decision, survey, roadmap, case_study) are each stored as a course with one lesson of that kind (see lib/lessonKinds.ts).
+type Kind = 'syllabus' | 'practice' | 'accretion' | Exclude<LessonKind, 'concept'>;
 
 const DEPTHS: Array<{ key: Depth; label: string; desc: string; target: string }> = [
   { key: 'know', label: 'Know about it', desc: 'Follow conversations and articles. A short overview, no exercises.', target: 'Awareness' },
@@ -25,6 +29,10 @@ const DEPTHS: Array<{ key: Depth; label: string; desc: string; target: string }>
 
 const KINDS: Array<{ key: Kind; label: string; desc: string; explain: string }> = [
   { key: 'syllabus', label: 'Course', desc: 'a syllabus to finish', explain: 'A roadmap of modules in order. Each one ends with a check, and what you learn comes back for review.' },
+  { key: 'decision', label: 'Decision', desc: 'choose between options', explain: 'One lesson that compares real options side by side (cost, upkeep, lock-in, outlook) and ends with a way to decide. Add more decisions to it later.' },
+  { key: 'survey', label: 'Overview', desc: 'map a field', explain: 'One lesson that shows how a field is divided, what each part is for and what to learn first. Good before you commit to a course.' },
+  { key: 'case_study', label: 'Case study', desc: 'learn from real cases', explain: 'One lesson built from cases of how teams made a choice, with the reasoning and when it would not apply. Cases are labelled documented or illustrative.' },
+  { key: 'roadmap', label: 'Roadmap', desc: 'a path to follow', explain: 'One lesson that lays out phases in order, with a realistic pace and milestones you can check. For a full syllabus with a lesson per module, choose Course.' },
   { key: 'practice', label: 'Practice', desc: 'a skill you repeat', explain: 'No syllabus. A short daily rep, a scoring rubric, and a trend line of how you’re improving.' },
   { key: 'accretion', label: 'Collect ideas', desc: 'no finish line', explain: 'A place in your Notebook. Captures on this subject land here, and ideas worth keeping become review cards. Never a percentage.' },
 ];
@@ -45,10 +53,28 @@ export default function LearnSomethingNewPage() {
   const [area, setArea] = useState('Tech');
   const [depth, setDepth] = useState<Depth>('use');
   const [kind, setKind] = useState<Kind>('syllabus');
+  // Until they choose a kind themselves, the title suggests one ("Postgres vs MongoDB" reads as a decision).
+  const [kindPicked, setKindPicked] = useState(false);
+  // Sections chosen for the current lesson kind; switching kind starts again from all of that kind's sections.
+  const lessonKind: LessonKind | null = isLessonKind(kind) ? kind : null;
+  const [bp, setBp] = useState<{ kind: LessonKind; value: BlockType[] } | null>(null);
+  const blueprint: BlockType[] = lessonKind ? (bp && bp.kind === lessonKind ? bp.value : [...KIND_DEFAULT_BLOCKS[lessonKind]]) : [];
   const [modules, setModules] = useState<DraftModule[] | null>(null);
   const [building, setBuilding] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // "Start learning" hands over its answers in the address: the title, the reason, and what each lesson of a series should be.
+  const [moduleKind, setModuleKind] = useState<LessonKind | null>(null);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const t = p.get('title');
+    if (t) { setTitle(t); setKind('syllabus'); setKindPicked(true); }
+    const w = p.get('why');
+    if (w) setWhy(w);
+    const mk = p.get('moduleKind');
+    if (isLessonKind(mk) && mk !== 'concept') setModuleKind(mk);
+  }, []);
 
   const depthTarget = DEPTHS.find((d) => d.key === depth)!.target;
   const chosen = (modules ?? []).filter((m) => m.on);
@@ -83,12 +109,14 @@ export default function LearnSomethingNewPage() {
     setCreating(true);
     setError(null);
     const curriculum = kind === 'syllabus'
-      ? chosen.map((m, i) => ({ id: Math.random().toString(36).slice(2, 9), order: i + 1, title: m.title, estimatedMinutes: m.estimatedMinutes, completed: false, completedAt: null, notes: '' }))
-      : [];
+      ? chosen.map((m, i) => ({ id: Math.random().toString(36).slice(2, 9), order: i + 1, title: m.title, estimatedMinutes: m.estimatedMinutes, completed: false, completedAt: null, notes: '', ...(moduleKind ? { kind: moduleKind } : {}) }))
+      : lessonKind
+        ? [{ id: Math.random().toString(36).slice(2, 9), order: 1, title: title.trim(), estimatedMinutes: 30, completed: false, completedAt: null, notes: '', kind: lessonKind, ...(blueprint.length > 0 && !isDefaultBlueprint(lessonKind, blueprint) ? { blueprint } : {}) }]
+        : [];
     const body = (status: 'active' | 'queued') => JSON.stringify({
       title: title.trim(),
       area,
-      mode: kind,
+      mode: lessonKind ? 'syllabus' : kind,
       status,
       depthTarget,
       why: why.trim() || `I want to learn ${title.trim()}`,
@@ -135,7 +163,14 @@ export default function LearnSomethingNewPage() {
           id="what"
           className="form-input h-14 text-[1.2rem]"
           value={title}
-          onChange={(e) => { setTitle(e.target.value); setModules(null); }}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            setModules(null);
+            if (!kindPicked) {
+              const guess = guessLessonKind(e.target.value);
+              setKind(guess === 'concept' ? 'syllabus' : guess);
+            }
+          }}
           placeholder="e.g. Postgres internals, Investing, Spoken English"
           autoFocus
         />
@@ -155,15 +190,19 @@ export default function LearnSomethingNewPage() {
 
       <fieldset className="m-0 flex flex-col gap-3 border-0 p-0">
         <legend className="mb-3 p-0 text-[1.15rem] font-semibold">What kind of learning is it?</legend>
-        <div className="grid gap-2.5 sm:grid-cols-3">
+        <div className="grid gap-2.5 sm:grid-cols-2">
           {KINDS.map((k) => (
-            <button key={k.key} type="button" aria-pressed={kind === k.key} onClick={() => setKind(k.key)} className={choice(kind === k.key)}>
+            <button key={k.key} type="button" aria-pressed={kind === k.key} onClick={() => { setKind(k.key); setKindPicked(true); }} className={choice(kind === k.key)}>
               <span className="text-[1rem] font-semibold">{k.label}</span>
               <span className="text-[0.85rem] text-fg-secondary">{k.desc}</span>
             </button>
           ))}
         </div>
-        <p className="m-0 text-[0.9rem] text-fg-muted">{KINDS.find((k) => k.key === kind)!.explain}</p>
+        <p className="m-0 text-[0.9rem] text-fg-muted">
+          {!kindPicked && lessonKind ? `That reads like “${KINDS.find((k) => k.key === kind)!.label}”, so we picked it. Change it if not. ` : ''}
+          {KINDS.find((k) => k.key === kind)!.explain}
+        </p>
+        {lessonKind && <BlueprintPicker allowed={KIND_BLOCKS[lessonKind]} value={blueprint} onChange={(value) => setBp({ kind: lessonKind, value })} />}
       </fieldset>
 
       {kind === 'syllabus' && (

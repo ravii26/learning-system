@@ -116,6 +116,11 @@ export default function BuildProgramPage() {
   useEffect(() => {
     fetch('/api/library').then((r) => (r.ok ? r.json() : null)).then((d) => d && setLibrary(d.mine ?? [])).catch(() => {});
   }, []);
+  // "Start learning" passes the goal in the address (?goal=...).
+  useEffect(() => {
+    const g = new URLSearchParams(window.location.search).get('goal');
+    if (g) setGoal(g);
+  }, []);
   const [ownList, setOwnList] = useState(false);
   const libraryMatch = useMemo(() => {
     if (ownList || goal.trim().length <= 2 || !library.length) return null;
@@ -457,7 +462,7 @@ export default function BuildProgramPage() {
           <span className="text-[0.85rem] text-fg-muted">Nothing is saved until you approve the plan.</span>
         </div>
         <p className="m-0 text-[0.85rem] text-fg-muted">
-          Just want to add one topic? <Link href="/learn/new">Add a single topic</Link>
+          Just want to add one topic? <Link href="/learn/start">Add a single topic</Link>
         </p>
       </div>
     );

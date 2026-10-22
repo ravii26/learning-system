@@ -9,6 +9,8 @@
  * SessionLog.moduleId point at it.
  */
 import type { PrismaClient, Prisma } from '@prisma/client';
+import { isLessonKind, type LessonKind } from './lessonKinds';
+import { normalizeBlueprint, type BlockType } from './lessonBlocks';
 
 export type DbClient = PrismaClient | Prisma.TransactionClient;
 
@@ -20,6 +22,10 @@ export interface CurriculumJson {
   completed: boolean;
   completedAt: string | null;
   notes: string;
+  /** Only present for non-concept lessons, so existing modules keep their exact shape. */
+  kind?: LessonKind;
+  /** Which sections a decision lesson has; absent = all of them. */
+  blueprint?: BlockType[];
 }
 
 export interface CurriculumRowLike {
@@ -31,6 +37,8 @@ export interface CurriculumRowLike {
   completed: boolean;
   completedAt: Date | null;
   notes: string;
+  kind?: string;
+  blueprint?: unknown;
 }
 
 const newLegacyId = () => Math.random().toString(36).substring(2, 9);
@@ -44,6 +52,8 @@ export function curriculumRowToJson(row: CurriculumRowLike): CurriculumJson {
     completed: row.completed,
     completedAt: row.completedAt ? row.completedAt.toISOString() : null,
     notes: row.notes,
+    ...(isLessonKind(row.kind) && row.kind !== 'concept' ? { kind: row.kind } : {}),
+    ...(normalizeBlueprint(row.blueprint).length ? { blueprint: normalizeBlueprint(row.blueprint) } : {}),
   };
 }
 
@@ -56,6 +66,11 @@ export function curriculumJsonToRowData(j: Partial<CurriculumJson>, fallbackOrde
     completed: Boolean(j.completed),
     completedAt: j.completed && j.completedAt ? new Date(j.completedAt) : null,
     notes: typeof j.notes === 'string' ? j.notes : '',
+    // Left out when absent or unknown, so a stale copy of the syllabus (one
+    // written before kinds existed) can never reset a module's kind.
+    ...(isLessonKind(j.kind) ? { kind: j.kind } : {}),
+    // Same rule: only a list that was actually sent changes the stored one.
+    ...(Array.isArray(j.blueprint) ? { blueprint: normalizeBlueprint(j.blueprint) } : {}),
   };
 }
 

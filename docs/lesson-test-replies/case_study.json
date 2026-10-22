@@ -1,0 +1,52 @@
+{
+  "title": "When teams change architecture",
+  "summary": "Read two cases of an architecture change and say what drove the choice and when it would not apply.",
+  "learningObjectives": ["Find the constraint behind a decision", "Judge when a case does not transfer"],
+  "keyTakeaways": ["Every case had constraints you may not share", "Do not copy a famous company's choice"],
+  "explanation": "When reading any case, ask three questions: **what constraint forced the choice**, **what did they give up**, and **what would have to be true for you to do the same**.\n\nThe cases below are SAMPLE scenarios for testing the layout. They are labelled illustrative on purpose.",
+  "blocks": [
+    {
+      "type": "case_study",
+      "title": "A small shop keeps its monolith",
+      "basis": "illustrative",
+      "situation": "A six-person team runs one application and feels pressure to split it into services.",
+      "choice": "They keep the single application and add module boundaries inside it.",
+      "reasons": ["Only one team deploys", "No part of the app scales differently from the rest"],
+      "outcome": "Deploys stay simple and the team ships features faster.",
+      "lesson": "Split a system when teams or scaling needs differ, not because services are fashionable."
+    },
+    {
+      "type": "case_study",
+      "title": "A busy product splits its search",
+      "basis": "illustrative",
+      "situation": "Search traffic is far heavier than the rest of the app and slows everything during peaks.",
+      "choice": "They move search to its own service with its own scaling.",
+      "reasons": ["Search load is spiky and different from other load", "A separate team owns it"],
+      "outcome": "Peaks no longer slow checkout, at the price of extra operational work.",
+      "lesson": "Extract a part when its load or ownership genuinely differs, and accept the operational cost."
+    },
+    {
+      "type": "comparison_table",
+      "title": "The two cases compared",
+      "options": ["Keeps monolith", "Splits search"],
+      "rows": [
+        { "criterion": "Driving constraint", "cells": [{ "text": "One team, uniform load" }, { "text": "Uneven load, separate owners" }] },
+        { "criterion": "What they gave up", "cells": [{ "text": "Independent scaling" }, { "text": "Simplicity of one deploy" }] },
+        { "criterion": "Operational burden", "cells": [{ "text": "Low", "rating": 3, "best": true }, { "text": "Higher", "rating": 1 }] }
+      ]
+    }
+  ],
+  "codeOrExample": "",
+  "commonMistakes": ["Copying a famous company's architecture", "Ignoring that their team size and traffic were different"],
+  "quiz": [
+    { "question": "What drove the monolith case?", "options": ["Fashion", "One team and uniform load", "A new language", "Cost cutting only"], "correctIndex": 1, "explanation": "With one team and uniform load there was no reason to split." },
+    { "question": "In the search case, which change would make splitting unnecessary?", "options": ["Search load becomes similar to the rest", "A bigger logo", "More meetings", "A new database"], "correctIndex": 0, "explanation": "The split was driven by uneven load; remove that and the reason goes." },
+    { "question": "What is NOT safe to conclude from either case?", "options": ["Constraints matter", "Every company should copy one of them", "Splitting has a cost", "Keeping a monolith can be fine"], "correctIndex": 1, "explanation": "Cases show reasoning under specific constraints, not a universal answer." }
+  ],
+  "recommendedResources": [{ "title": "Martin Fowler: MonolithFirst", "type": "article", "searchQuery": "Martin Fowler MonolithFirst", "whyRecommended": "A well-known essay on when to split a system." }],
+  "socraticChallenge": { "scenario": "Your team of 4 reads that a large company split into 200 services.", "question": "Should you?", "idealAnswer": "Probably not: your constraints (team size, load) differ. Ask what drove their split and whether the same driver exists for you." },
+  "exercises": [{ "type": "write", "instruction": "Apply the reasoning", "prompt": "Your app has one team but one component has 10x the load. What do you do?", "answer": "Consider extracting just that component, since the load differs, and keep the rest together to limit operational cost." }],
+  "reviewCards": [{ "concept": "Case transfer", "prompt": "When does a case study's reasoning stop applying to you?", "answer": "When your constraints (team size, load, ownership) differ from the ones that drove their choice." }],
+  "estimatedDifficulty": "intermediate",
+  "prerequisites": []
+}

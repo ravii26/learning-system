@@ -2,6 +2,9 @@
 import { alertDialog, confirmDialog } from '@/components/dialogs';
 
 import React, { useState } from 'react';
+import { KIND_BLOCKS, KIND_DEFAULT_BLOCKS, LESSON_KINDS, LESSON_KIND_BADGE, LESSON_KIND_LABEL, guessLessonKind, isDefaultBlueprint, type LessonKind } from '@/lib/lessonKinds';
+import type { BlockType } from '@/lib/lessonBlocks';
+import { BlueprintPicker } from '@/components/lesson/BlueprintPicker';
 
 export interface CourseModule {
   id: string;
@@ -11,6 +14,10 @@ export interface CourseModule {
   completed: boolean;
   completedAt: string | null;
   notes: string;
+  /** What the lesson must leave you able to do; absent = a concept lesson. */
+  kind?: LessonKind;
+  /** Which sections the lesson has; absent = all of its kind's sections. */
+  blueprint?: BlockType[];
 }
 
 interface CurriculumViewProps {
@@ -34,6 +41,12 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newMinutes, setNewMinutes] = useState(30);
+  // Suggested from the title until the learner picks one themselves.
+  const [pickedKind, setPickedKind] = useState<LessonKind | null>(null);
+  const newKind: LessonKind = pickedKind ?? guessLessonKind(newTitle);
+  // The sections chosen for the kind being added; a different kind starts again from all of its sections.
+  const [bp, setBp] = useState<{ kind: LessonKind; value: BlockType[] } | null>(null);
+  const newBlueprint = bp && bp.kind === newKind ? bp.value : [...KIND_DEFAULT_BLOCKS[newKind]];
   const [bulkText, setBulkText] = useState('');
   const [showBulk, setShowBulk] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -148,10 +161,15 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
       completed: false,
       completedAt: null,
       notes: '',
+      ...(newKind !== 'concept' ? { kind: newKind } : {}),
+      // Only stored when the learner dropped some sections; otherwise the default (all) applies.
+      ...(newBlueprint.length > 0 && !isDefaultBlueprint(newKind, newBlueprint) ? { blueprint: newBlueprint } : {}),
     };
     const updated = [...modules, mod];
     setModules(updated);
     setNewTitle('');
+    setPickedKind(null);
+    setBp(null);
     await save(updated);
   };
 
@@ -165,6 +183,8 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
       completed: false,
       completedAt: null,
       notes: '',
+      // A line like "Postgres vs MongoDB" becomes a decision lesson; the badge on the row shows it.
+      ...(guessLessonKind(title) !== 'concept' ? { kind: guessLessonKind(title) } : {}),
     }));
     const updated = [...modules, ...newMods];
     setModules(updated);
@@ -307,6 +327,11 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
                   }}>
                     {isCurrent && <span style={{ color: 'var(--color-primary-light)', marginRight: '6px' }}>→</span>}
                     {mod.title}
+                    {mod.kind && mod.kind !== 'concept' && (
+                      <span style={{ marginLeft: '8px', fontSize: '0.68rem', fontWeight: 500, color: 'var(--color-text-muted)', border: '1px solid var(--border-color)', borderRadius: '99px', padding: '1px 8px', whiteSpace: 'nowrap' }}>
+                        {LESSON_KIND_BADGE[mod.kind]}
+                      </span>
+                    )}
                   </p>
                   {mod.completedAt && (
                     <p style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
@@ -542,6 +567,16 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
               onChange={e => setNewTitle(e.target.value)}
               style={{ flexGrow: 1 }}
             />
+            <select
+              className="form-input"
+              aria-label="What kind of lesson"
+              title="Understand a concept, or compare options and decide"
+              value={newKind}
+              onChange={e => setPickedKind(e.target.value as LessonKind)}
+              style={{ width: 'auto' }}
+            >
+              {LESSON_KINDS.map(k => <option key={k} value={k}>{LESSON_KIND_LABEL[k]}</option>)}
+            </select>
             <input
               type="number"
               className="form-input"
@@ -572,6 +607,7 @@ export default function CurriculumView({ curriculum, onSaveCurriculum, onImportT
             </button>
           </div>
         )}
+        {!showBulk && newKind !== 'concept' && <BlueprintPicker allowed={KIND_BLOCKS[newKind]} value={newBlueprint} onChange={(value) => setBp({ kind: newKind, value })} />}
       </div>
     </div>
   );

@@ -1,0 +1,48 @@
+{
+  "title": "Clean chord changes: G to C",
+  "summary": "Switch between G and C on guitar without buzzing or stopping, at a steady slow tempo.",
+  "learningObjectives": ["Move between G and C using the shortest finger path", "Keep a steady beat while changing"],
+  "keyTakeaways": ["Practise the change, not the chords", "Slow and clean beats fast and sloppy", "Short daily sessions beat one long one"],
+  "explanation": "A chord change is the hardest part of beginner guitar. The trick is to practise **the movement between two chords**, not each chord alone.\n\nGood looks like this: your fingers land together, every string rings, and you do not stop the beat. Do this drill **once a day for about 10 minutes**, and make the target a little harder each week.",
+  "blocks": [
+    {
+      "type": "steps",
+      "title": "How to make the change",
+      "steps": [
+        { "title": "Set up", "instruction": "Sit with the guitar upright and tune it. Place your fingers for G (second finger on the 6th string, 3rd fret; first finger on the 5th string, 2nd fret; third finger on the 1st string, 3rd fret).", "check": "Strum once: all six strings ring.", "snag": "A muted string usually means a finger is touching its neighbour; arch your fingers." },
+        { "title": "Find the shortest path", "instruction": "Look for a finger that barely moves between G and C. Keep your third finger as a guide and move the others around it.", "check": "You can name which finger moves least.", "snag": "Lifting every finger at once makes the change slow; move them together as one shape." },
+        { "title": "Change without strumming", "instruction": "Move from G to C and back, saying 'change' on each switch, with no strumming. Go slowly enough to land every finger.", "check": "All fingers land at the same moment.", "snag": "Looking away from the neck breaks your aim; look at it until it feels automatic." },
+        { "title": "Add the beat", "instruction": "Strum once per chord at 60 beats per minute with a metronome, switching on the beat.", "check": "You change without stopping for 8 bars.", "snag": "Rushing to catch up; if you fall behind, slow the metronome by 5 bpm." }
+      ]
+    },
+    {
+      "type": "routine",
+      "title": "Today's practice session",
+      "parts": [
+        { "label": "Warm-up", "minutes": 3, "instruction": "Stretch your fingers and play each chord once, slowly.", "target": "Every string rings in both chords" },
+        { "label": "Main drill", "minutes": 6, "instruction": "Change G to C and back with no strumming, then with one strum per chord at 60 bpm.", "target": "20 clean changes in a row" },
+        { "label": "Use it for real", "minutes": 4, "instruction": "Play a four-bar loop (G, C, G, C) with a simple down-strum pattern.", "target": "One full loop without stopping" }
+      ],
+      "note": "Stop if your fingers or wrist hurt. Raise the tempo by 5 bpm only when the target is easy."
+    }
+  ],
+  "codeOrExample": "",
+  "commonMistakes": ["Practising fast and building sloppy habits", "Skipping the metronome, so the beat drifts", "Lifting all fingers high off the strings"],
+  "quiz": [
+    { "question": "Your G to C change is buzzing and late. What is the best first fix?", "options": ["Strum harder", "Slow the tempo until every finger lands together", "Skip the warm-up", "Use a lighter pick"], "correctIndex": 1, "explanation": "Slowing down lets the fingers learn the path; speed comes later." },
+    { "question": "Which part of the drill builds the movement without the strumming hand getting in the way?", "options": ["The main drill with strums", "Changing with no strumming", "The warm-up", "The real loop"], "correctIndex": 1, "explanation": "Removing the strumming isolates the fretting-hand movement." },
+    { "question": "A muted string most often means:", "options": ["The guitar is out of tune", "A finger is touching the neighbouring string", "You are playing too slowly", "The strings are new"], "correctIndex": 1, "explanation": "A flat finger touching the next string stops it from ringing; arch the fingers." }
+  ],
+  "recommendedResources": [{ "title": "Justin Guitar: beginner chord changes", "type": "video", "searchQuery": "Justin Guitar beginner G to C chord change", "whyRecommended": "A widely used, free teacher with clear demonstrations." }],
+  "socraticChallenge": { "scenario": "You have practised G to C for two weeks and it is not getting faster.", "question": "What would you change about your practice?", "idealAnswer": "Slow down, isolate the change without strumming, check for a muted string, and shorten but repeat the sessions daily rather than practising longer less often." },
+  "exercises": [
+    { "type": "do", "instruction": "Time yourself", "prompt": "Set a one-minute timer and count clean G to C changes.", "answer": "Success: 20 clean changes in a minute with every string ringing." },
+    { "type": "write", "instruction": "Diagnose", "prompt": "Your change is clean but you stop the beat. What is the most likely cause?", "answer": "You are changing too slowly for the tempo; lower the metronome until you can keep the beat, then raise it." }
+  ],
+  "reviewCards": [
+    { "concept": "Chord change", "prompt": "Why practise the change between two chords instead of each chord alone?", "answer": "The movement is the hard part; isolating it trains the fingers' path." },
+    { "concept": "Tempo", "prompt": "What should you do if you fall behind the metronome while changing chords?", "answer": "Slow the metronome by about 5 bpm and rebuild from there." }
+  ],
+  "estimatedDifficulty": "beginner",
+  "prerequisites": ["Holding the guitar and tuning it"]
+}

@@ -1,0 +1,42 @@
+{
+  "title": "Reading Atomic Habits",
+  "summary": "Read a self-improvement book actively: ask before, answer while reading, and recall after, so you remember and use it.",
+  "learningObjectives": ["Set a purpose before you read", "Recall each part from memory", "Turn one idea into a small action"],
+  "keyTakeaways": ["Reading is not learning until you can recall it", "Write before you look", "Apply one idea at a time"],
+  "explanation": "This guide gives you a **method**, not a summary of the book. It does not describe the book's chapters, because the exact structure is not known here, so the parts below are split by **position**.\n\nA simple pace: read for 25 minutes, close the book, and write what you remember. Keep a note page with three headings: *What I remember*, *What I do not understand*, *One thing to try*.",
+  "blocks": [
+    {
+      "type": "study_guide",
+      "title": "How to work through it",
+      "resource": { "title": "Atomic Habits", "kind": "book" },
+      "basis": "by_position",
+      "before": ["Why am I reading this, and what do I want to change?", "What do I already believe about how habits form?"],
+      "parts": [
+        { "label": "The opening third", "focus": "What problem the author says they are solving, and the central idea.", "questions": ["What is the main claim in one sentence?", "What example convinces you most, and why?"] },
+        { "label": "The middle third", "focus": "The practical methods offered.", "questions": ["Which method could you try this week?", "What would stop you from doing it?"] },
+        { "label": "The last third", "focus": "How the ideas combine and how to keep going.", "questions": ["How would you explain the whole approach to a friend?"] }
+      ],
+      "after": ["Close the book and write everything you remember.", "Which one idea will you test, and when?"],
+      "note": "Split by position because the exact chapters are not known here."
+    }
+  ],
+  "codeOrExample": "",
+  "commonMistakes": ["Highlighting instead of recalling", "Reading fast to finish rather than to understand", "Trying to apply every idea at once"],
+  "quiz": [
+    { "question": "What should you do right after a reading session?", "options": ["Start the next chapter", "Close the book and write what you remember", "Highlight the best lines", "Skim the index"], "correctIndex": 1, "explanation": "Recalling from memory strengthens it far more than rereading." },
+    { "question": "Why ask questions before reading?", "options": ["To fill time", "To give your reading a purpose and something to look for", "Because books require it", "To skip parts"], "correctIndex": 1, "explanation": "A purpose focuses attention on what matters to you." },
+    { "question": "You finished a part but cannot recall it. The best response is:", "options": ["Keep reading", "Reread it passively", "Write what you can, then check the gaps against the text", "Give up on the book"], "correctIndex": 2, "explanation": "Attempting recall first shows the gaps, and checking afterwards fixes them." }
+  ],
+  "recommendedResources": [{ "title": "Make It Stick: The Science of Successful Learning", "type": "book", "searchQuery": "Make It Stick Brown Roediger McDaniel", "whyRecommended": "A well-regarded book on retrieval practice and effective study." }],
+  "socraticChallenge": { "scenario": "You read two chapters last week and remember almost nothing.", "question": "What would you change about how you read?", "idealAnswer": "Read in shorter sessions with a question in mind, close the book to write what you remember after each, and review the notes a day later." },
+  "exercises": [
+    { "type": "write", "instruction": "Recall", "prompt": "After your next reading session, close the book and write three sentences about what you read.", "answer": "Success: three sentences written before you looked back at the text, then checked against it." },
+    { "type": "do", "instruction": "Apply", "prompt": "Pick one idea from the book and try it for a week.", "answer": "Success: one idea chosen, a specific time to do it, and a note of how it went." }
+  ],
+  "reviewCards": [
+    { "concept": "Active reading", "prompt": "What three things make reading active rather than passive?", "answer": "A question before, answering as you read, and recalling from memory after." },
+    { "concept": "Recall first", "prompt": "Why write what you remember before looking back at the book?", "answer": "Trying to recall strengthens memory and shows the gaps." }
+  ],
+  "estimatedDifficulty": "beginner",
+  "prerequisites": []
+}

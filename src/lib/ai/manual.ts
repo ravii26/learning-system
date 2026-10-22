@@ -65,14 +65,29 @@ export function extractJson(text: string): ExtractResult {
 
   const fences = Array.from(t.matchAll(/```(?:json|JSON)?\s*\n?([\s\S]*?)```/g)).map((m) => m[1].trim());
   const candidates = [...fences, t];
+  const asObject = (s: string) => {
+    const parsed = tryParse(s);
+    return parsed !== null && typeof parsed === 'object' ? parsed : null;
+  };
+  const inside = (s: string) => {
+    const inner = balanced(straighten(s));
+    return inner ? asObject(inner) : null;
+  };
+
+  // 1. A whole candidate that is itself the JSON.
   for (const c of candidates) {
-    const direct = tryParse(c);
-    if (direct !== null && typeof direct === 'object') return { ok: true, value: direct };
-    const inner = balanced(straighten(c));
-    if (inner) {
-      const parsed = tryParse(inner);
-      if (parsed !== null && typeof parsed === 'object') return { ok: true, value: parsed };
-    }
+    const direct = asObject(c);
+    if (direct) return { ok: true, value: direct };
+  }
+  // 2. The balanced JSON in the whole reply. This comes before looking inside the fences because a
+  //    lesson's strings can hold code fences of their own ("```python ..."), which cut a fence match
+  //    short and leave a fragment; a balanced scan respects strings, so it sees the whole object.
+  const whole = inside(t);
+  if (whole) return { ok: true, value: whole };
+  // 3. JSON inside a fence that has prose around it.
+  for (const c of fences) {
+    const found = inside(c);
+    if (found) return { ok: true, value: found };
   }
   const opened = /[{[]/.test(t);
   return {

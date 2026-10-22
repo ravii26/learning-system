@@ -57,6 +57,31 @@ describe('curriculum mapping', () => {
     expect(curriculumJsonToRowData({ title: 'x', completed: false, completedAt: '2026-01-01' }, 1).completedAt).toBeNull();
   });
 
+  it('keeps a decision kind through the round trip, and leaves concept modules without one', () => {
+    const decision = mod('d1', { kind: 'decision' });
+    const data = curriculumJsonToRowData(decision, 1);
+    expect(data.kind).toBe('decision');
+    expect(curriculumRowToJson({ id: 'row', legacyId: 'd1', ...data })).toEqual(decision);
+    expect(curriculumRowToJson({ id: 'row', legacyId: 'c1', ...curriculumJsonToRowData(mod('c1'), 1), kind: 'concept' })).not.toHaveProperty('kind');
+  });
+
+  it('keeps a blueprint in reading order and drops unknown sections', () => {
+    const data = curriculumJsonToRowData(mod('d', { kind: 'decision', blueprint: ['decision_flow', 'banana', 'comparison_table'] }), 1);
+    expect(data.blueprint).toEqual(['comparison_table', 'decision_flow']);
+    expect(curriculumRowToJson({ id: 'r', legacyId: 'd', ...data }).blueprint).toEqual(['comparison_table', 'decision_flow']);
+  });
+
+  it('no blueprint sent leaves the stored one alone; an empty row blueprint is not shown', () => {
+    expect(curriculumJsonToRowData(mod('a'), 1)).not.toHaveProperty('blueprint');
+    expect(curriculumRowToJson({ id: 'r', legacyId: 'a', ...curriculumJsonToRowData(mod('a'), 1), blueprint: null })).not.toHaveProperty('blueprint');
+    expect(curriculumRowToJson({ id: 'r', legacyId: 'a', ...curriculumJsonToRowData(mod('a'), 1), blueprint: [] })).not.toHaveProperty('blueprint');
+  });
+
+  it('a module with no (or an unknown) kind does not touch the stored kind', () => {
+    expect(curriculumJsonToRowData(mod('a'), 1)).not.toHaveProperty('kind');
+    expect(curriculumJsonToRowData(mod('a', { kind: 'banana' }), 1)).not.toHaveProperty('kind');
+  });
+
   it('never stores an empty title', () => {
     expect(curriculumJsonToRowData({ title: '   ' }, 1).title).toBe('Untitled module');
   });

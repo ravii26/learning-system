@@ -7,6 +7,7 @@ import Link from 'next/link';
 // Modular Components
 import SocraticCoach from './SocraticCoach';
 import ModuleStudyRoom from './ModuleStudyRoom';
+import { readStudySession, writeStudySession } from '@/lib/studySession';
 import DailySessions from './DailySessions';
 import ConfusionMistakeBank from './ConfusionMistakeBank';
 import RichTextEditor from './RichTextEditor';
@@ -21,6 +22,7 @@ import TopicTimeDrawer from './TopicTimeDrawer';
 import PlacementDrawer from './PlacementDrawer';
 import TopicToolsMenu from './TopicToolsMenu';
 import { topicLabelUnderGoal } from '@/lib/statusLabels';
+import { LESSON_KIND_LABEL, guessLessonKind, type LessonKind } from '@/lib/lessonKinds';
 
 /** Latest quiz/challenge result per module — from /api/topics/[id]/attempts. */
 export interface ModuleEvidence {
@@ -41,6 +43,8 @@ export interface CourseModule {
   completed: boolean;
   completedAt: string | null;
   notes: string;
+  /** What the lesson must leave you able to do; absent = a concept lesson. */
+  kind?: LessonKind;
 }
 
 interface Resource {
@@ -110,6 +114,9 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
 
   // Active Selected Module
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
+  useEffect(() => {
+    if (activeModuleId) writeStudySession(`topic:${params.id}`, activeModuleId);
+  }, [params.id, activeModuleId]);
   const [newModuleTitle, setNewModuleTitle] = useState('');
   const [generatingModules, setGeneratingModules] = useState(false);
 
@@ -211,8 +218,10 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
         // from Where you stand), else the first unfinished, else the first.
         if (!activeModuleId && sortedCurriculum.length > 0) {
           const linked = searchParams.get('module');
+          const resumed = readStudySession<string>(`topic:${params.id}`);
           const target =
             (linked && sortedCurriculum.find((m: CourseModule) => m.id === linked)) ||
+            (resumed && sortedCurriculum.find((m: CourseModule) => m.id === resumed)) ||
             sortedCurriculum.find((m: CourseModule) => !m.completed) ||
             sortedCurriculum[0];
           setActiveModuleId(target.id);
@@ -225,7 +234,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
     } finally {
       setLoading(false);
     }
-  }, [params.id, activeModuleId]);
+  }, [params.id, activeModuleId, searchParams]);
 
   useEffect(() => {
     fetchTopic();
@@ -239,6 +248,9 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
       autoStartedRef.current = true;
       handleGenerateCurriculum();
     }
+  // Generation is deliberately tied to the autostart transition; the handler
+  // is declared below and changes with editable topic fields.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, topic, curriculum.length, searchParams]);
 
   // Focus Timer Tick
@@ -284,6 +296,34 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
       });
     } catch (e) {
       console.error('Failed to save curriculum:', e);
+    }
+  };
+
+  // A "Collect ideas" topic has no lessons. This gives it one, so it can be studied as well as noted in.
+  const handleTurnIntoLessons = async () => {
+    if (!topic) return;
+    const lesson: CourseModule = {
+      id: Math.random().toString(36).substring(2, 9),
+      order: 1,
+      title: topic.title,
+      estimatedMinutes: 30,
+      completed: false,
+      completedAt: null,
+      notes: '',
+      ...(guessLessonKind(topic.title) !== 'concept' ? { kind: guessLessonKind(topic.title) } : {}),
+    };
+    try {
+      const res = await fetch(`/api/topics/${params.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'syllabus', curriculum: [lesson], nextAction: `Study: ${lesson.title}` }),
+      });
+      if (!res.ok) throw new Error('save failed');
+      setTopic({ ...topic, mode: 'syllabus' });
+      setCurriculum([lesson]);
+      toast.success('Added a lesson. Your notes and captured ideas stay here too.');
+    } catch {
+      toast.error('Couldn’t add a lesson. Try again.');
     }
   };
 
@@ -435,15 +475,12 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
   // Auto-Save Notes
   const handleSaveNotes = async (html: string) => {
     setNotes(html);
-    try {
-      await fetch(`/api/topics/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes: html }),
-      });
-    } catch (e) {
-      console.error('Failed to auto-save notes:', e);
-    }
+    const res = await fetch(`/api/topics/${params.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: html }),
+    });
+    if (!res.ok) throw new Error('Could not save topic notes');
   };
 
   // Resource Handlers
@@ -670,6 +707,19 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
         </div>
       )}
 
+      {topic?.mode === 'accretion' && (
+        <section aria-labelledby="ideas-h" className="flex flex-col items-start gap-3 rounded-xl border border-line p-6">
+          <h2 id="ideas-h" className="m-0 text-[1.15rem] font-semibold">This topic collects ideas</h2>
+          <p className="m-0 max-w-[60ch] text-[0.95rem] text-fg-secondary">
+            Right now it only holds notes. Add a lesson to learn it properly: a written lesson with exercises, a quiz and review cards
+            {guessLessonKind(topic.title) !== 'concept' ? `, shaped as “${LESSON_KIND_LABEL[guessLessonKind(topic.title)].toLowerCase()}”` : ''}.
+          </p>
+          <button type="button" onClick={handleTurnIntoLessons} className="btn btn-primary h-11 px-5 py-0">
+            Add a lesson
+          </button>
+        </section>
+      )}
+
       {topic?.mode === 'practice' ? (
         <DailySessions topicId={params.id} topicTitle={title} />
       ) : (
@@ -723,6 +773,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
           <div className="flex min-w-0 flex-col gap-6">
             {activeModule ? (
               <ModuleStudyRoom
+                key={activeModule.id}
                 topicId={params.id}
                 topicTitle={title}
                 topicArea={area}
