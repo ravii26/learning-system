@@ -12,6 +12,7 @@ import LessonPractice from './LessonPractice';
 import ManualAiPanel, { postManual } from '@/components/ManualAiPanel';
 import { useAiMode } from '@/lib/useAiMode';
 import ModuleNotesDrawer from './ModuleNotesDrawer';
+import ReadAloud from '@/components/ReadAloud';
 import { readStudySession, writeStudySession } from '@/lib/studySession';
 
 interface ModuleStudyRoomProps {
@@ -59,6 +60,7 @@ export default function ModuleStudyRoom({
   notesOpen: notesDrawerOpen,
   onNotesOpenChange: setNotesDrawerOpen,
 }: ModuleStudyRoomProps) {
+  const guideRef = React.useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'guide' | 'practice' | 'media' | 'challenge' | 'quiz'>('guide');
   const [lesson, setLesson] = useState<any | null>(null);
   const [loadingLesson, setLoadingLesson] = useState(true);
@@ -401,6 +403,13 @@ export default function ModuleStudyRoom({
               )}
             </div>
             <div className="flex items-center gap-2">
+              {lesson && !loadingLesson && !manualPrompt && activeTab === 'guide' && (
+                <ReadAloud
+                  resetKey={module.id}
+                  getRoot={() => guideRef.current}
+                  intro={[module.title, lesson.summary || '']}
+                />
+              )}
               {finishButton(true)}
             </div>
           </div>
@@ -474,7 +483,7 @@ export default function ModuleStudyRoom({
               </p>
             )}
             {activeTab === 'guide' && (
-              <div className="flex flex-col gap-9">
+              <div ref={guideRef} className="flex flex-col gap-9">
                 {objectives.length > 0 && (
                   <section aria-labelledby="obj-h" className="flex flex-col gap-3">
                     <h3 id="obj-h" className="m-0 text-[1.05rem] font-semibold">By the end, you’ll be able to</h3>
