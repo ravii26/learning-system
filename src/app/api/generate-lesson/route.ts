@@ -625,9 +625,12 @@ section is better than a forced one, and the learner never sees it.
 REAL LIFE RULE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Put at least one real-life example in "explanation" (a named person, company,
-everyday situation or realistic numbers), marked as an illustration when it is
-made up rather than a documented fact.
+Use a real-life example (a named person or company, an everyday situation,
+realistic numbers) only where it makes THIS lesson clearer. Decide per
+lesson: an abstract idea or a behaviour usually needs one; a plain fact, a
+definition or a drill may not. Do not add one just to have one. When you use
+an example you made up rather than a documented fact, mark it as an
+illustration.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PRACTICE RULE
