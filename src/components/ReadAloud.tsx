@@ -19,6 +19,7 @@ const VOICES = [
 ];
 const SPEEDS = [0.85, 1, 1.15, 1.3, 1.5];
 const PREF_KEY = 'learning-os.read-aloud';
+const USED_KEY = 'learning-os.read-aloud.used';
 
 type Status = 'idle' | 'loading' | 'playing' | 'paused';
 type Engine = 'kokoro' | 'browser';
@@ -52,6 +53,8 @@ export default function ReadAloud({ getRoot, intro, resetKey }: {
   const [speed, setSpeed] = useState(1);
   const [progress, setProgress] = useState(0);
   const [note, setNote] = useState<string | null>(null);
+  const [phase, setPhase] = useState<'download' | 'prepare'>('download');
+  const [seek, setSeek] = useState<number | null>(null);
 
   const partsRef = useRef<NarrationPart[]>([]);
   const runRef = useRef(0);
@@ -75,6 +78,18 @@ export default function ReadAloud({ getRoot, intro, resetKey }: {
     const p = readPrefs();
     setVoice(p.voice);
     setSpeed(p.speed);
+  }, []);
+
+  // People who have listened before get the voice loaded quietly in the
+  // background, so pressing Listen starts at once. Everyone else downloads
+  // nothing until they ask.
+  useEffect(() => {
+    let used = false;
+    try { used = localStorage.getItem(USED_KEY) === '1'; } catch { /* private mode */ }
+    if (!used) return;
+    const idle = (window as any).requestIdleCallback || ((f: () => void) => setTimeout(f, 1500));
+    idle(() => { ensureWorker().catch(() => {}); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setHighlight = (el: HTMLElement | null) => {
@@ -124,7 +139,10 @@ export default function ReadAloud({ getRoot, intro, resetKey }: {
       worker.onmessage = (e: MessageEvent) => {
         const m = e.data;
         if (m.type === 'progress') setProgress(Math.round(m.value));
-        else if (m.type === 'ready') resolve();
+        else if (m.type === 'ready') {
+          try { localStorage.setItem(USED_KEY, '1'); } catch { /* private mode */ }
+          resolve();
+        }
         else if (m.type === 'audio') {
           pending.current.get(m.id)?.resolve({ audio: m.audio, rate: m.rate });
           pending.current.delete(m.id);
@@ -155,7 +173,7 @@ export default function ReadAloud({ getRoot, intro, resetKey }: {
       // Keep memory small: only the current and next clips are ever needed.
       for (const k of Array.from(cache.current.keys())) {
         const n = Number(k.split('|')[2]);
-        if (n < i - 1) cache.current.delete(k);
+        if (n < i - 1 || n > i + 3) cache.current.delete(k);
       }
     }
     return p;
@@ -191,8 +209,10 @@ export default function ReadAloud({ getRoot, intro, resetKey }: {
     const parts = partsRef.current;
     if (engineRef.current === 'kokoro') {
       setStatus('loading');
+      setPhase('download');
       try {
         await ensureWorker();
+        setPhase('prepare');
       } catch {
         if (run !== runRef.current) return;
         if (typeof speechSynthesis === 'undefined') {
@@ -205,7 +225,6 @@ export default function ReadAloud({ getRoot, intro, resetKey }: {
       }
     }
     if (run !== runRef.current) return;
-    setStatus('playing');
     for (let i = start; i < parts.length; i++) {
       if (run !== runRef.current) return;
       setIndex(i);
@@ -213,10 +232,13 @@ export default function ReadAloud({ getRoot, intro, resetKey }: {
       try {
         if (engineRef.current === 'kokoro') {
           const clip = await getClip(i);
-          if (i + 1 < parts.length) getClip(i + 1).catch(() => {});
+          // Make the next two pieces while this one plays, so there are no gaps.
+          for (let k = i + 1; k <= i + 2 && k < parts.length; k++) getClip(k).catch(() => {});
           if (run !== runRef.current) return;
+          setStatus((s) => (s === 'paused' ? s : 'playing'));
           await playClip(clip, run);
         } else {
+          setStatus('playing');
           await speakBrowser(parts[i].text, run);
         }
       } catch {
@@ -283,7 +305,6 @@ export default function ReadAloud({ getRoot, intro, resetKey }: {
     try { localStorage.setItem(PREF_KEY, JSON.stringify({ voice: v, speed: s })); } catch { /* private mode */ }
   };
 
-  const pct = total ? Math.round(((index + 0.5) / total) * 100) : 0;
 
   return (
     <>
@@ -316,8 +337,10 @@ export default function ReadAloud({ getRoot, intro, resetKey }: {
             </button>
             <div className="ml-1 min-w-0 flex-1 text-[0.85rem]" aria-live="polite">
               {status === 'loading'
-                ? `Getting the voice ready${progress ? ` · ${progress}%` : ''}${progress && progress < 100 ? ' (first time only)' : ''}`
-                : `Part ${Math.min(index + 1, total)} of ${total}`}
+                ? phase === 'download'
+                  ? `Downloading the voice${progress ? ` · ${progress}%` : ''} (first time only)`
+                  : 'Preparing the first sentence…'
+                : `Part ${Math.min((seek ?? index) + 1, total)} of ${total}`}
             </div>
             <select aria-label="Voice" value={voice} onChange={(e) => changeVoice(e.target.value)} className="h-8 max-w-[8.5rem] rounded-lg bg-white/15 px-2 text-[0.8rem] text-on-ink">
               {VOICES.map((v) => <option key={v.id} value={v.id} className="text-fg">{v.label}</option>)}
@@ -329,9 +352,20 @@ export default function ReadAloud({ getRoot, intro, resetKey }: {
               <Icon name="close" size={16} />
             </button>
           </div>
-          <div className="h-1 overflow-hidden rounded-full bg-white/20" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-            <div className="h-full bg-on-ink transition-[width]" style={{ width: `${pct}%` }} />
-          </div>
+          <input
+            type="range"
+            aria-label="Position in the lesson"
+            min={0}
+            max={Math.max(total - 1, 0)}
+            step={1}
+            value={seek ?? index}
+            disabled={total < 2}
+            onChange={(e) => setSeek(Number(e.target.value))}
+            onPointerUp={() => { if (seek !== null) { jump(seek); setSeek(null); } }}
+            onKeyUp={() => { if (seek !== null) { jump(seek); setSeek(null); } }}
+            onBlur={() => setSeek(null)}
+            className="h-1 w-full cursor-pointer accent-current"
+          />
           {note && <p className="m-0 text-[0.8rem] opacity-80">{note}</p>}
         </div>
       )}

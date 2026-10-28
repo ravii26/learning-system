@@ -11,7 +11,10 @@ export interface NarrationPart {
 }
 
 /** Longest piece sent to the voice model in one go; longer text is split at sentence ends. */
-export const MAX_PART_CHARS = 280;
+export const MAX_PART_CHARS = 200;
+
+/** The first piece is kept short so speech starts sooner. */
+export const FIRST_PART_CHARS = 110;
 
 const READABLE = 'h2,h3,h4,p,li,blockquote,figcaption,summary';
 const SKIPPED = 'pre,svg,table,button,script,style,[aria-hidden="true"],[data-no-tts]';
@@ -84,5 +87,10 @@ export function buildNarration(root: HTMLElement | null, intro: string[] = []): 
       parts.push({ text: heading ? `${p}.` : p, el });
     });
   });
+  // Re-split the opening so the first sound is quick to make.
+  if (parts[0] && parts[0].text.length > FIRST_PART_CHARS) {
+    const first = parts.shift()!;
+    parts.unshift(...splitForSpeech(first.text, FIRST_PART_CHARS).map((text) => ({ text, el: first.el })));
+  }
   return parts;
 }
