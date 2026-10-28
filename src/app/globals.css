@@ -978,6 +978,14 @@ input::placeholder {
   margin: 1em 0;
 }
 
+/* The paragraph being read aloud (components/ReadAloud.tsx). */
+.tts-reading {
+  background: color-mix(in srgb, var(--color-text-primary) 9%, transparent);
+  border-radius: 6px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-text-primary) 9%, transparent);
+  transition: background 0.2s;
+}
+
 /* Rendered markdown (lib/markdown.ts). .lesson-prose is for reading at
    length — serif, generous measure; .md-content is the compact UI version. */
 .lesson-prose,
