@@ -24,20 +24,23 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
-  const activeTopics = await db.topic.findMany({
-    where: { status: 'active', userId, deletedAt: null },
-    select: { id: true, title: true },
-    orderBy: { lastTouchedDate: 'desc' },
-    take: 2,
-  });
-
-  // Days since the weekly check-in. ReviewSession is the weekly-audit
-  // snapshot (renamed from ReviewLog in the Phase 3 migration, which freed
-  // that name for the per-concept review log) — don't swap in reviewLog.
-  const lastReview = await db.reviewSession.findFirst({
-    where: { userId },
-    orderBy: { reviewedAt: 'desc' },
-  });
+  // Both lookups are independent: run them together so every page pays for
+  // one database round trip here instead of two.
+  // The weekly check-in is the ReviewSession table (renamed from ReviewLog in
+  // the Phase 3 migration, which freed that name for the per-concept review
+  // log) — don't swap in reviewLog.
+  const [activeTopics, lastReview] = await Promise.all([
+    db.topic.findMany({
+      where: { status: 'active', userId, deletedAt: null },
+      select: { id: true, title: true },
+      orderBy: { lastTouchedDate: 'desc' },
+      take: 2,
+    }),
+    db.reviewSession.findFirst({
+      where: { userId },
+      orderBy: { reviewedAt: 'desc' },
+    }),
+  ]);
   const daysSinceCheckIn = lastReview
     ? Math.floor((Date.now() - lastReview.reviewedAt.getTime()) / (1000 * 60 * 60 * 24))
     : null;
