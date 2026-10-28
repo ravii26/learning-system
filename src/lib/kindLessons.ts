@@ -1,5 +1,6 @@
 import type { AIMessage } from '@/lib/ai/aiClient';
 import { EXERCISES_JSON } from '@/lib/program/lessonGuide';
+import { REAL_LIFE_JSON, REAL_LIFE_RULE } from '@/lib/tryInRealLife';
 import { BLOCK_LABEL, normalizeBlueprint, type BlockType } from '@/lib/lessonBlocks';
 import { KIND_BLOCKS, KIND_DEFAULT_BLOCKS, type LessonKind } from '@/lib/lessonKinds';
 import { ACCURACY, BLOCK_EXAMPLE, BLOCK_RULES, buildDecisionMessages, levelGuide, type DecisionPromptInput } from '@/lib/decisionLesson';
@@ -251,6 +252,7 @@ ${blueprint.map((t) => `  • ${BLOCK_RULES[t]}${spec.extraBlockRules?.[t] ? ` $
 - commonMistakes: ${spec.mistakes}
 - quiz: ${spec.quiz} Do not put the correct answer at the same index every time.
 - exercises: ${spec.exercises}
+- tryInRealLife: ${REAL_LIFE_RULE}
 - socraticChallenge: ${spec.socratic}
 - reviewCards: ${spec.reviewCards}
 - codeOrExample: ${spec.code ?? 'leave as "".'}
@@ -278,6 +280,7 @@ Return VALID JSON ONLY. No markdown fences, no commentary. Use exactly this stru
   ],
   "socraticChallenge": { "scenario": "...", "question": "...", "idealAnswer": "..." },
   ${EXERCISES_JSON}
+  ${REAL_LIFE_JSON}
   "reviewCards": [ { "concept": "Short name", "prompt": "Standalone question", "answer": "Short, checkable answer" } ],
   "estimatedDifficulty": "beginner | intermediate | advanced",
   "prerequisites": ["Only genuinely necessary prerequisite"]
