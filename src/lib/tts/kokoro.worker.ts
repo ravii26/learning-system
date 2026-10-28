@@ -11,17 +11,25 @@ let tts: any = null;
 
 async function load() {
   if (tts) return;
+  // Report one overall percentage across all model files, not one per file.
+  const files: Record<string, { loaded: number; total: number }> = {};
   const progress_callback = (p: any) => {
-    if (p?.status === 'progress' && typeof p.progress === 'number') ctx.postMessage({ type: 'progress', value: p.progress });
+    if (p?.status !== 'progress' || !p.file || !p.total) return;
+    files[p.file] = { loaded: p.loaded, total: p.total };
+    let loaded = 0, total = 0;
+    for (const f of Object.values(files)) { loaded += f.loaded; total += f.total; }
+    ctx.postMessage({ type: 'progress', value: total ? (loaded / total) * 100 : 0 });
   };
   // WebGPU is much faster; fall back to WASM when it is missing or fails.
   if (ctx.navigator?.gpu) {
     try {
       tts = await KokoroTTS.from_pretrained(MODEL, { dtype: 'fp32', device: 'webgpu', progress_callback });
+      await tts.generate('Ready.', { voice: 'af_heart' }); // warm-up: compiles the GPU programs now, not mid-lesson
       return;
     } catch { /* try WASM */ }
   }
   tts = await KokoroTTS.from_pretrained(MODEL, { dtype: 'q8', device: 'wasm', progress_callback });
+  await tts.generate('Ready.', { voice: 'af_heart' });
 }
 
 ctx.onmessage = async (e: MessageEvent) => {
