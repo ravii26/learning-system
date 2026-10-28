@@ -9,7 +9,6 @@
 import { isValidQuizQuestion } from './reviewCards';
 import { normalizeExercises } from './program/lessonGuide';
 import { normalizeBlocks } from './lessonBlocks';
-import { normalizeRealLife } from './tryInRealLife';
 
 const strList = (v: unknown, max = 12): string[] =>
   (Array.isArray(v) ? v : [])
@@ -73,7 +72,6 @@ export function normalizeLesson(raw: unknown): Record<string, unknown> | null {
     reviewCards,
     socraticChallenge,
     exercises: normalizeExercises(l.exercises),
-    tryInRealLife: normalizeRealLife(l.tryInRealLife),
     ...(blocks.length ? { blocks } : { blocks: undefined }),
     // Set by the server from the request; a "kind" the model made up is dropped.
     kind: undefined,

@@ -14,7 +14,6 @@ import type { AIMessage } from '@/lib/ai/aiClient';
 import { competencyFromModuleId, type CompetencyMap } from '@/data/competencies';
 import { guessArchetype, isArchetype, type Archetype } from '@/lib/program/fieldGuide';
 import { EXERCISES_JSON, LESSON_GUIDE } from '@/lib/program/lessonGuide';
-import { REAL_LIFE_JSON, REAL_LIFE_RULE } from '@/lib/tryInRealLife';
 import type { Intake } from '@/lib/program/types';
 import { lessonKindOf } from '@/lib/lessonKinds';
 import { buildKindMessages } from '@/lib/kindLessons';
@@ -630,8 +629,6 @@ Put at least one real-life example in "explanation" (a named person, company,
 everyday situation or realistic numbers), marked as an illustration when it is
 made up rather than a documented fact.
 
-${REAL_LIFE_RULE}
-
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PRACTICE RULE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -669,7 +666,7 @@ Before returning the JSON, verify:
 2. Could a student actually learn something from it?
 3. Is there a concrete example?
 4. If this topic has natural mistakes, did you name a realistic one (else leave it empty)?
-5. Is there a practical application, and a real-life task if this subject is learned by doing or by changing behaviour?
+5. Is there a practical application?
 6. Do the questions require reasoning?
 7. Are the distractors plausible?
 8. Is anything generic filler?
@@ -784,8 +781,6 @@ Use exactly this structure:
   },
 
 ${EXERCISES_JSON}
-
-  ${REAL_LIFE_JSON}
 
   "reviewCards": [
     {

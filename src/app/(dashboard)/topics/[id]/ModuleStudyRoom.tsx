@@ -6,8 +6,6 @@ import { renderMarkdown } from '@/lib/markdown';
 import { normalizeBlocks } from '@/lib/lessonBlocks';
 import { LESSON_KIND_LABEL, lessonKindOf } from '@/lib/lessonKinds';
 import { LessonBlocks } from '@/components/lesson/LessonBlocks';
-import { RealLifeTries } from '@/components/lesson/RealLifeTries';
-import { normalizeRealLife } from '@/lib/tryInRealLife';
 import { Accordion, Icon, KnowledgeMark } from '@/components/ui';
 import ProblemLog from './ProblemLog';
 import LessonPractice from './LessonPractice';
@@ -563,8 +561,6 @@ export default function ModuleStudyRoom({
                     </ul>
                   </section>
                 )}
-
-                <RealLifeTries items={normalizeRealLife(lesson.tryInRealLife)} />
 
                 <div className="flex flex-wrap items-center gap-4 border-t border-line pt-6">
                   <button type="button" onClick={() => setActiveTab(exercises.length ? 'practice' : checkTab)} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
