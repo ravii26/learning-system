@@ -5,6 +5,7 @@ import { slugifySkillName } from '@/lib/skillSlug';
 import { ensureAreaSkillId } from '@/lib/areaSkill';
 import { syncTopicListsAndMirror } from '@/lib/topicListSync';
 import { recomputeGoalReadiness } from '@/lib/goalReadinessRecompute';
+import { resolveModuleKind } from '@/lib/moduleKinds';
 
 /**
  * Every goal and its readiness, newest first. List, not detail — full
@@ -37,6 +38,8 @@ interface CreateGoalTopic {
   nextAction?: string;
   mode?: 'self_directed' | 'course';
   curriculum?: string[];
+  /** The lesson kind the roadmap AI gave each curriculum item, keyed by title. */
+  curriculumKinds?: Record<string, unknown>;
 }
 
 /**
@@ -129,15 +132,20 @@ export async function POST(request: Request) {
           primaryTaken = true;
         }
 
-        const curriculumModules = (t.curriculum || []).map((modTitle, idx) => ({
-          id: Math.random().toString(36).substring(2, 9),
-          order: idx + 1,
-          title: modTitle,
-          estimatedMinutes: 45,
-          completed: false,
-          completedAt: null,
-          notes: '',
-        }));
+        const curriculumModules = (t.curriculum || []).map((modTitle, idx) => {
+          // The AI's label if valid, else a free keyword guess; "concept" is the default and is not stored.
+          const kind = resolveModuleKind(t.curriculumKinds?.[modTitle], modTitle);
+          return {
+            id: Math.random().toString(36).substring(2, 9),
+            order: idx + 1,
+            title: modTitle,
+            estimatedMinutes: 45,
+            completed: false,
+            completedAt: null,
+            notes: '',
+            ...(kind !== 'concept' ? { kind } : {}),
+          };
+        });
 
         const topicWhy = t.why || `Part of ${title.trim()}`;
         const topicNextAction = t.nextAction || 'Review the module list and start module 1';

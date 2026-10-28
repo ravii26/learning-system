@@ -4,6 +4,7 @@ import {
 } from '@/data/competencies';
 import type { AIMessage } from '@/lib/ai/aiClient';
 import type { Intake } from './types';
+import { KIND_PROMPT_GUIDE, kindsByTitle, kindsFromRecord } from '@/lib/moduleKinds';
 import { ARCHETYPE_GUIDE, LEVEL_WORDS, guessArchetype, isArchetype, type Archetype } from './fieldGuide';
 
 /**
@@ -37,7 +38,7 @@ const MAP_JSON_SHAPE = `{
       "from": "aware|use|build|interview",
       "prerequisites": ["<keys of earlier competencies>"],
       "summary": "<what the learner can DO after it, concrete and checkable>",
-      "lessons": ["<lesson 1 title>", "<lesson 2 title>"]
+      "lessons": [{ "title": "<lesson 1 title>", "kind": "<lesson kind>" }, { "title": "<lesson 2 title>", "kind": "<lesson kind>" }]
     }
   ]
 }`;
@@ -48,7 +49,8 @@ function mapRules(archetype: Archetype, target: TargetLevel): string {
 - 20 to 50 competencies in learning order, grouped into 4-7 sections.
 - SPECIFIC, never vague. Every title names the actual thing a teacher would teach that week. Banned as titles: "Basics", "Fundamentals", "Introduction to X", "Advanced X", "X Techniques", "X Skills", "Deep dives", "Project 1", "Second project", "Understanding X", "Mastering X". Test: if a title could appear in the plan for a different field, rewrite it.
 - "summary" says what the learner can do afterwards, measurably when possible ("introduce yourself for 90 seconds without long pauses", "switch between G and C 30 times a minute", "solve 10 two-pointer problems").
-- "lessons": 1 to ${MAX_LESSONS} concrete lesson titles inside this competency, in order, each one 30-60 minute sitting (about 1 lesson per hour of work the topic needs). For "skill" topics, lessons are the specific drills/exercises to practise. For "build" topics, lessons are the steps of the project.
+- "lessons": 1 to ${MAX_LESSONS} concrete lesson titles inside this competency, in order, each one 30-60 minute sitting (about 1 lesson per hour of work the topic needs). For "skill" topics, lessons are the specific drills/exercises to practise. For "build" topics, lessons are the steps of the project. Each lesson is an object with a "title" and a "kind". This lesson "kind" is NOT the same as the topic's "kind" above; it decides how that one lesson is written.
+${KIND_PROMPT_GUIDE}
 - "from" is the lowest level at which this topic belongs in a plan. For this kind of goal the levels mean: "aware" = ${w.aware}, "use" = ${w.use}, "build" = ${w.build}, "interview" = ${w.interview}.
 - The learner is aiming for "${target}" (${w[target]}). EVERYTHING they need to reach their goal, including its final project/showcase, must have "from" at or below "${target}", or their plan will leave it out. Use levels above "${target}" only for 3-6 genuine next steps beyond their goal. A topic's level is never lower than the level of the topics it depends on.
 - "kind": follow the guide for this kind of goal. "build" ONLY for 1 or 2 end-to-end projects/showcases; put "project" in those titles.
@@ -171,10 +173,12 @@ export function capProjects(j: any): void {
   for (const c of builds) if (!keep.has(c)) c.kind = 'skill';
 }
 
+const cleanLessonTitle = (l: string) => l.replace(/\s+/g, ' ').trim().slice(0, 120);
+
 const lessonsOf = (v: unknown): string[] =>
   Array.from(new Set((Array.isArray(v) ? v : [])
     .filter((l): l is string => typeof l === 'string')
-    .map((l) => l.replace(/\s+/g, ' ').trim().slice(0, 120))
+    .map(cleanLessonTitle)
     .filter(Boolean))).slice(0, MAX_LESSONS);
 
 /**
@@ -193,6 +197,13 @@ export function sanitizeMap(j: any, fallbackTitle: string): { map: CompetencyMap
     while (seen.has(key)) key = `${key}-2`;
     seen.add(key);
     if (typeof c.key === 'string') keyFor.set(c.key, key);
+    // Lessons are plain titles or { title, kind }. Labels are kept by title so
+    // an edited or reordered list keeps them on untouched lessons.
+    const rawLessons: unknown[] = Array.isArray(c.lessons) ? c.lessons : [];
+    const lessons = lessonsOf(rawLessons.map((l: any) => (typeof l === 'string' ? l : l?.title)));
+    const lessonKinds = Object.fromEntries(
+      Object.entries({ ...kindsFromRecord(c.lessonKinds), ...kindsByTitle(rawLessons, cleanLessonTitle) }).filter(([t]) => lessons.includes(t)),
+    );
     comps.push({
       key,
       title,
@@ -202,7 +213,8 @@ export function sanitizeMap(j: any, fallbackTitle: string): { map: CompetencyMap
       from: TARGET_LEVELS.includes(c.from) ? (c.from as TargetLevel) : 'use',
       prerequisites: Array.isArray(c.prerequisites) ? c.prerequisites.filter((p: unknown) => typeof p === 'string') : [],
       summary: typeof c.summary === 'string' && c.summary.trim() ? c.summary.trim().slice(0, 240) : title,
-      ...(lessonsOf(c.lessons).length ? { lessons: lessonsOf(c.lessons) } : {}),
+      ...(lessons.length ? { lessons } : {}),
+      ...(Object.keys(lessonKinds).length ? { lessonKinds } : {}),
     });
   }
   // Remap prerequisite keys to the slugged ones; drop any that point nowhere or forward.

@@ -36,6 +36,12 @@ export interface Competency {
    * own module, so a 7-hour topic isn't squeezed into one lesson.
    */
   lessons?: string[];
+  /**
+   * The lesson kind (see src/lib/lessonKinds.ts) the AI gave each lesson,
+   * keyed by lesson title. A lesson with no entry is labelled by a keyword
+   * guess when the plan is saved.
+   */
+  lessonKinds?: Record<string, string>;
 }
 
 export interface CompetencyMap {
