@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
+import { resolveModuleKind } from '@/lib/moduleKinds';
 import { DEPTH_FOR_TARGET, lessonsOf, moduleIdFor, type Competency } from '@/data/competencies';
 import { ensureAreaSkillId } from '@/lib/areaSkill';
 import { estimateHours } from './skeleton';
@@ -109,7 +110,11 @@ export async function persistProgram(tx: Tx, { userId, draft, adjustments }: Per
       const modules = comps.flatMap((c) => {
         const lessons = lessonsOf(c);
         const minutes = Math.round((estimateHours(c, intake, adjustments.emphasis[c.key] ?? 1) * 60) / lessons.length);
-        return lessons.map((title, j) => ({ id: moduleIdFor(c.key, j + 1), title, estimatedMinutes: minutes }));
+        return lessons.map((title, j) => {
+          // The AI's label for this lesson if it gave one, else a free keyword guess. "concept" is the default and is not stored.
+          const kind = resolveModuleKind(c.lessonKinds?.[title], title);
+          return { id: moduleIdFor(c.key, j + 1), title, estimatedMinutes: minutes, ...(kind !== 'concept' ? { kind } : {}) };
+        });
       }).map((m, i) => ({ ...m, order: i + 1, completed: false, completedAt: null, notes: '' }));
       const resources = item.resources.map((r) => ({
         title: r.title, type: r.type, url: r.url, purpose: r.role, status: 'NOT_STARTED', notes: '',
@@ -165,6 +170,7 @@ export async function persistProgram(tx: Tx, { userId, draft, adjustments }: Per
             order: m.order,
             title: m.title,
             estimatedMinutes: m.estimatedMinutes,
+            ...(m.kind ? { kind: m.kind } : {}),
             completed: false,
             completedAt: null,
             notes: '',

@@ -605,6 +605,34 @@ Do not fabricate sources or claim something is "industry standard" unless
 the claim is genuinely justified.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OPTIONAL SECTIONS RULE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Not every lesson needs every section. Include a section ONLY when it helps
+this lesson; otherwise return it empty ([] for lists, "" for text). An empty
+section is better than a forced one, and the learner never sees it.
+
+- "whenToUse" and "whenNotToUse": for tools, techniques and methods that have
+  a right and wrong moment. Leave both [] for a fact, a skill drill, a language
+  point or a habit, where "when not to use it" would be filler.
+- "commonMistakes": only real, specific mistakes people make with this exact
+  topic. [] if you cannot name a concrete one.
+- "codeOrExample": runnable code, a recipe card, a worked routine or a worked
+  numeric example when one teaches the idea. "" when the explanation already
+  contains its example and a second one would repeat it.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REAL LIFE RULE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use a real-life example (a named person or company, an everyday situation,
+realistic numbers) only where it makes THIS lesson clearer. Decide per
+lesson: an abstract idea or a behaviour usually needs one; a plain fact, a
+definition or a drill may not. Do not add one just to have one. When you use
+an example you made up rather than a documented fact, mark it as an
+illustration.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PRACTICE RULE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -640,7 +668,7 @@ Before returning the JSON, verify:
 1. Is the lesson specifically about "${moduleTitle}"?
 2. Could a student actually learn something from it?
 3. Is there a concrete example?
-4. Is there at least one realistic misconception?
+4. If this topic has natural mistakes, did you name a realistic one (else leave it empty)?
 5. Is there a practical application?
 6. Do the questions require reasoning?
 7. Are the distractors plausible?
@@ -681,15 +709,15 @@ Use exactly this structure:
 
   "explanation": "Markdown explanation containing concrete teaching, intuition, mechanisms, examples, and practical application.",
 
-  "codeOrExample": "Runnable code or a detailed concrete example. Include comments where useful.",
+  "codeOrExample": "Runnable code or a detailed concrete example. Include comments where useful. \"\" if none fits.",
 
   "commonMistakes": [
-    "Specific realistic mistake and how to avoid it",
+    "Specific realistic mistake and how to avoid it (use [] if none is natural)",
     "Another important misconception, if applicable"
   ],
 
   "whenToUse": [
-    "Concrete situation where the concept is appropriate",
+    "Concrete situation where the concept is appropriate (use [] if the idea has no right or wrong moment)",
     "Another situation where it is useful"
   ],
 

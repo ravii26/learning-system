@@ -5,6 +5,9 @@ import {
   hasAnyAIProviderConfigured,
 } from '@/lib/ai/aiClient';
 import { requireAuth } from '@/lib/apiAuth';
+import { KIND_PROMPT_GUIDE } from '@/lib/moduleKinds';
+import { sanitizeTopics } from '@/lib/roadmapTopics';
+import type { LessonKind } from '@/lib/lessonKinds';
 
 export interface GeneratedTopic {
   title: string;
@@ -42,6 +45,12 @@ export interface GeneratedTopic {
    * Specific concepts/modules inside this topic.
    */
   curriculum?: string[];
+
+  /**
+   * The lesson kind the AI gave each curriculum item, keyed by its title.
+   * Items it did not label are labelled later by a keyword guess.
+   */
+  curriculumKinds?: Record<string, LessonKind>;
 
   /**
    * What the learner should be capable of doing after completing
@@ -248,37 +257,6 @@ function buildFallbackTopics(
   }
 
   return topics;
-}
-
-function sanitizeTopics(raw: unknown): GeneratedTopic[] | null {
-  if (!Array.isArray(raw) || raw.length === 0) return null;
-  const valid: GeneratedTopic[] = [];
-  for (const item of raw) {
-    if (!item || typeof item !== 'object') continue;
-    const title = String(item.title || '').trim();
-    if (!title || title.length < 3) continue;
-    const why = String(item.why || `Build foundational capability in ${title}.`).trim();
-    const nextAction = String(item.nextAction || `Review the core concepts of ${title} and complete the first exercise.`).trim();
-    const rawHours = typeof item.estimatedHours === 'number' ? item.estimatedHours : parseInt(String(item.estimatedHours || '10'), 10);
-    const estimatedHours = isNaN(rawHours) ? 10 : Math.max(2, Math.min(100, rawHours));
-    const curriculum = Array.isArray(item.curriculum) && item.curriculum.length > 0
-      ? item.curriculum.map((c: any) => typeof c === 'object' && c?.title ? String(c.title) : String(c))
-      : [`Core Principles of ${title}`, `Practical Examples of ${title}`, `Hands-on Practice with ${title}`];
-
-    valid.push({
-      title,
-      area: String(item.area || 'Tech'),
-      why,
-      depthTarget: item.depthTarget || 'Working Knowledge',
-      estimatedHours,
-      nextAction,
-      mode: (item.mode === 'self_directed' || item.mode === 'project' || item.mode === 'course') ? item.mode : 'course',
-      curriculum,
-      outcome: typeof item.outcome === 'string' ? item.outcome : `Able to understand and apply ${title} independently.`,
-      completionCriteria: Array.isArray(item.completionCriteria) ? item.completionCriteria.map((c: any) => String(c)) : [`Demonstrate understanding of ${title}`],
-    });
-  }
-  return valid.length >= 3 ? valid : null;
 }
 
 export async function POST(request: Request) {
@@ -619,6 +597,11 @@ For Personal Finance:
 If the curriculum item could belong to almost any subject,
 rewrite it.
 
+Give every curriculum item a "kind", which decides how its lesson is
+written later.
+
+${KIND_PROMPT_GUIDE}
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 WHY FIELD
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -879,10 +862,10 @@ For a valid goal:
         "Another observable capability"
       ],
       "curriculum": [
-        "Specific concept or skill",
-        "Specific concept or skill",
-        "Specific practical exercise",
-        "Specific edge case or application"
+        { "title": "Specific concept or skill", "kind": "concept" },
+        { "title": "Specific concept or skill", "kind": "concept" },
+        { "title": "Specific practical exercise", "kind": "drill" },
+        { "title": "Specific edge case or application", "kind": "concept" }
       ]
     }
   ]
