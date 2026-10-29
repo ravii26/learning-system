@@ -38,6 +38,29 @@ describe('extractJson: replies the way chat apps really send them', () => {
     expect(r).toMatchObject({ ok: false });
     expect((r as { problem: string }).problem).toMatch(/cut off/);
   });
+  it('a real line break inside a text value is repaired', () => {
+    expect(val('```json\n{"title":"A","explanation":"line one\nline two"}\n```')).toEqual({ title: 'A', explanation: 'line one\nline two' });
+  });
+  it('real tabs and Windows line breaks inside a text value are repaired', () => {
+    expect(val('{"s":"a\tb\r\nc"}')).toEqual({ s: 'a\tb\r\nc' });
+  });
+  it('repairs only inside strings: escapes, escaped quotes and structure are left alone', () => {
+    expect(val('{\n  "s": "he said \\"hi\\" and left\\nalone",\n  "n": [1, 2]\n}')).toEqual({ s: 'he said "hi" and left\nalone', n: [1, 2] });
+  });
+  it('a line break inside a value of a long reply with prose around it', () => {
+    const body = '{"summary":"x","explanation":"First paragraph.\n\nSecond paragraph.","quiz":[]}';
+    expect(val(`Here is the lesson:\n\`\`\`json\n${body}\n\`\`\`\nDone.`)).toEqual({ summary: 'x', explanation: 'First paragraph.\n\nSecond paragraph.', quiz: [] });
+  });
+  it('complete but broken JSON is called a formatting error, not cut off', () => {
+    const r = extractJson('```json\n{"a": 1 "b": 2}\n```');
+    expect(r).toMatchObject({ ok: false });
+    expect((r as { problem: string }).problem).toMatch(/formatting error/);
+    expect((r as { problem: string }).problem).not.toMatch(/cut off/);
+  });
+  it('a reply that really stops early still says cut off, even with a line break inside', () => {
+    const r = extractJson('```json\n{"title":"A","summary":"line one\nline two","learningObjectives":["one","tw');
+    expect((r as { problem: string }).problem).toMatch(/cut off/);
+  });
   it('no JSON at all says so', () => {
     expect(extractJson('Sorry, I cannot help with that.')).toMatchObject({ ok: false, problem: expect.stringMatching(/No JSON/) });
     expect(extractJson('   ')).toMatchObject({ ok: false, problem: expect.stringMatching(/empty/) });

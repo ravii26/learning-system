@@ -21,8 +21,42 @@ export function toChatPrompt(messages: AIMessage[]): string {
 const straighten = (s: string) => s.replace(/[“”„″]/g, '"').replace(/[‘’′]/g, "'");
 const noTrailingCommas = (s: string) => s.replace(/,(\s*[}\]])/g, '$1');
 
+/**
+ * Chat apps often write a real line break or tab inside a text value (long
+ * lesson fields especially), which JSON forbids. Inside strings only, turn
+ * them into their escaped forms; the structure outside strings is untouched.
+ */
+function escapeControlCharsInStrings(text: string): string {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (const ch of text) {
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        out += ch;
+      } else if (ch === '\\') {
+        escaped = true;
+        out += ch;
+      } else if (ch === '"') {
+        inString = false;
+        out += ch;
+      } else if (ch === '\n') out += '\\n';
+      else if (ch === '\r') out += '\\r';
+      else if (ch === '\t') out += '\\t';
+      else if (ch < ' ') out += `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`;
+      else out += ch;
+    } else {
+      if (ch === '"') inString = true;
+      out += ch;
+    }
+  }
+  return out;
+}
+
 function tryParse(s: string): unknown | null {
-  for (const candidate of [s, noTrailingCommas(s), noTrailingCommas(straighten(s))]) {
+  const repairs = [s, noTrailingCommas(s), noTrailingCommas(straighten(s))];
+  for (const candidate of [...repairs, ...repairs.map(escapeControlCharsInStrings)]) {
     try {
       return JSON.parse(candidate);
     } catch {
@@ -69,9 +103,14 @@ export function extractJson(text: string): ExtractResult {
     const parsed = tryParse(s);
     return parsed !== null && typeof parsed === 'object' ? parsed : null;
   };
+  // True when some text was a complete {...} that still would not parse: a
+  // formatting error, not a reply that stopped early.
+  let completeButUnreadable = false;
   const inside = (s: string) => {
     const inner = balanced(straighten(s));
-    return inner ? asObject(inner) : null;
+    const parsed = inner ? asObject(inner) : null;
+    if (inner && !parsed) completeButUnreadable = true;
+    return parsed;
   };
 
   // 1. A whole candidate that is itself the JSON.
@@ -92,9 +131,11 @@ export function extractJson(text: string): ExtractResult {
   const opened = /[{[]/.test(t);
   return {
     ok: false,
-    problem: opened
-      ? 'The reply looks cut off: the JSON never finishes. Chat apps sometimes stop long answers.'
-      : 'No JSON found in the reply. Make sure you pasted the chat’s answer, not the prompt.',
+    problem: completeButUnreadable
+      ? 'The JSON in the reply has a formatting error (for example a broken quote or a stray character), so it could not be read.'
+      : opened
+        ? 'The reply looks cut off: the JSON never finishes. Chat apps sometimes stop long answers.'
+        : 'No JSON found in the reply. Make sure you pasted the chat’s answer, not the prompt.',
   };
 }
 
