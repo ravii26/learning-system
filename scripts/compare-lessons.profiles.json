@@ -1,0 +1,43 @@
+{
+  "module": {
+    "topicTitle": "Data structures and algorithms",
+    "moduleTitle": "Binary search",
+    "area": "Tech",
+    "kind": "concept",
+    "coursePosition": "Module 6 of 50. Done so far: arrays, two pointers, sliding window, hashing, sorting."
+  },
+  "profiles": [
+    {
+      "id": "student",
+      "label": "CS student preparing for interviews",
+      "learnerLevel": "intermediate",
+      "priorKnowledge": "Final-year computer science student. Comfortable with Python. Has solved about 60 easy LeetCode problems.",
+      "goal": "Crack product-company coding interviews in 3 months",
+      "field": "Coding interview preparation",
+      "answers": [
+        { "question": "Which language do you use?", "answer": "Python" },
+        { "question": "How much time per day?", "answer": "2 hours" },
+        { "question": "What worries you most?", "answer": "Freezing on medium problems under time pressure" }
+      ],
+      "knownWeaknesses": ["off-by-one errors in loop bounds"],
+      "recentMistakes": ["Infinite loop because mid was never moved past"],
+      "markers": ["interview", "leetcode", "placement", "time pressure", "interviewer", "medium problem"]
+    },
+    {
+      "id": "accountant",
+      "label": "Accountant moving into data analysis",
+      "learnerLevel": "beginner",
+      "priorKnowledge": "Eight years as an accountant. Expert in Excel (VLOOKUP, sorting, filters). Two months of basic Python.",
+      "goal": "Move into a data analyst role and handle large datasets with code",
+      "field": "Data analysis for working professionals",
+      "answers": [
+        { "question": "Which language do you use?", "answer": "Python, a little" },
+        { "question": "How much time per day?", "answer": "45 minutes after work" },
+        { "question": "What worries you most?", "answer": "Maths-heavy explanations" }
+      ],
+      "knownWeaknesses": [],
+      "recentMistakes": [],
+      "markers": ["excel", "vlookup", "spreadsheet", "invoice", "ledger", "accounting", "sorted column"]
+    }
+  ]
+}

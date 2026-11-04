@@ -59,6 +59,8 @@ export interface AICallOptions {
   maxTokens?: number;
   /** What the call is for ("lesson", "plan.draft"...), so usage can be broken down by feature. */
   purpose?: string;
+  /** Sees each provider attempt (model, tokens) as it is logged; used by scripts that report cost. */
+  onAttempt?: (a: AttemptLog) => void;
 }
 
 export interface AICallResult {
@@ -93,7 +95,7 @@ export async function callAIContent(messages: AIMessage[], options: AICallOption
 
   const failures: ProviderFailure[] = [];
   const attempts: AttemptLog[] = [];
-  const onAttempt = (a: AttemptLog) => { attempts.push(a); };
+  const onAttempt = (a: AttemptLog) => { attempts.push(a); options.onAttempt?.(a); };
   const done = () => logAttempts(options.purpose ?? 'other', userId, attempts);
 
   const aiCreditsKey = process.env.AICREDITS_API_KEY;

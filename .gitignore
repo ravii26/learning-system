@@ -22,3 +22,4 @@ coverage
 *.sql.gz
 clear-my-prod-data.sql
 prisma/scripts/clear-all-data.sql
+compare-out/
