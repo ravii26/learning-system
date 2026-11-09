@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Icon } from '@/components/ui';
 import { useToast } from '@/components/ToastProvider';
 import FocusPaths from '@/components/focus/FocusPaths';
 import PinControl from '@/components/focus/PinControl';
@@ -9,8 +10,8 @@ import { goalDisplayName } from '@/lib/focusQueue';
 import { useFocus } from '@/lib/useFocus';
 
 /**
- * Learn answers one question: where am I in each thing I'm learning? Your
- * paths come first; everything else waits below, grouped by goal.
+ * Learn answers one question: where was I? What you're working on comes
+ * first; everything else is folded away below, grouped by goal.
  */
 
 interface GoalRow {
@@ -49,9 +50,9 @@ export default function LearnPage() {
       .catch(() => toast.error('Couldn’t load your goals.'))
       .finally(() => alive && setLoaded(true));
     return () => { alive = false; };
-    // Loaded once per visit.
+    // Again whenever your Focus changes, since that can end a goal.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [focus.items.length]);
 
   if (!loaded || !focus.loaded) {
     return (
@@ -80,8 +81,14 @@ export default function LearnPage() {
       <FocusPaths focus={focus} />
 
       {(waitingGoals.length > 0 || looseTopics.length > 0) && (
-        <section aria-labelledby="not-now-h" className="flex flex-col gap-2">
-          <h2 id="not-now-h" className="m-0 text-[1.2rem] font-semibold">Not now</h2>
+        <details className="group">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4">
+            <span>
+              <span className="text-[1.1rem] font-semibold text-fg">Not now</span>
+              <span className="ml-2 text-[0.9rem] text-fg-muted">{waitingGoals.length + looseTopics.length}</span>
+            </span>
+            <Icon name="chevronRight" size={16} className="shrink-0 text-fg-muted transition-transform group-open:rotate-90" />
+          </summary>
           <ul className="m-0 list-none p-0">
             {waitingGoals.map((g) => {
               const inside = liveTopics.filter((t) => t.goal?.id === g.id);
@@ -127,7 +134,7 @@ export default function LearnPage() {
               </li>
             )}
           </ul>
-        </section>
+        </details>
       )}
 
       <nav aria-label="More" className="flex flex-wrap gap-5 text-[0.9rem]">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FocusFacts } from './focusQueue';
-import { addDays, dayLooksFull, finishLines, isUnresolved, planDayView, suggestWeek, weekDays, type WeekPlan } from './weekPlan';
+import { addDays, dayLooksFull, isUnresolved, planDayView, suggestWeek, weekDays, type WeekPlan } from './weekPlan';
 
 const item = (id: string, over: Partial<FocusFacts> = {}): FocusFacts => ({
   id, rhythm: 'few_weekly', targetDate: null, createdAt: '2026-01-01T00:00:00Z', lastActivityAt: null,
@@ -138,26 +138,5 @@ describe('dayLooksFull', () => {
   it('warns when measured time is well over your share', () => {
     expect(dayLooksFull([lesson, lesson], pace, 300, 5)).toBe(true);
     expect(dayLooksFull([lesson], pace, 300, 5)).toBe(false);
-  });
-});
-
-describe('finishLines', () => {
-  const base = { href: '/x', finished: false, lessonsDone: 0, lessonsTotal: 0 };
-  const step = (id: string, state: string, lessonsDone: number, lessonsTotal: number) => ({ id, title: id, state, href: `/${id}`, lessonsDone, lessonsTotal });
-
-  it('finds started topics inside goals, nearest first', () => {
-    const lines = finishLines([{ ...base, id: 'g', kind: 'goal', title: 'DSA', steps: [step('done', 'done', 5, 5), step('now', 'current', 1, 5), step('almost', 'todo', 4, 5), step('later', 'todo', 0, 5)] }]);
-    expect(lines.map((l) => [l.title, l.left, l.parent])).toEqual([['almost', 1, 'DSA'], ['now', 4, 'DSA']]);
-  });
-
-  it('includes a pinned topic, and skips finished items', () => {
-    const topic = { ...base, id: 't', kind: 'topic', title: 'Git', lessonsDone: 1, lessonsTotal: 3, steps: [] };
-    expect(finishLines([topic])).toMatchObject([{ title: 'Git', left: 2, parent: null }]);
-    expect(finishLines([{ ...topic, finished: true }])).toEqual([]);
-  });
-
-  it('shows only a few', () => {
-    const steps = ['a', 'b', 'c', 'd'].map((id) => step(id, 'todo', 1, 3));
-    expect(finishLines([{ ...base, id: 'g', kind: 'goal', title: 'G', steps }])).toHaveLength(3);
   });
 });

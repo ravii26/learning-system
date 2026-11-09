@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { localDateKey } from './timeSummary';
 import { goalDisplayName, isRhythm, rankFocus, type FocusFacts, type Ranked, type Rhythm } from './focusQueue';
+import { JUST_FINISHED_DAYS, MIN_STUDY_SECONDS, lastTouch, pickTopic, resumeLesson, type Touch, type Visit } from './resumePoint';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -25,12 +26,32 @@ export interface FocusView extends FocusFacts {
   steps: PathStep[];
   lessonsDone: number;
   lessonsTotal: number;
+  /** The topic you're in and how far along it is. */
+  currentTopic: { title: string; lessonsDone: number; lessonsTotal: number } | null;
+  /** Set when there's nothing to study yet and the next step is setting it up. */
+  setup: 'no_topics' | 'no_lessons' | null;
+  /** A topic you recently finished, when the next step moved on from it. */
+  movedOnFrom: string | null;
+  /** The last lesson you finished before the next one, for a refresher. */
+  previousLesson: { title: string; href: string } | null;
+}
+
+/** The last thing you studied that isn't part of your Focus. */
+export interface OffFocusResume {
+  topicId: string;
+  title: string;
+  nextStep: string;
+  href: string;
+  lastStudiedAt: string;
+  lessonsDone: number;
+  lessonsTotal: number;
 }
 
 export interface PathStep {
   id: string;
   title: string;
-  state: 'done' | 'current' | 'todo';
+  /** "started" is a topic partly done; "skipped" is a lesson you went past. */
+  state: 'done' | 'current' | 'todo' | 'started' | 'skipped';
   href: string;
   /** Lessons inside this step; only topics have them. */
   lessonsDone?: number;
@@ -46,6 +67,8 @@ const COUNTS_AS_SESSION_SECONDS = 5 * 60;
 const COUNTS_AS_DONE_SECONDS = 10 * 60;
 const SET_ASIDE = new Set(['dropped', 'reference', 'maintenance']);
 const GOAL_OVER = new Set(['achieved', 'abandoned']);
+const NO_TOUCH: Touch = { lessonId: null, at: null };
+const topicHref = (topicId: string, moduleId?: string) => `/topics/${topicId}${moduleId ? `?module=${encodeURIComponent(moduleId)}` : ''}`;
 
 export function parseTz(value: unknown): number {
   const tz = Number(value);
@@ -94,14 +117,21 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
       select: { topicId: true, legacyId: true, title: true, order: true, completed: true, completedAt: true, estimatedMinutes: true, kind: true },
     }),
     db.studyTimeEntry.findMany({ where: { userId, topicId: { in: topicIds }, startedAt: { gte: historyStart } }, select: { topicId: true, moduleId: true, seconds: true, startedAt: true } }),
-    db.studyTimeEntry.groupBy({ by: ['topicId'], where: { userId, topicId: { in: topicIds } }, _max: { startedAt: true } }),
+    db.studyTimeEntry.groupBy({ by: ['topicId', 'moduleId'], where: { userId, topicId: { in: topicIds }, seconds: { gte: MIN_STUDY_SECONDS } }, _max: { startedAt: true } }),
   ]);
 
   const topicById = new Map(topics.map((t) => [t.id, t]));
-  const lastByTopic = new Map(lastStudied.map((l) => [l.topicId, l._max.startedAt]));
   const modulesOf = (topicId: string): ModuleRow[] => modules.filter((m) => m.topicId === topicId);
-  const nextIn = (topicId: string) => modulesOf(topicId).find((m) => !m.completed) ?? null;
-  const topicHref = (topicId: string, moduleId?: string) => `/topics/${topicId}${moduleId ? `?module=${encodeURIComponent(moduleId)}` : ''}`;
+  const visitsOf = (topicId: string): Visit[] => lastStudied.flatMap((l) => (l.topicId === topicId && l._max.startedAt ? [{ moduleId: l.moduleId, at: l._max.startedAt }] : []));
+  const touchByTopic = new Map(topicIds.map((id) => [id, lastTouch(modulesOf(id), visitsOf(id))]));
+  const touchedAt = (topicId: string) => touchByTopic.get(topicId)?.at ?? null;
+  const nextIn = (topicId: string) => resumeLesson(modulesOf(topicId), touchByTopic.get(topicId) ?? NO_TOUCH);
+  const previousOf = (topicId: string, lesson: ModuleRow | null) => {
+    if (!lesson) return null;
+    const list = modulesOf(topicId);
+    const before = list.slice(0, list.indexOf(lesson)).reverse().find((m) => m.completed);
+    return before ? { title: before.title, href: topicHref(topicId, before.legacyId) } : null;
+  };
 
   const views: FocusView[] = live.map((row) => {
     let title = row.title ?? 'Untitled';
@@ -114,13 +144,19 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
     let steps: PathStep[] = [];
     let lessonsDone = 0;
     let lessonsTotal = 0;
-    const lessonSteps = (topicId: string, current: ModuleRow | null): PathStep[] =>
-      modulesOf(topicId).map((m) => ({
+    let currentTopic: FocusView['currentTopic'] = null;
+    let setup: FocusView['setup'] = null;
+    let movedOnFrom: string | null = null;
+    let previousLesson: FocusView['previousLesson'] = null;
+    const lessonSteps = (topicId: string, current: ModuleRow | null): PathStep[] => {
+      const currentIndex = current ? modulesOf(topicId).indexOf(current) : -1;
+      return modulesOf(topicId).map((m, i) => ({
         id: m.legacyId,
         title: m.title,
-        state: m.completed ? 'done' : m.legacyId === current?.legacyId ? 'current' : 'todo',
+        state: m.completed ? 'done' : i === currentIndex ? 'current' : i < currentIndex ? 'skipped' : 'todo',
         href: topicHref(topicId, m.legacyId),
       }));
+    };
 
     if (row.kind === 'goal') {
       title = row.goal ? goalDisplayName(row.goal) : title;
@@ -129,14 +165,20 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
         .map((l) => topicById.get(l.topicId as string))
         .filter((t): t is NonNullable<typeof t> => !!t && !t.deletedAt && !SET_ASIDE.has(t.status));
       scope = usable.map((t) => t.id);
-      const chosen = usable.find((t) => t.status === 'active' && nextIn(t.id))
-        ?? usable.find((t) => nextIn(t.id))
-        ?? usable.find((t) => modulesOf(t.id).length === 0);
+      const picked = pickTopic(usable, (t) => !!nextIn(t.id), (t) => modulesOf(t.id).length > 0, (t) => touchedAt(t.id));
+      const chosen = picked.topic;
+      if (usable.length === 0) setup = 'no_topics';
       if (chosen) {
         next = nextIn(chosen.id);
         nextStep = next?.title ?? chosen.title;
         href = topicHref(chosen.id, next?.legacyId);
         position = `Topic ${usable.indexOf(chosen) + 1} of ${usable.length}`;
+        const inside = modulesOf(chosen.id);
+        currentTopic = { title: chosen.title, lessonsDone: inside.filter((m) => m.completed).length, lessonsTotal: inside.length };
+        if (inside.length === 0) setup = 'no_lessons';
+        previousLesson = previousOf(chosen.id, next);
+        const finishedAt = picked.movedOnFrom ? touchedAt(picked.movedOnFrom.id) : null;
+        if (picked.movedOnFrom && finishedAt && now.getTime() - finishedAt.getTime() < JUST_FINISHED_DAYS * DAY_MS) movedOnFrom = picked.movedOnFrom.title;
       }
       steps = usable.map((t) => {
         const inside = modulesOf(t.id);
@@ -147,7 +189,7 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
         return {
           id: t.id,
           title: t.title,
-          state: t.id === chosen?.id ? 'current' : inside.length > 0 && !stepNext ? 'done' : 'todo',
+          state: t.id === chosen?.id ? 'current' : inside.length > 0 && !stepNext ? 'done' : done > 0 ? 'started' : 'todo',
           href: topicHref(t.id, stepNext?.legacyId),
           lessonsDone: done,
           lessonsTotal: inside.length,
@@ -166,6 +208,9 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
       lessonsDone = inside.filter((m) => m.completed).length;
       lessonsTotal = inside.length;
       if (next) position = `Lesson ${inside.indexOf(next) + 1} of ${inside.length}`;
+      if (row.topic && !finished) currentTopic = { title: row.topic.title, lessonsDone, lessonsTotal };
+      if (row.topicId && inside.length === 0 && !finished) setup = 'no_lessons';
+      previousLesson = row.topicId ? previousOf(row.topicId, next) : null;
     } else if (row.kind === 'lesson') {
       title = row.topic?.title ?? title;
       scope = row.topicId ? [row.topicId] : [];
@@ -198,7 +243,7 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
     const completedToday = !!row.completedAt;
     const doneToday = (secondsByDay.get(today) ?? 0) >= COUNTS_AS_DONE_SECONDS || finishedLessonToday || manualDays.has(today) || completedToday;
 
-    const activity = [...scope.map((id) => lastByTopic.get(id) ?? null), ...row.doneAt].filter((d): d is Date => !!d);
+    const activity = [...scope.map((id) => touchedAt(id)), ...row.doneAt].filter((d): d is Date => !!d);
     const lastActivityAt = activity.length ? new Date(Math.max(...activity.map((d) => d.getTime()))).toISOString() : null;
     const target = row.targetDate ?? row.goal?.targetDate ?? null;
 
@@ -228,10 +273,45 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
       steps,
       lessonsDone,
       lessonsTotal,
+      currentTopic,
+      setup,
+      movedOnFrom,
+      previousLesson,
     };
   });
 
   return rankFocus(views, now);
+}
+
+/** What you last studied outside your Focus, if it still has lessons left. */
+export async function loadOffFocus(db: Db, userId: string, items: FocusView[]): Promise<OffFocusResume | null> {
+  const inFocus = items.flatMap((i) => (i.kind === 'goal' ? i.steps.map((s) => s.id) : i.topicId ? [i.topicId] : []));
+  const latest = await db.studyTimeEntry.findFirst({
+    where: { userId, seconds: { gte: MIN_STUDY_SECONDS }, topicId: { notIn: inFocus } },
+    orderBy: { startedAt: 'desc' },
+    select: { topicId: true },
+  });
+  if (!latest) return null;
+
+  const [topic, lessons, visits] = await Promise.all([
+    db.topic.findFirst({ where: { id: latest.topicId, userId, deletedAt: null }, select: { id: true, title: true, status: true } }),
+    db.curriculumItem.findMany({ where: { userId, topicId: latest.topicId, removed: false }, orderBy: { order: 'asc' }, select: { legacyId: true, title: true, completed: true, completedAt: true } }),
+    db.studyTimeEntry.groupBy({ by: ['moduleId'], where: { userId, topicId: latest.topicId, seconds: { gte: MIN_STUDY_SECONDS } }, _max: { startedAt: true } }),
+  ]);
+  if (!topic || SET_ASIDE.has(topic.status)) return null;
+
+  const touch = lastTouch(lessons, visits.flatMap((v) => (v._max.startedAt ? [{ moduleId: v.moduleId, at: v._max.startedAt }] : [])));
+  const next = resumeLesson(lessons, touch);
+  if (!next || !touch.at) return null;
+  return {
+    topicId: topic.id,
+    title: topic.title,
+    nextStep: next.title,
+    href: topicHref(topic.id, next.legacyId),
+    lastStudiedAt: touch.at.toISOString(),
+    lessonsDone: lessons.filter((l) => l.completed).length,
+    lessonsTotal: lessons.length,
+  };
 }
 
 export type PinResult = { ok: true; id: string } | { ok: false; status: number; error: string };
