@@ -137,34 +137,3 @@ export function dayLooksFull(
   }
   return total > (weeklyTargetMinutes / plannedDays) * 1.5;
 }
-
-export interface FinishLine { id: string; title: string; parent: string | null; left: number; done: number; total: number; href: string }
-
-interface PathLike {
-  id: string;
-  kind: string;
-  title: string;
-  href: string | null;
-  finished: boolean;
-  lessonsDone: number;
-  lessonsTotal: number;
-  steps: Array<{ id: string; title: string; state: string; href: string; lessonsDone?: number; lessonsTotal?: number }>;
-}
-
-/** What you're nearest to completing: small wins instead of one huge number. */
-export function finishLines(items: PathLike[], limit = 3): FinishLine[] {
-  const lines: FinishLine[] = [];
-  for (const item of items) {
-    if (item.finished) continue;
-    if (item.kind === 'goal') {
-      for (const s of item.steps) {
-        const total = s.lessonsTotal ?? 0;
-        const done = s.lessonsDone ?? 0;
-        if (total > done && (s.state === 'current' || done > 0)) lines.push({ id: s.id, title: s.title, parent: item.title, left: total - done, done, total, href: s.href });
-      }
-    } else if (item.kind === 'topic' && item.href && item.lessonsTotal > item.lessonsDone) {
-      lines.push({ id: item.id, title: item.title, parent: null, left: item.lessonsTotal - item.lessonsDone, done: item.lessonsDone, total: item.lessonsTotal, href: item.href });
-    }
-  }
-  return lines.sort((a, b) => a.left - b.left).slice(0, limit);
-}

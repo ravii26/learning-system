@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
-import { loadFocus, parseTz, savePin, todayKey } from '@/lib/focusData';
+import { loadFocus, loadOffFocus, parseTz, savePin, todayKey } from '@/lib/focusData';
 import { localDateKey } from '@/lib/timeSummary';
 import { addDays, weekDays } from '@/lib/weekPlan';
 
@@ -33,7 +33,9 @@ export async function GET(request: Request) {
     ]);
     const plan = { today, days: weekDays(today), entries };
     const reviewedToday = recentReviews.some((r) => localDateKey(r.reviewedAt, tz) === today);
-    return NextResponse.json({ items, setupDone: !!user?.focusSetupAt, dueCards, reviewedToday, plan });
+    // A nicety for Learn, so it never takes the rest of Focus down with it.
+    const offFocus = await loadOffFocus(db, userId, items).catch(() => null);
+    return NextResponse.json({ items, setupDone: !!user?.focusSetupAt, dueCards, reviewedToday, plan, offFocus });
   } catch (e) {
     console.error('Failed to load Focus:', e);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
