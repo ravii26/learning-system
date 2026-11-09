@@ -32,23 +32,31 @@ export default async function DashboardLayout({
   // The weekly check-in is the ReviewSession table (renamed from ReviewLog in
   // the Phase 3 migration, which freed that name for the per-concept review
   // log) — don't swap in reviewLog.
+  // The sidebar is a convenience: if a lookup fails it's left out, so one bad
+  // query can't take every page in the app down with it.
+  const orEmpty = <T,>(what: string, query: Promise<T>, fallback: T) =>
+    query.catch((e: unknown) => {
+      console.error(`Sidebar: could not load ${what}:`, e);
+      return fallback;
+    });
+
   const [activeTopics, pins, lastReview] = await Promise.all([
-    db.topic.findMany({
+    orEmpty('active topics', db.topic.findMany({
       where: { status: 'active', userId, deletedAt: null },
       select: { id: true, title: true },
       orderBy: { lastTouchedDate: 'desc' },
       take: SIDEBAR_ITEMS,
-    }),
-    db.focusItem.findMany({
+    }), []),
+    orEmpty('Focus items', db.focusItem.findMany({
       where: { userId, completedAt: null },
       select: { id: true, title: true, goalId: true, topicId: true, moduleId: true, goal: { select: { title: true, shortName: true } }, topic: { select: { title: true } } },
       orderBy: { createdAt: 'asc' },
       take: SIDEBAR_ITEMS,
-    }),
-    db.reviewSession.findFirst({
+    }), []),
+    orEmpty('the last check-in', db.reviewSession.findFirst({
       where: { userId },
       orderBy: { reviewedAt: 'desc' },
-    }),
+    }), null),
   ]);
   // Your Focus list once you have one; until then, your active topics.
   const sidebarLabel = pins.length > 0 ? 'Focus' : 'Now';
