@@ -283,7 +283,7 @@ export default function TodayPage() {
         {showSetup && <FocusSetup focus={focus} topics={topics} />}
 
         {usingQueue ? (
-          <TodayQueue focus={focus} dueCards={due.length} reviewMinutes={reviewMinutes} pace={pace.byKind} />
+          <TodayQueue focus={focus} dueCards={due.length} reviewMinutes={reviewMinutes} pace={pace.byKind} weeklyTargetMinutes={time?.weeklyTargetMinutes ?? null} />
         ) : pick ? (
           <section aria-labelledby="next-h" className="glass-panel flex flex-col gap-6 p-7">
             <div className="flex flex-col gap-2.5">
