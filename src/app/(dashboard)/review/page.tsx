@@ -108,7 +108,6 @@ export default function ReviewPage() {
   const [reviewError, setReviewError] = useState<string | null>(null);
 
   // Queue Promotion State
-  const [activeSlotsRemaining, setActiveSlotsRemaining] = useState(2);
   const [promotingTopic, setPromotingTopic] = useState<Topic | null>(null);
   const [why, setWhy] = useState('');
   const [depthTarget, setDepthTarget] = useState('Proficiency');
@@ -209,7 +208,6 @@ export default function ReviewPage() {
     if (activePaused.length === 0) {
       // Go straight to promotion if there are no active/paused topics
       setStep('promote');
-      calculateActiveSlots(0);
       return;
     }
     setStep('reviewing');
@@ -247,19 +245,8 @@ export default function ReviewPage() {
       setCurrentIdx(currentIdx + 1);
       loadTopicForReview(currentIdx + 1);
     } else {
-      // Calculate remaining active slots before promotion
-      let activeCountAfterReview = 0;
-      updatedDecisions.forEach(d => {
-        if (d.decision === 'continue') activeCountAfterReview++;
-      });
-      calculateActiveSlots(activeCountAfterReview);
       setStep('promote');
     }
-  };
-
-  const calculateActiveSlots = (currentActive: number) => {
-    const remaining = Math.max(0, 2 - currentActive);
-    setActiveSlotsRemaining(remaining);
   };
 
   // Promotion handlers
@@ -289,7 +276,6 @@ export default function ReviewPage() {
       }
     ]);
 
-    setActiveSlotsRemaining(prev => Math.max(0, prev - 1));
     setQueuedTopics(prev => prev.filter(t => t.id !== promotingTopic.id));
     setPromotingTopic(null);
   };
@@ -716,11 +702,11 @@ export default function ReviewPage() {
           <div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '6px' }}>Move something up from Next</h2>
             <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-              You have <strong>{activeSlotsRemaining} / 2</strong> active slots available. Decide if you would like to promote any of your queued learning topics.
+              Decide if you would like to promote any of your queued learning topics.
             </p>
           </div>
 
-          {activeSlotsRemaining > 0 && queuedTopics.length > 0 && (
+          {queuedTopics.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>Available in Queue</span>
               {queuedTopics.map((qt) => (
@@ -740,12 +726,6 @@ export default function ReviewPage() {
           {queuedTopics.length === 0 && (
             <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '16px 0', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
               No topics in queue.
-            </p>
-          )}
-
-          {activeSlotsRemaining === 0 && (
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', background: 'var(--fill-1)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--fill-3)' }}>
-              Both Now slots are taken. Finish or rest a topic to make room.
             </p>
           )}
 

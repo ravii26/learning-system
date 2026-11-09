@@ -28,6 +28,7 @@ interface ModuleStudyRoomProps {
   pace?: KindPace;
   /** Time recorded on this lesson, once finished. */
   actualSeconds?: number;
+  pinControl?: React.ReactNode;
   notes: string;
   onSaveNotes: (html: string) => Promise<void>;
   /** Called after this module's own notes were saved, so the page keeps its copy fresh. */
@@ -60,6 +61,7 @@ export default function ModuleStudyRoom({
   module,
   pace,
   actualSeconds,
+  pinControl,
   notes,
   onSaveNotes,
   onModuleNotesSaved,
@@ -434,7 +436,8 @@ export default function ModuleStudyRoom({
                 </>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {pinControl}
               {lesson && !loadingLesson && !manualPrompt && activeTab === 'guide' && (
                 <ReadAloud
                   resetKey={module.id}

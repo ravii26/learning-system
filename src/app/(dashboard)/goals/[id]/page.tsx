@@ -10,6 +10,8 @@ import type { Knowledge } from '@/lib/moduleState';
 import type { ProgramView } from '@/lib/program/load';
 import ProgramPanel from './ProgramPanel';
 import GoalForecastCard from './GoalForecastCard';
+import PinControl from '@/components/focus/PinControl';
+import { useFocus } from '@/lib/useFocus';
 import CustomDialog, { type CustomDialogConfig } from '@/components/CustomDialog';
 import { GOAL_STATUSES, GOAL_STATUS_EFFECT, GOAL_STATUS_WORD, type GoalStatusName } from '@/lib/goalStatusWords';
 import { VALID_AREAS } from '@/lib/validations/topic';
@@ -68,6 +70,7 @@ export default function GoalDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
+  const focus = useFocus();
   const [goal, setGoal] = useState<GoalDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -201,7 +204,8 @@ export default function GoalDetailPage() {
           {goal.why && <p className="m-0 text-[0.95rem] text-fg-muted">{goal.why}</p>}
         </div>
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="goal-status" className="text-[0.85rem] font-semibold text-fg-secondary">Status</label>
+          <PinControl focus={focus} target={{ kind: 'goal', goalId: params.id }} />
+          <label htmlFor="goal-status"className="text-[0.85rem] font-semibold text-fg-secondary">Status</label>
           <select id="goal-status" value={goal.status} onChange={(e) => handleStatusChange(e.target.value as GoalStatusName)} disabled={updatingStatus} className="form-input h-10 w-auto min-w-[170px] py-0">
             {GOAL_STATUSES.map((s) => <option key={s} value={s}>{GOAL_STATUS_WORD[s]}</option>)}
           </select>

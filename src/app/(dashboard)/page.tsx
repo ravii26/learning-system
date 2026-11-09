@@ -15,6 +15,10 @@ import { topicLabelUnderGoal } from '@/lib/statusLabels';
 import { lessonTimeLabel, paceKey, reviewMinutes as estimateReviewMinutes } from '@/lib/pace';
 import { usePace } from '@/lib/usePace';
 import WeeklyTarget from './WeeklyTarget';
+import { useFocus } from '@/lib/useFocus';
+import { RHYTHM_LABEL } from '@/lib/focusQueue';
+import TodayQueue from '@/components/focus/TodayQueue';
+import FocusSetup from '@/components/focus/FocusSetup';
 
 /**
  * Today — the front door. It answers "what do I do now?" by deciding for
@@ -72,6 +76,7 @@ export default function TodayPage() {
   const [time, setTime] = useState<TimeWeek | null>(null);
   const [cardSeconds, setCardSeconds] = useState<number | null>(null);
   const pace = usePace();
+  const focus = useFocus();
   const [loading, setLoading] = useState(true);
 
   const [captureTitle, setCaptureTitle] = useState('');
@@ -204,8 +209,14 @@ export default function TodayPage() {
   const nextTime = nextMinutes && nextMinutes > 0 ? lessonTimeLabel(nextMinutes, pace.byKind[paceKey(next?.module.kind)], { short: true }) : null;
   const hasPracticeTopic = topics.some((t) => t.mode === 'practice');
 
-  const subline = pick && due.length
-    ? 'One session and a short review make today count. Everything else is optional.'
+  // With nothing pinned, Today keeps working the way it always has.
+  const usingQueue = focus.items.length > 0;
+  const showSetup = focus.loaded && !focus.setupDone && !usingQueue && topics.length > 0;
+
+  const subline = usingQueue
+    ? 'One short list. Everything else can wait.'
+    : pick && due.length
+    ?'One session and a short review make today count. Everything else is optional.'
     : pick
       ? 'One focused session makes today count.'
       : due.length
@@ -270,7 +281,11 @@ export default function TodayPage() {
           </section>
         )}
 
-        {pick ? (
+        {showSetup && <FocusSetup focus={focus} topics={topics} />}
+
+        {usingQueue ? (
+          <TodayQueue focus={focus} dueCards={due.length} reviewMinutes={reviewMinutes} pace={pace.byKind} />
+        ) : pick ? (
           <section aria-labelledby="next-h" className="glass-panel flex flex-col gap-6 p-7">
             <div className="flex flex-col gap-2.5">
               <div className="text-[0.9rem] text-fg-muted">
@@ -323,7 +338,7 @@ export default function TodayPage() {
 
         <CheckinsDue />
 
-        {due.length > 0 ? (
+        {usingQueue ? null : due.length > 0 ? (
           <section aria-labelledby="rev-h" className="glass-panel flex flex-wrap items-center gap-6 px-7 py-6">
             <div className="relative h-16 w-14 shrink-0" aria-hidden="true">
               <span className="absolute left-2.5 top-0 h-14 w-11 rounded-lg border border-line bg-sunk" />
@@ -445,7 +460,24 @@ export default function TodayPage() {
           </section>
         )}
 
-        {activeTopics.length > 0 && (
+        {usingQueue && (
+          <section aria-labelledby="focus-side-h" className="flex flex-col gap-4">
+            <div className="flex items-baseline justify-between">
+              <h2 id="focus-side-h" className="m-0 text-[0.95rem] font-semibold">Focus</h2>
+              <Link href="/plan" className="text-[0.875rem] text-fg-secondary">Edit</Link>
+            </div>
+            {focus.items.filter((i) => !i.finished).map((i) => (
+              <div key={i.id} className="flex min-w-0 flex-col">
+                {i.href
+                  ? <Link href={i.href} className="truncate text-[1rem] font-semibold text-fg no-underline hover:no-underline">{i.title}</Link>
+                  : <span className="truncate text-[1rem] font-semibold text-fg">{i.title}</span>}
+                <span className="text-[0.82rem] text-fg-muted">{RHYTHM_LABEL[i.rhythm]}</span>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {!usingQueue && activeTopics.length > 0 && (
           <section aria-labelledby="now-h" className="flex flex-col gap-5">
             <h2 id="now-h" className="m-0 text-[0.95rem] font-semibold">Now</h2>
             {activeTopics.map((t) => {

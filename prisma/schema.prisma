@@ -67,6 +67,8 @@ model User {
   aiMode       String   @default("app")
   // Your own weekly study target; null means none set.
   weeklyTargetMinutes Int?
+  // Set once you finish or skip the first Focus setup.
+  focusSetupAt DateTime?
 
   topics                 Topic[]
   activityLogs           ActivityLog[]
@@ -106,6 +108,38 @@ model User {
   fieldResources         FieldResource[]
   fieldMapSharesSent     FieldMapShare[]      @relation("FieldMapShareFrom")
   fieldMapSharesReceived FieldMapShare[]      @relation("FieldMapShareTo")
+  focusItems             FocusItem[]
+}
+
+/// Something you've pinned as a current priority. Today's list is picked
+/// from these; anything not pinned simply waits. See src/lib/focusQueue.ts.
+model FocusItem {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind     String // goal | topic | lesson | custom
+  goalId   String?
+  goal     Goal?   @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  topicId  String?
+  topic    Topic?  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  moduleId String? // CurriculumItem.legacyId, for a pinned lesson
+  title    String? // only for custom items: a book, habit or one-off task
+
+  rhythm     String    @default("few_weekly") // daily | few_weekly | when_i_can | by_date | once
+  targetDate DateTime?
+
+  // When you marked it done by hand; pruned to recent entries.
+  doneAt      DateTime[] @default([])
+  // Local calendar days (yyyy-mm-dd), so they follow the learner's own "today".
+  skippedDay  String?
+  addedDay    String?
+  completedAt DateTime? // a "just once" item that's finished
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, completedAt])
 }
 
 model Topic {
@@ -194,6 +228,7 @@ model Topic {
   problemAttempts  ProblemAttempt[]
   placementChecks  PlacementCheck[]
   programItems     ProgramItem[]
+  focusItems       FocusItem[]
 }
 
 /// Evidence from the Study Room: one row per checked quiz or graded
@@ -603,6 +638,7 @@ model Goal {
   programs       Program[]
   programChanges ProgramChange[]
   weeklyCheckins WeeklyCheckin[]
+  focusItems     FocusItem[]
 
   @@index([userId, status, targetDate])
 }

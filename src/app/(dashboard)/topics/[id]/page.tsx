@@ -20,6 +20,8 @@ import { useStudyTracker } from '@/lib/useStudyTracker';
 import { formatDuration } from '@/lib/timeSummary';
 import { lessonTimeLabel, paceKey } from '@/lib/pace';
 import { usePace } from '@/lib/usePace';
+import { useFocus } from '@/lib/useFocus';
+import PinControl from '@/components/focus/PinControl';
 import TopicTimeDrawer from './TopicTimeDrawer';
 import PlacementDrawer from './PlacementDrawer';
 import TopicToolsMenu from './TopicToolsMenu';
@@ -167,6 +169,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
   // Real study time: tracked while you study here (see useStudyTracker)
   const tracker = useStudyTracker({ topicId: params.id, moduleId: activeModuleId, forceActive: timerActive });
   const pace = usePace(params.id);
+  const focus = useFocus();
   const [timeTotals, setTimeTotals] = useState({ todaySeconds: 0, allTimeSeconds: 0 });
   const [timeDrawerOpen, setTimeDrawerOpen] = useState(false);
   const [addingModule, setAddingModule] = useState(false);
@@ -662,6 +665,8 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
             </button>
           </div>
 
+          <PinControl focus={focus} target={{ kind: 'topic', topicId: params.id }} label="Pin topic" />
+
           {/* Everything else, one click away: keeps the header to what you use every session. */}
           <TopicToolsMenu
             attention={confusions.filter((c) => !c.resolved).length + mistakes.length || undefined}
@@ -786,6 +791,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                 module={activeModule}
                 pace={pace.byKind[paceKey(activeModule.kind)]}
                 actualSeconds={pace.moduleSeconds[activeModule.id]}
+                pinControl={<PinControl focus={focus} target={{ kind: 'lesson', topicId: params.id, moduleId: activeModule.id }} label="Pin lesson" />}
                 evidence={evidence[activeModule.id]}
                 onEvidenceChanged={fetchEvidence}
                 notes={notes}
