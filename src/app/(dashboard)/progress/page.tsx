@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ButtonLink, KNOWLEDGE_LABEL, KnowledgeStrip, Sparkline, knowledgeSummary } from '@/components/ui';
 import { formatDuration } from '@/lib/timeSummary';
 import type { Knowledge } from '@/lib/moduleState';
+import ReminderControl from '@/components/focus/ReminderControl';
 
 /**
  * Where you stand. Answers three questions from evidence only — nothing
@@ -177,6 +178,8 @@ export default function WhereYouStandPage() {
           {sentence ?? 'Nothing measured yet. Study a module, take its check, and review its cards — this page fills in from what you actually do.'}
         </p>
       </header>
+
+      <ReminderControl />
 
       {all.length > 0 && (
         <section aria-label="Everything you’re learning, by state" className="flex flex-col gap-3.5">

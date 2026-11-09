@@ -53,7 +53,7 @@ function deadlineReason(days: number): string {
 }
 
 function neglectReason(days: number, touched: boolean): string {
-  if (!touched) return 'New in your Focus';
+  if (!touched) return 'Not started yet';
   if (days <= 0) return 'Studied today';
   return days === 1 ? 'Not studied since yesterday' : `Not studied in ${days} days`;
 }
@@ -87,6 +87,35 @@ export function rankFocus<T extends FocusFacts>(items: T[], now: Date = new Date
     .map((item) => ({ item, ...assess(item, now) }))
     .sort((a, b) => a.tier - b.tier || (a.tier === 0 ? a.dueAt - b.dueAt : b.idleDays - a.idleDays))
     .map(({ item, tier, reason }) => ({ ...item, tier, reason }));
+}
+
+const MAX_SHORT_NAME = 40;
+
+/** "DSA Interview Preparation" from a plan's long generated title. */
+export function shortGoalName(title: string): string {
+  const firstPart = title.split(/[:,]/)[0].trim().replace(/^(complete|mastering|master|learning|learn|the)\s+/i, '');
+  const short = firstPart.split(/\s+(?:for|from|to)\s+/i)[0].trim().slice(0, MAX_SHORT_NAME).trim();
+  return short || title.slice(0, MAX_SHORT_NAME).trim();
+}
+
+export const goalDisplayName = (goal: { title: string; shortName?: string | null }) => goal.shortName?.trim() || shortGoalName(goal.title);
+
+export const TODAY_SIZE_KEY = 'learning-os:today-size';
+
+export function readTodaySize(): TodaySize {
+  try {
+    const saved = localStorage.getItem(TODAY_SIZE_KEY);
+    if (saved === 'quick' || saved === 'normal' || saved === 'deep') return saved;
+  } catch { /* Storage may be disabled. */ }
+  return 'normal';
+}
+
+/** The whole day: what's open, in order, and how much of it is done. */
+export function planToday<T extends FocusFacts>(ranked: T[], size: TodaySize, extra: number, review: { due: number; reviewedToday: boolean }) {
+  const pick = pickToday(ranked, size, extra);
+  const reviewOpen = review.due > 0;
+  const doneCount = pick.done.length + (!reviewOpen && review.reviewedToday ? 1 : 0);
+  return { ...pick, reviewOpen, doneCount, total: doneCount + pick.list.length + (reviewOpen ? 1 : 0) };
 }
 
 export interface TodayPick<T> {

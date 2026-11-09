@@ -22,6 +22,7 @@ import { lessonTimeLabel, paceKey } from '@/lib/pace';
 import { usePace } from '@/lib/usePace';
 import { useFocus } from '@/lib/useFocus';
 import PinControl from '@/components/focus/PinControl';
+import NextUpCard from '@/components/focus/NextUpCard';
 import TopicTimeDrawer from './TopicTimeDrawer';
 import PlacementDrawer from './PlacementDrawer';
 import TopicToolsMenu from './TopicToolsMenu';
@@ -177,6 +178,9 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
   const tracker = useStudyTracker({ topicId: params.id, moduleId: activeModuleId, forceActive: timerActive });
   const pace = usePace(params.id);
   const focus = useFocus();
+  // While a finish is saving, "what's next" would still show this lesson.
+  const [finishing, setFinishing] = useState(false);
+  const [justFinished, setJustFinished] = useState(false);
   const [timeTotals, setTimeTotals] = useState({ todaySeconds: 0, allTimeSeconds: 0 });
   const [timeDrawerOpen, setTimeDrawerOpen] = useState(false);
   const [addingModule, setAddingModule] = useState(false);
@@ -355,9 +359,16 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
         : m
     );
     // Time still waiting to be saved has to count towards this lesson.
-    if (nowCompleting) await tracker.flushNow();
+    if (nowCompleting) {
+      setFinishing(true);
+      await tracker.flushNow();
+    }
     await handleSaveCurriculum(updated);
     void pace.refresh();
+    if (nowCompleting) {
+      setFinishing(false);
+      setJustFinished(true);
+    }
 
     // Finishing a module turns its lesson into Daily Review cards, so it
     // comes back before you forget it.
@@ -799,6 +810,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                 pace={pace.byKind[paceKey(activeModule.kind)]}
                 actualSeconds={pace.moduleSeconds[activeModule.id]}
                 pinControl={<PinControl focus={focus} target={{ kind: 'lesson', topicId: params.id, moduleId: activeModule.id }} label="Pin lesson" />}
+                nextUp={finishing ? null : <NextUpCard focus={focus} scrollTo={justFinished} />}
                 evidence={evidence[activeModule.id]}
                 onEvidenceChanged={fetchEvidence}
                 notes={notes}

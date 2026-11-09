@@ -1,0 +1,665 @@
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+
+// Subcomponents Import
+import RoadmapWizard from '../../RoadmapWizard';
+import PinControl from '@/components/focus/PinControl';
+import { useFocus } from '@/lib/useFocus';
+import { topicLabelUnderGoal } from '@/lib/statusLabels';
+import type { GoalStatusName } from '@/lib/goalStatusWords';
+import { KnowledgeStrip } from '@/components/ui';
+import type { Knowledge } from '@/lib/moduleState';
+
+interface Topic {
+  id: string;
+  title: string;
+  area: string;
+  why: string | null;
+  depthTarget: string | null;
+  status: string;
+  progressPct: number;
+  currentStage: string;
+  lastCompleted: string | null;
+  nextAction: string | null;
+  lastTouchedDate: string;
+  notes: string | null;
+  activeSlotType: string | null;
+  knowledgeMap?: any;
+  mistakes?: any[];
+  mode?: string;
+  curriculum?: Array<{ order: number; title: string; completed: boolean }> | null;
+  /** The goal this topic serves, if any (from /api/topics). */
+  goal?: { id: string; title: string; status: string } | null;
+}
+
+interface GoalRow {
+  id: string;
+  title: string;
+  status: GoalStatusName;
+  readinessMet: number;
+  readinessTotal: number;
+  _count?: { links: number };
+}
+
+interface Stats {
+  counts: {
+    inbox: number;
+    queued: number;
+    active: number;
+    paused: number;
+    maintenance: number;
+    reference: number;
+    dropped: number;
+  };
+  staleActiveCount: number;
+  daysSinceLastReview: number | null;
+}
+
+interface Toast {
+  id: number;
+  message: string;
+  type: 'success' | 'error' | 'info';
+  exiting?: boolean;
+}
+
+const AREAS = ['All types', 'Tech', 'Business', 'Finance', 'Creative', 'Personal', 'Other'];
+
+let toastIdCounter = 0;
+
+/** Every topic and its status, for tidying up. Day to day, Learn is the page to use. */
+export default function ManageTopicsPage() {
+  const router = useRouter();
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
+
+  // Bulk selection (list view) and the soft-delete trash
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [trash, setTrash] = useState<Topic[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Toast
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // Search & Filter
+  const [search, setSearch] = useState('');
+  const [selectedArea, setSelectedArea] = useState('All types');
+  const [goals, setGoals] = useState<GoalRow[]>([]);
+  const [selectedGoal, setSelectedGoal] = useState('all');
+
+  const [knowledge, setKnowledge] = useState<Record<string, Knowledge[]>>({});
+
+  // Inbox Capture
+  const [newInboxTitle, setNewInboxTitle] = useState('');
+  const [capturing, setCapturing] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+
+  // Quick Activation Modal State (Fallback for direct activation)
+  const [activatingTopic, setActivatingTopic] = useState<Topic | null>(null);
+  const [why, setWhy] = useState('');
+  const [depthTarget, setDepthTarget] = useState('Proficiency');
+  const [nextAction, setNextAction] = useState('');
+  const [activationError, setActivationError] = useState<string | null>(null);
+
+  // AI Roadmap Wizard state
+  const [showRoadmapWizard, setShowRoadmapWizard] = useState(false);
+  const [captureTopicMode, setCaptureTopicMode] = useState<'self_directed' | 'course'>('self_directed');
+
+  const focus = useFocus();
+
+  const showToast = useCallback((message: string, type: Toast['type'] = 'success') => {
+    const id = ++toastIdCounter;
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
+      setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 320);
+    }, 3000);
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [topicsRes, statsRes, progressRes, goalsRes] = await Promise.all([
+        fetch('/api/topics'),
+        fetch('/api/stats'),
+        fetch('/api/progress'),
+        fetch('/api/goals').catch(() => null),
+      ]);
+      if (goalsRes?.ok) setGoals(await goalsRes.json());
+      if (progressRes.ok) {
+        const p = await progressRes.json();
+        setKnowledge(Object.fromEntries(p.topics.filter((t: any) => t.knowledge).map((t: any) => [t.id, t.knowledge.states])));
+      }
+
+      if (topicsRes.ok && statsRes.ok) {
+        const topicsData = await topicsRes.json();
+        const statsData = await statsRes.json();
+        setTopics(topicsData);
+        setStats(statsData);
+      }
+    } catch (e) {
+      console.error('Failed to load dashboard data:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTrash = async () => {
+    try {
+      const res = await fetch('/api/topics?deleted=1');
+      if (res.ok) setTrash(await res.json());
+    } catch {
+      // Trash is secondary — a failed load just hides the section.
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    fetchTrash();
+  }, []);
+
+  const toggleSelected = (id: string) => {
+    setConfirmingDelete(false);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = (ids: string[]) => {
+    setConfirmingDelete(false);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const allOn = ids.every((id) => next.has(id));
+      ids.forEach((id) => (allOn ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelected(new Set());
+    setConfirmingDelete(false);
+  };
+
+  // One request per topic: the API has no batch endpoint, and a few dozen
+  // parallel calls is fine at single-user scale. Failures are counted, not
+  // thrown, so a partial success still refreshes and reports honestly.
+  const runBulk = async (ids: string[], call: (id: string) => Promise<Response>, verb: string) => {
+    setBulkBusy(true);
+    const results = await Promise.allSettled(ids.map(call));
+    const failed = results.filter((r) => r.status === 'rejected' || !r.value.ok).length;
+    const done = ids.length - failed;
+    setBulkBusy(false);
+    clearSelection();
+    await Promise.all([fetchData(), fetchTrash()]);
+    router.refresh();
+    if (done > 0) showToast(`${verb} ${done} topic${done === 1 ? '' : 's'}`, 'success');
+    if (failed > 0) showToast(`${failed} could not be updated`, 'error');
+  };
+
+  const handleBulkLetGo = () =>
+    runBulk(Array.from(selected), (id) => fetch(`/api/topics/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'dropped' }),
+    }), 'Let go of');
+
+  const handleBulkDelete = () => {
+    if (!confirmingDelete) { setConfirmingDelete(true); return; }
+    runBulk(Array.from(selected), (id) => fetch(`/api/topics/${id}`, { method: 'DELETE' }), 'Moved to Trash:');
+  };
+
+  const handleRestore = (id: string) =>
+    runBulk([id], (tid) => fetch(`/api/topics/${tid}/restore`, { method: 'POST' }), 'Restored');
+
+  const handleQuickCapture = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newInboxTitle.trim()) return;
+
+    setCapturing(true);
+    setCaptureError(null);
+
+    try {
+      const res = await fetch('/api/topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newInboxTitle.trim(),
+          status: 'inbox',
+          topicMode: captureTopicMode,
+        }),
+      });
+
+      if (res.ok) {
+        const capturedTitle = newInboxTitle.trim();
+        setNewInboxTitle('');
+        await fetchData();
+        router.refresh();
+        showToast(`"${capturedTitle}" added to Inbox`, 'success');
+      } else {
+        const data = await res.json();
+        setCaptureError(data.error || 'Failed to capture topic');
+        showToast('Failed to capture topic', 'error');
+      }
+    } catch (err) {
+      setCaptureError('Failed to connect to server');
+      showToast('Connection error', 'error');
+    } finally {
+      setCapturing(false);
+    }
+  };
+
+  const handleTransition = async (topic: Topic, newStatus: string) => {
+    if (newStatus === 'active') {
+      if (!topic.why || !topic.depthTarget || !topic.nextAction) {
+        setActivatingTopic(topic);
+        setWhy(topic.why || '');
+        setDepthTarget(topic.depthTarget || 'Proficiency');
+        setNextAction(topic.nextAction || '');
+        setActivationError(null);
+        return;
+      }
+    }
+
+    try {
+      const res = await fetch(`/api/topics/${topic.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (res.ok) {
+        await fetchData();
+        router.refresh();
+      } else {
+        const data = await res.json();
+        showToast(data.error || 'Failed to update status', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to connect to server', 'error');
+    }
+  };
+
+  const submitFallbackActivation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activatingTopic) return;
+    if (!why.trim() || !nextAction.trim()) {
+      setActivationError('Why and Next Action are required to activate a topic.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/topics/${activatingTopic.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'active',
+          why: why.trim(),
+          depthTarget,
+          nextAction: nextAction.trim(),
+        }),
+      });
+
+      if (res.ok) {
+        const title = activatingTopic.title;
+        setActivatingTopic(null);
+        await fetchData();
+        router.refresh();
+        showToast(`"${title}" is now active`, 'success');
+      } else {
+        const data = await res.json();
+        setActivationError(data.error || 'Failed to activate topic');
+      }
+    } catch (err) {
+      setActivationError('Connection error');
+    }
+  };
+
+  // Search/Filter matching
+  const filteredTopics = topics.filter((t) => {
+    const matchesSearch =
+      t.title.toLowerCase().includes(search.toLowerCase()) ||
+      (t.notes && t.notes.toLowerCase().includes(search.toLowerCase()));
+    const matchesArea = selectedArea === 'All types' || t.area === selectedArea;
+    const matchesGoal = selectedGoal === 'all' || (selectedGoal === 'none' ? !t.goal : t.goal?.id === selectedGoal);
+    return matchesSearch && matchesArea && matchesGoal;
+  });
+
+  // Loading skeleton
+  if (loading) {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '7fr 3fr', gap: '32px', alignItems: 'start' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div className="flex-between">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="skeleton skeleton-text" style={{ width: '220px', height: '28px' }} />
+              <div className="skeleton skeleton-text" style={{ width: '320px', height: '14px' }} />
+            </div>
+            <div className="skeleton" style={{ width: '120px', height: '38px' }} />
+          </div>
+          <div className="skeleton" style={{ height: '56px', borderRadius: '12px' }} />
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
+            <div className="skeleton" style={{ height: '40px' }} />
+            <div className="skeleton" style={{ height: '40px' }} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="skeleton skeleton-col" />
+            ))}
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div className="skeleton" style={{ height: '220px', borderRadius: '12px' }} />
+          <div className="skeleton" style={{ height: '300px', borderRadius: '12px' }} />
+        </div>
+      </div>
+    );
+  }
+
+  const STATUS_WORD: Record<string, string> = {
+    active: 'Now',
+    queued: 'Next',
+    inbox: 'Inbox',
+    paused: 'Resting',
+    maintenance: 'Keeping fresh',
+    reference: 'Reference',
+    dropped: 'Let go',
+  };
+  const KIND: Record<string, string> = { syllabus: 'Course', accretion: 'Ideas you collect', practice: 'Daily practice', reference: 'Reference' };
+  const nextModuleOf = (t: Topic) =>
+    [...(t.curriculum ?? [])].sort((a, b) => a.order - b.order).find((m) => !m.completed)?.title ?? null;
+  const daysAgo = (d: string) => Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
+  const byStatus = (s: string) => filteredTopics.filter((t) => t.status === s);
+  const now = byStatus('active');
+  const next = byStatus('queued');
+  const inbox = byStatus('inbox');
+  const others = filteredTopics.filter((t) => ['paused', 'maintenance', 'reference', 'dropped'].includes(t.status));
+  const ghost = 'h-9 rounded-lg px-3 text-[0.85rem] font-medium text-fg-secondary hover:bg-fill-2 hover:text-fg';
+
+  const Row = ({ t, actions }: { t: Topic; actions: React.ReactNode }) => {
+    const states = knowledge[t.id] ?? [];
+    const nm = nextModuleOf(t);
+    return (
+      <li className="grid items-center gap-x-5 gap-y-2 border-b border-line py-3.5 last:border-b-0 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]">
+        <div className="flex min-w-0 items-start gap-3">
+          <input
+            type="checkbox"
+            aria-label={`Select ${t.title}`}
+            checked={selected.has(t.id)}
+            onChange={() => toggleSelected(t.id)}
+            className="mt-1.5 h-4 w-4 shrink-0 cursor-pointer accent-[var(--color-accent)]"
+          />
+        <div className="flex min-w-0 flex-col">
+          <Link href={`/topics/${t.id}`} className="truncate text-[1rem] font-semibold text-fg">{topicLabelUnderGoal(t.title, t.goal?.title)}</Link>
+          <span className="truncate text-[0.82rem] text-fg-muted">
+            {t.goal ? `${t.goal.title}` : t.area} · {KIND[t.mode ?? 'syllabus'] ?? 'Topic'}
+            {nm ? ` · next: ${nm}` : t.nextAction ? ` · next: ${t.nextAction}` : ''}
+          </span>
+        </div>
+        </div>
+        <div className="min-w-0">
+          {states.length > 0 ? <KnowledgeStrip states={states} size="sm" /> : <span className="text-[0.82rem] text-fg-muted">Not started</span>}
+        </div>
+        <div className="flex flex-wrap justify-end gap-1">{actions}<PinControl focus={focus} target={{ kind: 'topic', topicId: t.id }} /></div>
+      </li>
+    );
+  };
+
+  return (
+    <div className="mx-auto flex max-w-[1120px] flex-col gap-9">
+      <header className="flex flex-wrap items-end justify-between gap-5">
+        <div className="flex flex-col gap-2">
+          <Link href="/plan" className="text-[0.9rem] text-fg-secondary no-underline hover:text-fg hover:no-underline">Back to Learn</Link>
+          <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Manage topics</h1>
+          <p className="m-0 text-[0.95rem] text-fg-muted">Every topic and where it stands, for tidying up.</p>
+        </div>
+      </header>
+
+      <div className="flex flex-wrap items-center gap-2.5">
+        <label htmlFor="learn-search" className="sr-only">Search topics</label>
+        <input id="learn-search" className="form-input h-10 w-[220px] py-0 text-[0.9rem]" placeholder="Search topics" value={search} onChange={(e) => setSearch(e.target.value)} />
+        {goals.length > 0 && (
+          <>
+            <label htmlFor="learn-goal" className="sr-only">Goal</label>
+            <select id="learn-goal" className="form-input h-10 w-auto max-w-[240px] py-0 text-[0.9rem]" value={selectedGoal} onChange={(e) => setSelectedGoal(e.target.value)}>
+              <option value="all">All goals</option>
+              {goals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
+              <option value="none">Not in a goal</option>
+            </select>
+          </>
+        )}
+        <label htmlFor="learn-area" className="sr-only">Type</label>
+        <select id="learn-area" className="form-input h-10 w-auto py-0 text-[0.9rem]" value={selectedArea} onChange={(e) => setSelectedArea(e.target.value)}>
+          {AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+      </div>
+
+        <div className="flex flex-col gap-10">
+          <section aria-labelledby="now-h" className="flex flex-col gap-4">
+            <div className="flex items-baseline justify-between">
+              <h2 id="now-h" className="m-0 text-[1.2rem] font-semibold">Now <span className="font-normal text-fg-muted">{now.length}</span></h2>
+              {stats && stats.staleActiveCount > 0 && <span className="text-[0.85rem] text-k-fading-text">{stats.staleActiveCount} untouched for a week+</span>}
+            </div>
+            {now.length === 0 ? (
+              <p className="m-0 rounded-xl bg-sunk px-5 py-4 text-[0.95rem] text-fg-secondary">Nothing in Now. Start something from Next below, or learn something new.</p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {now.map((t) => {
+                  const states = knowledge[t.id] ?? [];
+                  const nm = nextModuleOf(t);
+                  const idle = daysAgo(t.lastTouchedDate);
+                  return (
+                    <div key={t.id} className="glass-panel flex flex-col gap-4 p-6">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[0.82rem] text-fg-muted">
+                          {t.goal ? <Link href={`/goals/${t.goal.id}`} className="text-fg-muted underline-offset-2 hover:text-fg hover:underline">{t.goal.title}</Link> : t.area} · {KIND[t.mode ?? 'syllabus'] ?? 'Topic'} · {idle === 0 ? 'touched today' : `${idle} day${idle === 1 ? '' : 's'} ago`}
+                        </span>
+                        <Link href={`/topics/${t.id}`} className="font-serif text-[1.6rem] font-medium leading-tight text-fg">{topicLabelUnderGoal(t.title, t.goal?.title)}</Link>
+                      </div>
+                      {states.length > 0 && <KnowledgeStrip states={states} showSummary />}
+                      <span className="text-[0.95rem] text-fg-secondary">Next: {nm ?? t.nextAction ?? 'set a next step'}</span>
+                      <div className="flex flex-wrap gap-2">
+                        <Link href={`/topics/${t.id}`} className="btn btn-primary h-10 py-0 no-underline hover:no-underline">Continue</Link>
+                        <button type="button" className={ghost} onClick={() => handleTransition(t, 'paused')}>Rest it</button>
+                        <button type="button" className={ghost} onClick={() => handleTransition(t, 'maintenance')}>Done — keep fresh</button>
+                        <PinControl focus={focus} target={{ kind: 'topic', topicId: t.id }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section aria-labelledby="next-h" className="flex flex-col gap-2">
+            <div className="flex items-baseline justify-between">
+              <h2 id="next-h" className="m-0 text-[1.2rem] font-semibold">Next <span className="font-normal text-fg-muted">{next.length}</span></h2>
+              {next.length > 1 && (
+                <button type="button" className={ghost} onClick={() => toggleAll(next.map((t) => t.id))}>
+                  {next.every((t) => selected.has(t.id)) ? 'Unselect all' : 'Select all'}
+                </button>
+              )}
+            </div>
+            {next.length === 0 ? (
+              <p className="m-0 text-[0.95rem] text-fg-muted">Nothing lined up. Move something up from your Inbox.</p>
+            ) : (
+              <ul className="m-0 list-none p-0">
+                {next.map((t) => (
+                  <Row key={t.id} t={t} actions={
+                    <>
+                      <button type="button" className="btn btn-secondary h-9 py-0 text-[0.85rem]" onClick={() => handleTransition(t, 'active')}>Start</button>
+                      <button type="button" className={ghost} onClick={() => handleTransition(t, 'inbox')}>Back to Inbox</button>
+                    </>
+                  } />
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section aria-labelledby="inbox-h" className="flex flex-col gap-3">
+            <div className="flex items-baseline justify-between">
+              <h2 id="inbox-h" className="m-0 text-[1.2rem] font-semibold">Inbox <span className="font-normal text-fg-muted">{inbox.length}</span></h2>
+              {inbox.length > 1 && (
+                <button type="button" className={ghost} onClick={() => toggleAll(inbox.map((t) => t.id))}>
+                  {inbox.every((t) => selected.has(t.id)) ? 'Unselect all' : 'Select all'}
+                </button>
+              )}
+            </div>
+            <form onSubmit={handleQuickCapture} className="flex gap-2">
+              <label htmlFor="inbox-add" className="sr-only">Add to Inbox</label>
+              <input
+                id="inbox-add"
+                className="form-input h-11 flex-1 py-0"
+                placeholder="Something you might want to learn — e.g. how caches fail"
+                value={newInboxTitle}
+                onChange={(e) => setNewInboxTitle(e.target.value)}
+                disabled={capturing}
+              />
+              <button type="submit" disabled={capturing || !newInboxTitle.trim()} className="btn btn-secondary h-11 py-0">{capturing ? 'Adding…' : 'Add'}</button>
+            </form>
+            {captureError && <p role="alert" className="m-0 text-[0.85rem] text-danger">{captureError}</p>}
+            {inbox.length > 0 && (
+              <ul className="m-0 list-none p-0">
+                {inbox.map((t) => (
+                  <Row key={t.id} t={t} actions={
+                    <>
+                      <button type="button" className="btn btn-secondary h-9 py-0 text-[0.85rem]" onClick={() => handleTransition(t, 'queued')}>Move to Next</button>
+                      <button type="button" className={ghost} onClick={() => handleTransition(t, 'active')}>Start</button>
+                      <button type="button" className={ghost} onClick={() => handleTransition(t, 'dropped')}>Let go</button>
+                    </>
+                  } />
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {others.length > 0 && (
+            <details className="flex flex-col gap-2">
+              <summary className="cursor-pointer text-[1.05rem] font-semibold text-fg-secondary">Resting, done and let go · {others.length}</summary>
+              <ul className="m-0 mt-2 list-none p-0">
+                {others.map((t) => (
+                  <Row key={t.id} t={t} actions={
+                    <>
+                      <span className="self-center pr-2 text-[0.82rem] text-fg-muted">{STATUS_WORD[t.status]}</span>
+                      {t.status !== 'dropped' && <button type="button" className="btn btn-secondary h-9 py-0 text-[0.85rem]" onClick={() => handleTransition(t, 'active')}>Resume</button>}
+                      <button type="button" className={ghost} onClick={() => handleTransition(t, 'queued')}>Move to Next</button>
+                    </>
+                  } />
+                ))}
+              </ul>
+            </details>
+          )}
+
+          {trash.length > 0 && (
+            <details className="flex flex-col gap-2">
+              <summary className="cursor-pointer text-[1.05rem] font-semibold text-fg-secondary">Trash · {trash.length}</summary>
+              <p className="m-0 mt-2 text-[0.85rem] text-fg-muted">Deleted topics keep their notes and review history. Restore puts one back where it was.</p>
+              <ul className="m-0 mt-2 list-none p-0">
+                {trash.map((t) => (
+                  <li key={t.id} className="flex items-center justify-between gap-4 border-b border-line py-3 last:border-b-0">
+                    <span className="min-w-0 truncate text-[0.95rem] text-fg-secondary">{t.title}</span>
+                    <button type="button" className={ghost} disabled={bulkBusy} onClick={() => handleRestore(t.id)}>Restore</button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+
+      {selected.size > 0 && (
+        <div
+          role="toolbar"
+          aria-label="Bulk actions"
+          className="glass-panel fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 flex-wrap items-center gap-2 px-4 py-3 shadow-card"
+        >
+          <span className="pr-2 text-[0.9rem] font-semibold text-fg">{selected.size} selected</span>
+          <button type="button" className="btn btn-secondary h-9 py-0 text-[0.85rem]" disabled={bulkBusy} onClick={handleBulkLetGo}>Let go</button>
+          <button
+            type="button"
+            className={`btn h-9 py-0 text-[0.85rem] ${confirmingDelete ? 'btn-danger' : 'btn-secondary'}`}
+            style={confirmingDelete ? { background: 'var(--color-danger)', color: '#fff', borderColor: 'var(--color-danger)' } : undefined}
+            disabled={bulkBusy}
+            onClick={handleBulkDelete}
+          >
+            {bulkBusy ? 'Working…' : confirmingDelete ? `Confirm delete ${selected.size}` : 'Delete'}
+          </button>
+          <button type="button" className={ghost} disabled={bulkBusy} onClick={clearSelection}>Cancel</button>
+        </div>
+      )}
+
+
+      {/* Fallback Quick Activation Form Modal */}
+      {activatingTopic && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'var(--bg-overlay)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1500, padding: '16px'
+        }}>
+          <form onSubmit={submitFallbackActivation} className="glass-panel" style={{ width: '100%', maxWidth: '440px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Activate Topic</h3>
+              <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                "{activatingTopic.title}"
+              </p>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Why are you learning this?</label>
+              <textarea className="form-input" style={{ width: '100%', height: '60px', resize: 'none' }} value={why} onChange={e => setWhy(e.target.value)} required />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Depth target</label>
+              <select className="form-input" value={depthTarget} onChange={e => setDepthTarget(e.target.value)} style={{ background: 'var(--bg-surface)' }}>
+                <option value="Awareness">Awareness</option>
+                <option value="Working Knowledge">Working Knowledge</option>
+                <option value="Proficiency">Proficiency</option>
+                <option value="Deep">Deep Knowledge</option>
+                <option value="Mastery">Mastery</option>
+              </select>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Concrete next action (verb-first)</label>
+              <input type="text" className="form-input" value={nextAction} onChange={e => setNextAction(e.target.value)} placeholder="e.g. Read chapter 1 of..." required />
+            </div>
+
+            {activationError && <p style={{ color: 'var(--color-danger)', fontSize: '0.8rem' }}>{activationError}</p>}
+
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
+              <button type="button" onClick={() => setActivatingTopic(null)} className="btn btn-secondary">Cancel</button>
+              <button type="submit" className="btn btn-primary">Activate Topic</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* AI Roadmap Wizard Modal */}
+      {showRoadmapWizard && (
+        <RoadmapWizard
+          onClose={() => setShowRoadmapWizard(false)}
+          onComplete={fetchData}
+        />
+      )}
+
+      {/* Toast Notifications */}
+      <div className="toast-container">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={`toast toast-${toast.type}${toast.exiting ? ' toast-exit' : ''}`}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
+
+    </div>
+  );
+}

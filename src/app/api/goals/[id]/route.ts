@@ -7,6 +7,7 @@ import { applyGoalArea, applyGoalStatus } from '@/lib/goalStatus';
 import { VALID_AREAS } from '@/lib/validations/topic';
 
 const VALID_STATUSES: GoalStatus[] = ['draft', 'active', 'achieved', 'abandoned', 'paused'];
+const MAX_SHORT_NAME = 60;
 
 /**
  * Goal detail: the roadmap as a dependency-ordered path (links, ordered),
@@ -55,7 +56,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     const body = await request.json();
-    const { status, targetDate, area } = body as { status?: GoalStatus; targetDate?: string | null; area?: string };
+    const { status, targetDate, area, shortName } = body as { status?: GoalStatus; targetDate?: string | null; area?: string; shortName?: unknown };
 
     if (status !== undefined && !VALID_STATUSES.includes(status as GoalStatus)) {
       return NextResponse.json({ error: `Invalid status: ${status}` }, { status: 400 });
@@ -64,7 +65,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: `Invalid type: ${area}` }, { status: 400 });
     }
 
-    const data: { status?: GoalStatus; achievedAt?: Date | null; targetDate?: Date | null } = {};
+    const data: { status?: GoalStatus; achievedAt?: Date | null; targetDate?: Date | null; shortName?: string | null } = {};
+    if (typeof shortName === 'string') data.shortName = shortName.trim().slice(0, MAX_SHORT_NAME) || null;
     if (status !== undefined) {
       data.status = status;
       data.achievedAt = status === 'achieved' ? new Date() : existing.achievedAt;

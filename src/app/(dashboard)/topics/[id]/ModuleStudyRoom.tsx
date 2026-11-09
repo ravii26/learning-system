@@ -33,6 +33,8 @@ interface ModuleStudyRoomProps {
   /** Time recorded on this lesson, once finished. */
   actualSeconds?: number;
   pinControl?: React.ReactNode;
+  /** Shown once this lesson is finished: what's next on your list. */
+  nextUp?: React.ReactNode;
   notes: string;
   onSaveNotes: (html: string) => Promise<void>;
   /** Called after this module's own notes were saved, so the page keeps its copy fresh. */
@@ -66,6 +68,7 @@ export default function ModuleStudyRoom({
   pace,
   actualSeconds,
   pinControl,
+  nextUp,
   notes,
   onSaveNotes,
   onModuleNotesSaved,
@@ -859,6 +862,7 @@ export default function ModuleStudyRoom({
       </article>
 
       {!module.completed && <div className="flex justify-start">{finishButton(false)}</div>}
+      {module.completed && nextUp}
       {/* Secondary, after the lesson: progress and lesson options. */}
       {sideContent}
 

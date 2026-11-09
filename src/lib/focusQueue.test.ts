@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickToday, rankFocus, type FocusFacts } from './focusQueue';
+import { goalDisplayName, pickToday, planToday, rankFocus, shortGoalName, type FocusFacts } from './focusQueue';
 
 const now = new Date('2026-06-15T12:00:00Z');
 const ago = (d: number) => new Date(now.getTime() - d * 86_400_000).toISOString();
@@ -44,7 +44,7 @@ describe('rankFocus', () => {
   });
 
   it('describes something never studied as new', () => {
-    expect(rank([item('fresh', { lastActivityAt: null })])[0].reason).toBe('New in your Focus');
+    expect(rank([item('fresh', { lastActivityAt: null })])[0].reason).toBe('Not started yet');
   });
 
   it('counts days the way a calendar does', () => {
@@ -54,6 +54,39 @@ describe('rankFocus', () => {
 
   it('flags an overdue date', () => {
     expect(rank([item('late', { targetDate: ago(2) })])[0].reason).toBe('Past its date');
+  });
+});
+
+describe('shortGoalName', () => {
+  it.each([
+    ['Complete DSA Interview Preparation for 20 LPA+ SDE Roles: interview-ready', 'DSA Interview Preparation'],
+    ['Spoken English Fluency for Everyday Conversations, Work and Interviews: fluent', 'Spoken English Fluency'],
+    ['System Design: interview-ready', 'System Design'],
+    ['Charismatic Communication, Public Speaking and Personal Presence: fluent', 'Charismatic Communication'],
+    ['Sales and Marketing for Tech Founders: From Finding Customers', 'Sales and Marketing'],
+  ])('shortens %s', (long, short) => {
+    expect(shortGoalName(long)).toBe(short);
+  });
+
+  it('prefers the name you chose', () => {
+    expect(goalDisplayName({ title: 'A long title for things', shortName: 'DSA' })).toBe('DSA');
+    expect(goalDisplayName({ title: 'A long title for things', shortName: ' ' })).toBe('A long title');
+  });
+});
+
+describe('planToday', () => {
+  const items = () => rank([item('a', { doneToday: true }), item('b'), item('c')]);
+
+  it('counts open review as a step', () => {
+    expect(planToday(items(), 'deep', 0, { due: 5, reviewedToday: false })).toMatchObject({ reviewOpen: true, doneCount: 1, total: 4 });
+  });
+
+  it('counts finished review as done', () => {
+    expect(planToday(items(), 'deep', 0, { due: 0, reviewedToday: true })).toMatchObject({ reviewOpen: false, doneCount: 2, total: 4 });
+  });
+
+  it('leaves review out when there was none today', () => {
+    expect(planToday(items(), 'deep', 0, { due: 0, reviewedToday: false })).toMatchObject({ doneCount: 1, total: 3 });
   });
 });
 
