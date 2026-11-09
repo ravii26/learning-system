@@ -640,6 +640,8 @@ model Goal {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   title      String // e.g. roadmapTitle from the generator
+  // What you call it day to day; empty means a shortened title is used.
+  shortName  String?
   outcome    String // the user's own words — verbatim, not rephrased
   why        String?
   status     GoalStatus @default(active)

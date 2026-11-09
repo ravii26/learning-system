@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { localDateKey } from './timeSummary';
-import { isRhythm, rankFocus, type FocusFacts, type Ranked, type Rhythm } from './focusQueue';
+import { goalDisplayName, isRhythm, rankFocus, type FocusFacts, type Ranked, type Rhythm } from './focusQueue';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -19,6 +19,22 @@ export interface FocusView extends FocusFacts {
   lessonKind: string | null;
   /** Marked done by hand today, so it can be taken back. */
   canUndo: boolean;
+  /** "Topic 2 of 7" or "Lesson 3 of 5", when there's a path to be on. */
+  position: string | null;
+  /** The topics of a goal or the lessons of a topic, in order. */
+  steps: PathStep[];
+  lessonsDone: number;
+  lessonsTotal: number;
+}
+
+export interface PathStep {
+  id: string;
+  title: string;
+  state: 'done' | 'current' | 'todo';
+  href: string;
+  /** Lessons inside this step; only topics have them. */
+  lessonsDone?: number;
+  lessonsTotal?: number;
 }
 
 const DAY_MS = 86_400_000;
@@ -57,7 +73,7 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
   const rows = await db.focusItem.findMany({
     where: { userId, OR: [{ completedAt: null }, { completedAt: { gte: new Date(now.getTime() - 2 * DAY_MS) } }] },
     include: {
-      goal: { select: { title: true, status: true, targetDate: true, links: { where: { topicId: { not: null } }, orderBy: { order: 'asc' }, select: { topicId: true } } } },
+      goal: { select: { title: true, shortName: true, status: true, targetDate: true, links: { where: { topicId: { not: null } }, orderBy: { order: 'asc' }, select: { topicId: true } } } },
       topic: { select: { title: true, status: true, deletedAt: true } },
     },
     orderBy: { createdAt: 'asc' },
@@ -91,9 +107,20 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
     let next: ModuleRow | null = null;
     let finished = false;
     let scope: string[] = [];
+    let position: string | null = null;
+    let steps: PathStep[] = [];
+    let lessonsDone = 0;
+    let lessonsTotal = 0;
+    const lessonSteps = (topicId: string, current: ModuleRow | null): PathStep[] =>
+      modulesOf(topicId).map((m) => ({
+        id: m.legacyId,
+        title: m.title,
+        state: m.completed ? 'done' : m.legacyId === current?.legacyId ? 'current' : 'todo',
+        href: topicHref(topicId, m.legacyId),
+      }));
 
     if (row.kind === 'goal') {
-      title = row.goal?.title ?? title;
+      title = row.goal ? goalDisplayName(row.goal) : title;
       href = `/goals/${row.goalId}`;
       const usable = (row.goal?.links ?? [])
         .map((l) => topicById.get(l.topicId as string))
@@ -106,7 +133,23 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
         next = nextIn(chosen.id);
         nextStep = next?.title ?? chosen.title;
         href = topicHref(chosen.id, next?.legacyId);
+        position = `Topic ${usable.indexOf(chosen) + 1} of ${usable.length}`;
       }
+      steps = usable.map((t) => {
+        const inside = modulesOf(t.id);
+        const done = inside.filter((m) => m.completed).length;
+        lessonsDone += done;
+        lessonsTotal += inside.length;
+        const stepNext = nextIn(t.id);
+        return {
+          id: t.id,
+          title: t.title,
+          state: t.id === chosen?.id ? 'current' : inside.length > 0 && !stepNext ? 'done' : 'todo',
+          href: topicHref(t.id, stepNext?.legacyId),
+          lessonsDone: done,
+          lessonsTotal: inside.length,
+        };
+      });
       finished = GOAL_OVER.has(row.goal?.status ?? '') || (usable.length > 0 && !chosen);
     } else if (row.kind === 'topic') {
       title = row.topic?.title ?? title;
@@ -114,8 +157,12 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
       next = row.topicId ? nextIn(row.topicId) : null;
       nextStep = next?.title ?? null;
       href = row.topicId ? topicHref(row.topicId, next?.legacyId) : null;
-      const hasLessons = !!row.topicId && modulesOf(row.topicId).length > 0;
-      finished = !!row.topic?.deletedAt || row.topic?.status === 'dropped' || (hasLessons && !next);
+      const inside = row.topicId ? modulesOf(row.topicId) : [];
+      finished = !!row.topic?.deletedAt || row.topic?.status === 'dropped' || (inside.length > 0 && !next);
+      if (row.topicId) steps = lessonSteps(row.topicId, next);
+      lessonsDone = inside.filter((m) => m.completed).length;
+      lessonsTotal = inside.length;
+      if (next) position = `Lesson ${inside.indexOf(next) + 1} of ${inside.length}`;
     } else if (row.kind === 'lesson') {
       title = row.topic?.title ?? title;
       scope = row.topicId ? [row.topicId] : [];
@@ -168,6 +215,10 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
       estimatedMinutes: next?.estimatedMinutes ?? null,
       lessonKind: next?.kind ?? null,
       canUndo: manualDays.has(today),
+      position,
+      steps,
+      lessonsDone,
+      lessonsTotal,
     };
   });
 

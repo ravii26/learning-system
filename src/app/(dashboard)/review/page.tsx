@@ -8,6 +8,8 @@ import { Button, ButtonLink } from '@/components/ui';
 import ResurfacedNote from '@/components/ResurfacedNote';
 import { reviewMinutes } from '@/lib/pace';
 import { confirmDialog } from '@/components/dialogs';
+import NextUpCard from '@/components/focus/NextUpCard';
+import { useFocus } from '@/lib/useFocus';
 
 const SPRINT_GRADES = [
   { grade: 'Again', key: '1', label: 'Forgot', hint: 'comes back soon' },
@@ -96,6 +98,7 @@ export default function ReviewPage() {
     cardShownAt.current = Date.now();
   }, [currentConceptIdx, dueConcepts.length, pauseAfterSlipping, activeTab]);
 
+  const focus = useFocus();
   const [recall, setRecall] = useState('');
   const [editing, setEditing] = useState<{ prompt: string; answer: string } | null>(null);
   const [lastGraded, setLastGraded] = useState<{ logId: string; label: string } | null>(null);
@@ -464,6 +467,7 @@ export default function ReviewPage() {
                   {upcoming.count} card{upcoming.count === 1 ? '' : 's'} coming up · next one {whenLabel(upcoming.nextAt)}
                 </p>
               )}
+              <NextUpCard focus={focus} />
               <ButtonLink href="/" className="mt-2 self-start">Back to Today</ButtonLink>
             </section>
           ) : pauseAfterSlipping ? (

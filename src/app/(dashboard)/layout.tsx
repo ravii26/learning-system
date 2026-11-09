@@ -8,6 +8,7 @@ import NavLinks from '@/app/(dashboard)/NavLinks';
 import { ToastProvider } from '@/components/ToastProvider';
 import HeaderToolbar from '@/components/HeaderToolbar';
 import { Icon } from '@/components/ui/Icon';
+import { goalDisplayName } from '@/lib/focusQueue';
 
 export const revalidate = 0; // Disable caching so the sidebar is always current
 
@@ -40,7 +41,7 @@ export default async function DashboardLayout({
     }),
     db.focusItem.findMany({
       where: { userId, completedAt: null },
-      select: { id: true, title: true, goalId: true, topicId: true, moduleId: true, goal: { select: { title: true } }, topic: { select: { title: true } } },
+      select: { id: true, title: true, goalId: true, topicId: true, moduleId: true, goal: { select: { title: true, shortName: true } }, topic: { select: { title: true } } },
       orderBy: { createdAt: 'asc' },
       take: SIDEBAR_ITEMS,
     }),
@@ -54,7 +55,7 @@ export default async function DashboardLayout({
   const sidebarItems = pins.length > 0
     ? pins.map((p) => ({
         id: p.id,
-        title: p.goal?.title ?? p.topic?.title ?? p.title ?? 'Untitled',
+        title: p.goal ? goalDisplayName(p.goal) : p.topic?.title ?? p.title ?? 'Untitled',
         href: p.goalId ? `/goals/${p.goalId}` : p.topicId ? `/topics/${p.topicId}${p.moduleId ? `?module=${encodeURIComponent(p.moduleId)}` : ''}` : null,
       }))
     : activeTopics.map((t) => ({ id: t.id, title: t.title, href: `/topics/${t.id}` as string | null }));

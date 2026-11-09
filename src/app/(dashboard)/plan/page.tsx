@@ -1,827 +1,140 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-
-// Subcomponents Import
-import RoadmapWizard from '../RoadmapWizard';
-import FocusPanel from '@/components/focus/FocusPanel';
+import { useToast } from '@/components/ToastProvider';
+import FocusPaths from '@/components/focus/FocusPaths';
 import PinControl from '@/components/focus/PinControl';
+import { goalDisplayName } from '@/lib/focusQueue';
 import { useFocus } from '@/lib/useFocus';
-import { topicLabelUnderGoal } from '@/lib/statusLabels';
-import { GOAL_STATUS_WORD, type GoalStatusName } from '@/lib/goalStatusWords';
-import { KnowledgeStrip } from '@/components/ui';
-import type { Knowledge } from '@/lib/moduleState';
 
-interface Topic {
-  id: string;
-  title: string;
-  area: string;
-  why: string | null;
-  depthTarget: string | null;
-  status: string;
-  progressPct: number;
-  currentStage: string;
-  lastCompleted: string | null;
-  nextAction: string | null;
-  lastTouchedDate: string;
-  notes: string | null;
-  activeSlotType: string | null;
-  knowledgeMap?: any;
-  mistakes?: any[];
-  mode?: string;
-  curriculum?: Array<{ order: number; title: string; completed: boolean }> | null;
-  /** The goal this topic serves, if any (from /api/topics). */
-  goal?: { id: string; title: string; status: string } | null;
-}
+/**
+ * Learn answers one question: where am I in each thing I'm learning? Your
+ * paths come first; everything else waits below, grouped by goal.
+ */
 
 interface GoalRow {
   id: string;
   title: string;
-  status: GoalStatusName;
-  readinessMet: number;
-  readinessTotal: number;
-  _count?: { links: number };
+  shortName: string | null;
+  status: string;
 }
 
-interface Stats {
-  counts: {
-    inbox: number;
-    queued: number;
-    active: number;
-    paused: number;
-    maintenance: number;
-    reference: number;
-    dropped: number;
-  };
-  staleActiveCount: number;
-  daysSinceLastReview: number | null;
+interface TopicRow {
+  id: string;
+  title: string;
+  status: string;
+  goal?: { id: string } | null;
 }
 
-interface Toast {
-  id: number;
-  message: string;
-  type: 'success' | 'error' | 'info';
-  exiting?: boolean;
-}
+const OVER = new Set(['abandoned', 'achieved']);
 
-const AREAS = ['All types', 'Tech', 'Business', 'Finance', 'Creative', 'Personal', 'Other'];
-const STATUSES = ['inbox', 'queued', 'active', 'paused', 'maintenance', 'reference', 'dropped'];
-
-const EMPTY_STATE_HINTS: Record<string, { icon: string; text: string }> = {
-  inbox:       { icon: '', text: 'Capture a curiosity above' },
-  queued:      { icon: '', text: 'Move topics here to queue them up' },
-  active:      { icon: '', text: 'Drag a topic here to start learning' },
-  paused:      { icon: '', text: 'Paused topics appear here' },
-  maintenance: { icon: '', text: 'Maintained topics appear here' },
-  reference:   { icon: '', text: 'Reference material lands here' },
-  dropped:     { icon: '', text: 'Dropped topics are archived here' },
-};
-
-let toastIdCounter = 0;
-
-export default function PlanPage() {
-  const router = useRouter();
-  const [topics, setTopics] = useState<Topic[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
-
-  // Bulk selection (list view) and the soft-delete trash
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [bulkBusy, setBulkBusy] = useState(false);
-  const [trash, setTrash] = useState<Topic[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Toast
-  const [toasts, setToasts] = useState<Toast[]>([]);
-
-  // Search & Filter
-  const [search, setSearch] = useState('');
-  const [selectedArea, setSelectedArea] = useState('All types');
-  const [goals, setGoals] = useState<GoalRow[]>([]);
-  const [selectedGoal, setSelectedGoal] = useState('all');
-
-  // View Mode: 'list' (clean, intuitive default) vs 'board' (full Kanban)
-  const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
-  const [knowledge, setKnowledge] = useState<Record<string, Knowledge[]>>({});
-
-  // Show/hide empty columns toggle
-  const [showEmptyColumns, setShowEmptyColumns] = useState(false);
-
-  // Inbox Capture
-  const [newInboxTitle, setNewInboxTitle] = useState('');
-  const [capturing, setCapturing] = useState(false);
-  const [captureError, setCaptureError] = useState<string | null>(null);
-
-  // Quick Activation Modal State (Fallback for direct activation)
-  const [activatingTopic, setActivatingTopic] = useState<Topic | null>(null);
-  const [why, setWhy] = useState('');
-  const [depthTarget, setDepthTarget] = useState('Proficiency');
-  const [nextAction, setNextAction] = useState('');
-  const [activationError, setActivationError] = useState<string | null>(null);
-
-  // AI Roadmap Wizard state
-  const [showRoadmapWizard, setShowRoadmapWizard] = useState(false);
-  const [captureTopicMode, setCaptureTopicMode] = useState<'self_directed' | 'course'>('self_directed');
-
-  // Focus sits on top; the full list opens on demand once something is pinned.
+export default function LearnPage() {
   const focus = useFocus();
-  const [seeEverything, setSeeEverything] = useState(false);
-
-  // Drag and Drop State
-  const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
-  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
-
-  const showToast = useCallback((message: string, type: Toast['type'] = 'success') => {
-    const id = ++toastIdCounter;
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
-      setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 320);
-    }, 3000);
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const [topicsRes, statsRes, progressRes, goalsRes] = await Promise.all([
-        fetch('/api/topics'),
-        fetch('/api/stats'),
-        fetch('/api/progress'),
-        fetch('/api/goals').catch(() => null),
-      ]);
-      if (goalsRes?.ok) setGoals(await goalsRes.json());
-      if (progressRes.ok) {
-        const p = await progressRes.json();
-        setKnowledge(Object.fromEntries(p.topics.filter((t: any) => t.knowledge).map((t: any) => [t.id, t.knowledge.states])));
-      }
-
-      if (topicsRes.ok && statsRes.ok) {
-        const topicsData = await topicsRes.json();
-        const statsData = await statsRes.json();
-        setTopics(topicsData);
-        setStats(statsData);
-      }
-    } catch (e) {
-      console.error('Failed to load dashboard data:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchTrash = async () => {
-    try {
-      const res = await fetch('/api/topics?deleted=1');
-      if (res.ok) setTrash(await res.json());
-    } catch {
-      // Trash is secondary — a failed load just hides the section.
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-    fetchTrash();
-  }, []);
-
-  // The field library is the owner's tool only.
+  const toast = useToast();
+  const [goals, setGoals] = useState<GoalRow[]>([]);
+  const [topics, setTopics] = useState<TopicRow[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
+
   useEffect(() => {
-    fetch('/api/auth').then((r) => r.json()).then((d) => setIsOwner(d.isOwner === true)).catch(() => {});
+    let alive = true;
+    Promise.all([fetch('/api/goals'), fetch('/api/topics'), fetch('/api/auth')])
+      .then(async ([g, t, a]) => {
+        if (!alive) return;
+        if (g.ok) setGoals(await g.json());
+        if (t.ok) setTopics(await t.json());
+        if (a.ok) setIsOwner((await a.json()).isOwner === true);
+      })
+      .catch(() => toast.error('Couldn’t load your goals.'))
+      .finally(() => alive && setLoaded(true));
+    return () => { alive = false; };
+    // Loaded once per visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const toggleSelected = (id: string) => {
-    setConfirmingDelete(false);
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleAll = (ids: string[]) => {
-    setConfirmingDelete(false);
-    setSelected((prev) => {
-      const next = new Set(prev);
-      const allOn = ids.every((id) => next.has(id));
-      ids.forEach((id) => (allOn ? next.delete(id) : next.add(id)));
-      return next;
-    });
-  };
-
-  const clearSelection = () => {
-    setSelected(new Set());
-    setConfirmingDelete(false);
-  };
-
-  // One request per topic: the API has no batch endpoint, and a few dozen
-  // parallel calls is fine at single-user scale. Failures are counted, not
-  // thrown, so a partial success still refreshes and reports honestly.
-  const runBulk = async (ids: string[], call: (id: string) => Promise<Response>, verb: string) => {
-    setBulkBusy(true);
-    const results = await Promise.allSettled(ids.map(call));
-    const failed = results.filter((r) => r.status === 'rejected' || !r.value.ok).length;
-    const done = ids.length - failed;
-    setBulkBusy(false);
-    clearSelection();
-    await Promise.all([fetchData(), fetchTrash()]);
-    router.refresh();
-    if (done > 0) showToast(`${verb} ${done} topic${done === 1 ? '' : 's'}`, 'success');
-    if (failed > 0) showToast(`${failed} could not be updated`, 'error');
-  };
-
-  const handleBulkLetGo = () =>
-    runBulk(Array.from(selected), (id) => fetch(`/api/topics/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'dropped' }),
-    }), 'Let go of');
-
-  const handleBulkDelete = () => {
-    if (!confirmingDelete) { setConfirmingDelete(true); return; }
-    runBulk(Array.from(selected), (id) => fetch(`/api/topics/${id}`, { method: 'DELETE' }), 'Moved to Trash:');
-  };
-
-  const handleRestore = (id: string) =>
-    runBulk([id], (tid) => fetch(`/api/topics/${tid}/restore`, { method: 'POST' }), 'Restored');
-
-  const handleQuickCapture = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newInboxTitle.trim()) return;
-
-    setCapturing(true);
-    setCaptureError(null);
-
-    try {
-      const res = await fetch('/api/topics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newInboxTitle.trim(),
-          status: 'inbox',
-          topicMode: captureTopicMode,
-        }),
-      });
-
-      if (res.ok) {
-        const capturedTitle = newInboxTitle.trim();
-        setNewInboxTitle('');
-        await fetchData();
-        router.refresh();
-        showToast(`"${capturedTitle}" added to Inbox`, 'success');
-      } else {
-        const data = await res.json();
-        setCaptureError(data.error || 'Failed to capture topic');
-        showToast('Failed to capture topic', 'error');
-      }
-    } catch (err) {
-      setCaptureError('Failed to connect to server');
-      showToast('Connection error', 'error');
-    } finally {
-      setCapturing(false);
-    }
-  };
-
-  const handleTransition = async (topic: Topic, newStatus: string) => {
-    if (newStatus === 'active') {
-      if (!topic.why || !topic.depthTarget || !topic.nextAction) {
-        setActivatingTopic(topic);
-        setWhy(topic.why || '');
-        setDepthTarget(topic.depthTarget || 'Proficiency');
-        setNextAction(topic.nextAction || '');
-        setActivationError(null);
-        return;
-      }
-    }
-
-    try {
-      const res = await fetch(`/api/topics/${topic.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (res.ok) {
-        await fetchData();
-        router.refresh();
-      } else {
-        const data = await res.json();
-        showToast(data.error || 'Failed to update status', 'error');
-      }
-    } catch (err) {
-      showToast('Failed to connect to server', 'error');
-    }
-  };
-
-  const submitFallbackActivation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activatingTopic) return;
-    if (!why.trim() || !nextAction.trim()) {
-      setActivationError('Why and Next Action are required to activate a topic.');
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/topics/${activatingTopic.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'active',
-          why: why.trim(),
-          depthTarget,
-          nextAction: nextAction.trim(),
-        }),
-      });
-
-      if (res.ok) {
-        const title = activatingTopic.title;
-        setActivatingTopic(null);
-        await fetchData();
-        router.refresh();
-        showToast(`"${title}" is now active`, 'success');
-      } else {
-        const data = await res.json();
-        setActivationError(data.error || 'Failed to activate topic');
-      }
-    } catch (err) {
-      setActivationError('Connection error');
-    }
-  };
-
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.setData('text/plain', id);
-    setDraggingCardId(id);
-  };
-
-  const handleDrop = async (e: React.DragEvent, newStatus: string) => {
-    setDragOverColumn(null);
-    const cardId = e.dataTransfer.getData('text/plain') || draggingCardId;
-    if (!cardId) return;
-
-    const topic = topics.find((t) => t.id === cardId);
-    if (!topic) return;
-
-    await handleTransition(topic, newStatus);
-  };
-
-  // Search/Filter matching
-  const filteredTopics = topics.filter((t) => {
-    const matchesSearch =
-      t.title.toLowerCase().includes(search.toLowerCase()) ||
-      (t.notes && t.notes.toLowerCase().includes(search.toLowerCase()));
-    const matchesArea = selectedArea === 'All types' || t.area === selectedArea;
-    const matchesGoal = selectedGoal === 'all' || (selectedGoal === 'none' ? !t.goal : t.goal?.id === selectedGoal);
-    return matchesSearch && matchesArea && matchesGoal;
-  });
-
-  // Loading skeleton
-  if (loading) {
+  if (!loaded || !focus.loaded) {
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: '7fr 3fr', gap: '32px', alignItems: 'start' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div className="flex-between">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div className="skeleton skeleton-text" style={{ width: '220px', height: '28px' }} />
-              <div className="skeleton skeleton-text" style={{ width: '320px', height: '14px' }} />
-            </div>
-            <div className="skeleton" style={{ width: '120px', height: '38px' }} />
-          </div>
-          <div className="skeleton" style={{ height: '56px', borderRadius: '12px' }} />
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
-            <div className="skeleton" style={{ height: '40px' }} />
-            <div className="skeleton" style={{ height: '40px' }} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="skeleton skeleton-col" />
-            ))}
-          </div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div className="skeleton" style={{ height: '220px', borderRadius: '12px' }} />
-          <div className="skeleton" style={{ height: '300px', borderRadius: '12px' }} />
-        </div>
+      <div className="mx-auto flex max-w-[860px] flex-col gap-5">
+        {[80, 200, 200].map((h, i) => <div key={i} className="skeleton rounded-md" style={{ height: h }} />)}
       </div>
     );
   }
 
-  const STALE_DAYS = 7;
-
-  // Determine which columns have content
-  const nonEmptyStatuses = STATUSES.filter(s => filteredTopics.some(t => t.status === s));
-  const visibleStatuses = showEmptyColumns ? STATUSES : (nonEmptyStatuses.length > 0 ? STATUSES : STATUSES);
-  // Always show at least the columns with items + INBOX + ACTIVE + QUEUED
-  const alwaysShowStatuses = new Set(['inbox', 'queued', 'active']);
-  const columnsToShow = showEmptyColumns
-    ? STATUSES
-    : STATUSES.filter(s => alwaysShowStatuses.has(s) || filteredTopics.some(t => t.status === s));
-
-  const hiddenEmptyCount = STATUSES.filter(
-    s => !alwaysShowStatuses.has(s) && !filteredTopics.some(t => t.status === s)
-  ).length;
-
-  const STATUS_WORD: Record<string, string> = {
-    active: 'Now',
-    queued: 'Next',
-    inbox: 'Inbox',
-    paused: 'Resting',
-    maintenance: 'Keeping fresh',
-    reference: 'Reference',
-    dropped: 'Let go',
-  };
-  const KIND: Record<string, string> = { syllabus: 'Course', accretion: 'Ideas you collect', practice: 'Daily practice', reference: 'Reference' };
-  const nextModuleOf = (t: Topic) =>
-    [...(t.curriculum ?? [])].sort((a, b) => a.order - b.order).find((m) => !m.completed)?.title ?? null;
-  const daysAgo = (d: string) => Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
-  const byStatus = (s: string) => filteredTopics.filter((t) => t.status === s);
-  const now = byStatus('active');
-  const next = byStatus('queued');
-  const inbox = byStatus('inbox');
-  const others = filteredTopics.filter((t) => ['paused', 'maintenance', 'reference', 'dropped'].includes(t.status));
-  const ghost = 'h-9 rounded-lg px-3 text-[0.85rem] font-medium text-fg-secondary hover:bg-fill-2 hover:text-fg';
   const pinnedGoals = new Set(focus.items.map((i) => i.goalId).filter(Boolean));
   const pinnedTopics = new Set(focus.items.map((i) => i.topicId).filter(Boolean));
-  const notNow = {
-    goals: goals.filter((g) => g.status !== 'abandoned' && g.status !== 'achieved' && !pinnedGoals.has(g.id)).length,
-    topics: topics.filter((t) => t.status !== 'dropped' && !pinnedTopics.has(t.id) && !(t.goal && pinnedGoals.has(t.goal.id))).length,
-  };
-  const showEverything = seeEverything || (focus.loaded && focus.items.length === 0);
-
-  const Row = ({ t, actions }: { t: Topic; actions: React.ReactNode }) => {
-    const states = knowledge[t.id] ?? [];
-    const nm = nextModuleOf(t);
-    return (
-      <li className="grid items-center gap-x-5 gap-y-2 border-b border-line py-3.5 last:border-b-0 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]">
-        <div className="flex min-w-0 items-start gap-3">
-          <input
-            type="checkbox"
-            aria-label={`Select ${t.title}`}
-            checked={selected.has(t.id)}
-            onChange={() => toggleSelected(t.id)}
-            className="mt-1.5 h-4 w-4 shrink-0 cursor-pointer accent-[var(--color-accent)]"
-          />
-        <div className="flex min-w-0 flex-col">
-          <Link href={`/topics/${t.id}`} className="truncate text-[1rem] font-semibold text-fg">{topicLabelUnderGoal(t.title, t.goal?.title)}</Link>
-          <span className="truncate text-[0.82rem] text-fg-muted">
-            {t.goal ? `${t.goal.title}` : t.area} · {KIND[t.mode ?? 'syllabus'] ?? 'Topic'}
-            {nm ? ` · next: ${nm}` : t.nextAction ? ` · next: ${t.nextAction}` : ''}
-          </span>
-        </div>
-        </div>
-        <div className="min-w-0">
-          {states.length > 0 ? <KnowledgeStrip states={states} size="sm" /> : <span className="text-[0.82rem] text-fg-muted">Not started</span>}
-        </div>
-        <div className="flex flex-wrap justify-end gap-1">{actions}<PinControl focus={focus} target={{ kind: 'topic', topicId: t.id }} /></div>
-      </li>
-    );
-  };
+  const liveTopics = topics.filter((t) => t.status !== 'dropped');
+  const waitingGoals = goals.filter((g) => !OVER.has(g.status) && !pinnedGoals.has(g.id));
+  const looseTopics = liveTopics.filter((t) => !t.goal && !pinnedTopics.has(t.id));
 
   return (
-    <div className="mx-auto flex max-w-[1120px] flex-col gap-9">
+    <div className="mx-auto flex max-w-[860px] flex-col gap-9">
       <header className="flex flex-wrap items-end justify-between gap-5">
-        <div className="flex flex-col gap-2">
-          <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Learn</h1>
-          <p className="m-0 text-[0.95rem] text-fg-muted">One place to begin anything: a lesson, a series or a full plan.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {isOwner && <Link href="/library" className="btn btn-secondary h-11 py-0 no-underline hover:no-underline">Field library</Link>}
+        <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Learn</h1>
+        <div className="flex flex-wrap items-center gap-2">
           <Link href="/learn/all" className="btn btn-secondary h-11 py-0 no-underline hover:no-underline">All lessons</Link>
           <Link href="/learn/start" className="btn btn-primary h-11 py-0 no-underline hover:no-underline">Start learning</Link>
         </div>
       </header>
 
-      <FocusPanel focus={focus} notNow={notNow} everythingOpen={showEverything} onToggleEverything={() => setSeeEverything((v) => !v)} />
+      <FocusPaths focus={focus} />
 
-      {showEverything && (<>
-      {goals.some((g) => g.status !== 'abandoned' && g.status !== 'achieved') && (
-        <section aria-labelledby="goals-h" className="flex flex-col gap-3">
-          <div className="flex items-baseline justify-between">
-            <h2 id="goals-h" className="m-0 text-[1.2rem] font-semibold">Your goals</h2>
-            <Link href="/goals" className="text-[0.88rem] text-fg-secondary">All goals</Link>
-          </div>
-          <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
-            {goals.filter((g) => g.status !== 'abandoned' && g.status !== 'achieved').map((g) => {
-              const count = topics.filter((t) => t.goal?.id === g.id).length;
+      {(waitingGoals.length > 0 || looseTopics.length > 0) && (
+        <section aria-labelledby="not-now-h" className="flex flex-col gap-2">
+          <h2 id="not-now-h" className="m-0 text-[1.2rem] font-semibold">Not now</h2>
+          <ul className="m-0 list-none p-0">
+            {waitingGoals.map((g) => {
+              const inside = liveTopics.filter((t) => t.goal?.id === g.id);
               return (
-                <li key={g.id} className={`flex flex-col gap-1.5 ${g.status === 'active' ? '' : 'opacity-70'}`}>
-                  <Link href={`/goals/${g.id}`} className="flex h-full flex-col gap-1.5 rounded-xl border border-line bg-surface px-4 py-3.5 no-underline hover:border-line-hover hover:no-underline">
-                    <span className="line-clamp-2 text-[0.98rem] font-semibold leading-snug text-fg">{g.title}</span>
-                    <span className="text-[0.8rem] text-fg-muted">
-                      {GOAL_STATUS_WORD[g.status] ?? g.status} · {count} topic{count === 1 ? '' : 's'}
-                      {g.readinessTotal > 0 ? ` · ${g.readinessMet} of ${g.readinessTotal} ready` : ''}
-                    </span>
-                  </Link>
-                  <PinControl focus={focus} target={{ kind: 'goal', goalId: g.id }} />
+                <li key={g.id} className="border-b border-line py-1 last:border-b-0">
+                  <details>
+                    <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4">
+                      <span className="min-w-0">
+                        <span className="text-[1.02rem] font-semibold text-fg">{goalDisplayName(g)}</span>
+                        <span className="ml-2 text-[0.88rem] text-fg-muted">{inside.length} topic{inside.length === 1 ? '' : 's'}</span>
+                      </span>
+                      <span onClick={(e) => e.preventDefault()}><PinControl focus={focus} target={{ kind: 'goal', goalId: g.id }} label="Start" /></span>
+                    </summary>
+                    <ul className="m-0 flex list-none flex-col gap-1 pb-3 pl-1">
+                      {inside.map((t) => (
+                        <li key={t.id} className="flex items-center justify-between gap-3 text-[0.95rem]">
+                          <Link href={`/topics/${t.id}`} className="min-w-0 text-fg-secondary">{t.title}</Link>
+                          <PinControl focus={focus} target={{ kind: 'topic', topicId: t.id }} label="Start" />
+                        </li>
+                      ))}
+                      <li><Link href={`/goals/${g.id}`} className="text-[0.88rem] font-medium text-fg-muted">Open goal</Link></li>
+                    </ul>
+                  </details>
                 </li>
               );
             })}
+            {looseTopics.length > 0 && (
+              <li className="py-1">
+                <details>
+                  <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2">
+                    <span className="text-[1.02rem] font-semibold text-fg">Other topics</span>
+                    <span className="text-[0.88rem] text-fg-muted">{looseTopics.length}</span>
+                  </summary>
+                  <ul className="m-0 flex list-none flex-col gap-1 pb-3 pl-1">
+                    {looseTopics.map((t) => (
+                      <li key={t.id} className="flex items-center justify-between gap-3 text-[0.95rem]">
+                        <Link href={`/topics/${t.id}`} className="min-w-0 text-fg-secondary">{t.title}</Link>
+                        <PinControl focus={focus} target={{ kind: 'topic', topicId: t.id }} label="Start" />
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </li>
+            )}
           </ul>
         </section>
       )}
 
-      <div className="flex flex-wrap items-center gap-2.5">
-        <div role="tablist" aria-label="View" className="flex rounded-xl bg-sunk p-1">
-          {([['list', 'Topics'], ['board', 'Board']] as const).map(([key, label]) => (
-            <button
-              key={key}
-              role="tab"
-              aria-selected={viewMode === key}
-              onClick={() => setViewMode(key)}
-              className={`h-9 rounded-[9px] px-4 text-[0.875rem] ${viewMode === key ? 'bg-surface font-semibold text-fg shadow-card' : 'font-medium text-fg-secondary hover:text-fg'}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <span className="flex-1" />
-        <label htmlFor="learn-search" className="sr-only">Search topics</label>
-        <input id="learn-search" className="form-input h-10 w-[220px] py-0 text-[0.9rem]" placeholder="Search topics" value={search} onChange={(e) => setSearch(e.target.value)} />
-        {goals.length > 0 && (
-          <>
-            <label htmlFor="learn-goal" className="sr-only">Goal</label>
-            <select id="learn-goal" className="form-input h-10 w-auto max-w-[240px] py-0 text-[0.9rem]" value={selectedGoal} onChange={(e) => setSelectedGoal(e.target.value)}>
-              <option value="all">All goals</option>
-              {goals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
-              <option value="none">Not in a goal</option>
-            </select>
-          </>
-        )}
-        <label htmlFor="learn-area" className="sr-only">Type</label>
-        <select id="learn-area" className="form-input h-10 w-auto py-0 text-[0.9rem]" value={selectedArea} onChange={(e) => setSelectedArea(e.target.value)}>
-          {AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
-        </select>
-      </div>
-
-      {viewMode === 'list' && (
-        <div className="flex flex-col gap-10">
-          <section aria-labelledby="now-h" className="flex flex-col gap-4">
-            <div className="flex items-baseline justify-between">
-              <h2 id="now-h" className="m-0 text-[1.2rem] font-semibold">Now <span className="font-normal text-fg-muted">{now.length}</span></h2>
-              {stats && stats.staleActiveCount > 0 && <span className="text-[0.85rem] text-k-fading-text">{stats.staleActiveCount} untouched for a week+</span>}
-            </div>
-            {now.length === 0 ? (
-              <p className="m-0 rounded-xl bg-sunk px-5 py-4 text-[0.95rem] text-fg-secondary">Nothing in Now. Start something from Next below, or learn something new.</p>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                {now.map((t) => {
-                  const states = knowledge[t.id] ?? [];
-                  const nm = nextModuleOf(t);
-                  const idle = daysAgo(t.lastTouchedDate);
-                  return (
-                    <div key={t.id} className="glass-panel flex flex-col gap-4 p-6">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[0.82rem] text-fg-muted">
-                          {t.goal ? <Link href={`/goals/${t.goal.id}`} className="text-fg-muted underline-offset-2 hover:text-fg hover:underline">{t.goal.title}</Link> : t.area} · {KIND[t.mode ?? 'syllabus'] ?? 'Topic'} · {idle === 0 ? 'touched today' : `${idle} day${idle === 1 ? '' : 's'} ago`}
-                        </span>
-                        <Link href={`/topics/${t.id}`} className="font-serif text-[1.6rem] font-medium leading-tight text-fg">{topicLabelUnderGoal(t.title, t.goal?.title)}</Link>
-                      </div>
-                      {states.length > 0 && <KnowledgeStrip states={states} showSummary />}
-                      <span className="text-[0.95rem] text-fg-secondary">Next: {nm ?? t.nextAction ?? 'set a next step'}</span>
-                      <div className="flex flex-wrap gap-2">
-                        <Link href={`/topics/${t.id}`} className="btn btn-primary h-10 py-0 no-underline hover:no-underline">Continue</Link>
-                        <button type="button" className={ghost} onClick={() => handleTransition(t, 'paused')}>Rest it</button>
-                        <button type="button" className={ghost} onClick={() => handleTransition(t, 'maintenance')}>Done — keep fresh</button>
-                        <PinControl focus={focus} target={{ kind: 'topic', topicId: t.id }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          <section aria-labelledby="next-h" className="flex flex-col gap-2">
-            <div className="flex items-baseline justify-between">
-              <h2 id="next-h" className="m-0 text-[1.2rem] font-semibold">Next <span className="font-normal text-fg-muted">{next.length}</span></h2>
-              {next.length > 1 && (
-                <button type="button" className={ghost} onClick={() => toggleAll(next.map((t) => t.id))}>
-                  {next.every((t) => selected.has(t.id)) ? 'Unselect all' : 'Select all'}
-                </button>
-              )}
-            </div>
-            {next.length === 0 ? (
-              <p className="m-0 text-[0.95rem] text-fg-muted">Nothing lined up. Move something up from your Inbox.</p>
-            ) : (
-              <ul className="m-0 list-none p-0">
-                {next.map((t) => (
-                  <Row key={t.id} t={t} actions={
-                    <>
-                      <button type="button" className="btn btn-secondary h-9 py-0 text-[0.85rem]" onClick={() => handleTransition(t, 'active')}>Start</button>
-                      <button type="button" className={ghost} onClick={() => handleTransition(t, 'inbox')}>Back to Inbox</button>
-                    </>
-                  } />
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section aria-labelledby="inbox-h" className="flex flex-col gap-3">
-            <div className="flex items-baseline justify-between">
-              <h2 id="inbox-h" className="m-0 text-[1.2rem] font-semibold">Inbox <span className="font-normal text-fg-muted">{inbox.length}</span></h2>
-              {inbox.length > 1 && (
-                <button type="button" className={ghost} onClick={() => toggleAll(inbox.map((t) => t.id))}>
-                  {inbox.every((t) => selected.has(t.id)) ? 'Unselect all' : 'Select all'}
-                </button>
-              )}
-            </div>
-            <form onSubmit={handleQuickCapture} className="flex gap-2">
-              <label htmlFor="inbox-add" className="sr-only">Add to Inbox</label>
-              <input
-                id="inbox-add"
-                className="form-input h-11 flex-1 py-0"
-                placeholder="Something you might want to learn — e.g. how caches fail"
-                value={newInboxTitle}
-                onChange={(e) => setNewInboxTitle(e.target.value)}
-                disabled={capturing}
-              />
-              <button type="submit" disabled={capturing || !newInboxTitle.trim()} className="btn btn-secondary h-11 py-0">{capturing ? 'Adding…' : 'Add'}</button>
-            </form>
-            {captureError && <p role="alert" className="m-0 text-[0.85rem] text-danger">{captureError}</p>}
-            {inbox.length > 0 && (
-              <ul className="m-0 list-none p-0">
-                {inbox.map((t) => (
-                  <Row key={t.id} t={t} actions={
-                    <>
-                      <button type="button" className="btn btn-secondary h-9 py-0 text-[0.85rem]" onClick={() => handleTransition(t, 'queued')}>Move to Next</button>
-                      <button type="button" className={ghost} onClick={() => handleTransition(t, 'active')}>Start</button>
-                      <button type="button" className={ghost} onClick={() => handleTransition(t, 'dropped')}>Let go</button>
-                    </>
-                  } />
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {others.length > 0 && (
-            <details className="flex flex-col gap-2">
-              <summary className="cursor-pointer text-[1.05rem] font-semibold text-fg-secondary">Resting, done and let go · {others.length}</summary>
-              <ul className="m-0 mt-2 list-none p-0">
-                {others.map((t) => (
-                  <Row key={t.id} t={t} actions={
-                    <>
-                      <span className="self-center pr-2 text-[0.82rem] text-fg-muted">{STATUS_WORD[t.status]}</span>
-                      {t.status !== 'dropped' && <button type="button" className="btn btn-secondary h-9 py-0 text-[0.85rem]" onClick={() => handleTransition(t, 'active')}>Resume</button>}
-                      <button type="button" className={ghost} onClick={() => handleTransition(t, 'queued')}>Move to Next</button>
-                    </>
-                  } />
-                ))}
-              </ul>
-            </details>
-          )}
-
-          {trash.length > 0 && (
-            <details className="flex flex-col gap-2">
-              <summary className="cursor-pointer text-[1.05rem] font-semibold text-fg-secondary">Trash · {trash.length}</summary>
-              <p className="m-0 mt-2 text-[0.85rem] text-fg-muted">Deleted topics keep their notes and review history. Restore puts one back where it was.</p>
-              <ul className="m-0 mt-2 list-none p-0">
-                {trash.map((t) => (
-                  <li key={t.id} className="flex items-center justify-between gap-4 border-b border-line py-3 last:border-b-0">
-                    <span className="min-w-0 truncate text-[0.95rem] text-fg-secondary">{t.title}</span>
-                    <button type="button" className={ghost} disabled={bulkBusy} onClick={() => handleRestore(t.id)}>Restore</button>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </div>
-      )}
-
-      {viewMode === 'list' && selected.size > 0 && (
-        <div
-          role="toolbar"
-          aria-label="Bulk actions"
-          className="glass-panel fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 flex-wrap items-center gap-2 px-4 py-3 shadow-card"
-        >
-          <span className="pr-2 text-[0.9rem] font-semibold text-fg">{selected.size} selected</span>
-          <button type="button" className="btn btn-secondary h-9 py-0 text-[0.85rem]" disabled={bulkBusy} onClick={handleBulkLetGo}>Let go</button>
-          <button
-            type="button"
-            className={`btn h-9 py-0 text-[0.85rem] ${confirmingDelete ? 'btn-danger' : 'btn-secondary'}`}
-            style={confirmingDelete ? { background: 'var(--color-danger)', color: '#fff', borderColor: 'var(--color-danger)' } : undefined}
-            disabled={bulkBusy}
-            onClick={handleBulkDelete}
-          >
-            {bulkBusy ? 'Working…' : confirmingDelete ? `Confirm delete ${selected.size}` : 'Delete'}
-          </button>
-          <button type="button" className={ghost} disabled={bulkBusy} onClick={clearSelection}>Cancel</button>
-        </div>
-      )}
-
-      {viewMode === 'board' && (
-        <div className="flex flex-col gap-3">
-          <p className="m-0 text-[0.9rem] text-fg-muted">Drag a topic between columns to change where it is.</p>
-          <div className="grid gap-4 overflow-x-auto pb-2" style={{ gridTemplateColumns: `repeat(${columnsToShow.length}, minmax(220px, 1fr))` }}>
-            {columnsToShow.map((status) => {
-              const list = byStatus(status);
-              return (
-                <div
-                  key={status}
-                  onDragOver={(e) => { e.preventDefault(); setDragOverColumn(status); }}
-                  onDragLeave={() => setDragOverColumn(null)}
-                  onDrop={(e) => handleDrop(e, status)}
-                  className={`flex min-h-[320px] flex-col gap-2.5 rounded-xl p-3 ${dragOverColumn === status ? 'column-drag-over' : 'bg-sunk'}`}
-                >
-                  <div className="flex items-baseline justify-between px-1">
-                    <span className="text-[0.95rem] font-semibold">{STATUS_WORD[status]}</span>
-                    <span className="text-[0.82rem] text-fg-muted">{list.length}</span>
-                  </div>
-                  {list.length === 0 && <span className="px-1 text-[0.82rem] text-fg-muted">{EMPTY_STATE_HINTS[status]?.text}</span>}
-                  {list.map((t) => {
-                    const states = knowledge[t.id] ?? [];
-                    return (
-                      <div
-                        key={t.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, t.id)}
-                        onDragEnd={() => setDraggingCardId(null)}
-                        className={`glass-card flex flex-col gap-2 p-3.5 ${draggingCardId === t.id ? 'card-dragging' : ''}`}
-                      >
-                        <Link href={`/topics/${t.id}`} className="text-[0.95rem] font-semibold text-fg">{t.title}</Link>
-                        <span className="text-[0.78rem] text-fg-muted">{t.area}</span>
-                        {states.length > 0 && <KnowledgeStrip states={states} size="sm" />}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-          {hiddenEmptyCount > 0 && (
-            <button type="button" className={`${ghost} self-start`} onClick={() => setShowEmptyColumns((v) => !v)}>
-              {showEmptyColumns ? 'Hide empty columns' : `Show ${hiddenEmptyCount} empty column${hiddenEmptyCount === 1 ? '' : 's'}`}
-            </button>
-          )}
-        </div>
-      )}
-      </>)}
-
-      {/* Fallback Quick Activation Form Modal */}
-      {activatingTopic && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          background: 'var(--bg-overlay)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1500, padding: '16px'
-        }}>
-          <form onSubmit={submitFallbackActivation} className="glass-panel" style={{ width: '100%', maxWidth: '440px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Activate Topic</h3>
-              <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-                "{activatingTopic.title}"
-              </p>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Why are you learning this?</label>
-              <textarea className="form-input" style={{ width: '100%', height: '60px', resize: 'none' }} value={why} onChange={e => setWhy(e.target.value)} required />
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Depth target</label>
-              <select className="form-input" value={depthTarget} onChange={e => setDepthTarget(e.target.value)} style={{ background: 'var(--bg-surface)' }}>
-                <option value="Awareness">Awareness</option>
-                <option value="Working Knowledge">Working Knowledge</option>
-                <option value="Proficiency">Proficiency</option>
-                <option value="Deep">Deep Knowledge</option>
-                <option value="Mastery">Mastery</option>
-              </select>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Concrete next action (verb-first)</label>
-              <input type="text" className="form-input" value={nextAction} onChange={e => setNextAction(e.target.value)} placeholder="e.g. Read chapter 1 of..." required />
-            </div>
-
-            {activationError && <p style={{ color: 'var(--color-danger)', fontSize: '0.8rem' }}>{activationError}</p>}
-
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
-              <button type="button" onClick={() => setActivatingTopic(null)} className="btn btn-secondary">Cancel</button>
-              <button type="submit" className="btn btn-primary">Activate Topic</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* AI Roadmap Wizard Modal */}
-      {showRoadmapWizard && (
-        <RoadmapWizard
-          onClose={() => setShowRoadmapWizard(false)}
-          onComplete={fetchData}
-        />
-      )}
-
-      {/* Toast Notifications */}
-      <div className="toast-container">
-        {toasts.map(toast => (
-          <div
-            key={toast.id}
-            className={`toast toast-${toast.type}${toast.exiting ? ' toast-exit' : ''}`}
-          >
-            {toast.message}
-          </div>
-        ))}
-      </div>
-
+      <nav aria-label="More" className="flex flex-wrap gap-5 text-[0.9rem]">
+        <Link href="/goals" className="text-fg-secondary">All goals</Link>
+        <Link href="/learn/manage" className="text-fg-secondary">Manage topics</Link>
+        {isOwner && <Link href="/library" className="text-fg-secondary">Field library</Link>}
+      </nav>
     </div>
   );
 }

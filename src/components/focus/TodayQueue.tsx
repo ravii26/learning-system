@@ -4,12 +4,16 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button, ButtonLink, Icon } from '@/components/ui';
 import { useToast } from '@/components/ToastProvider';
-import { TODAY_SIZES, ROTATION_WARNING_AT, pickToday, type TodaySize } from '@/lib/focusQueue';
+import { ROTATION_WARNING_AT, TODAY_SIZES, TODAY_SIZE_KEY, planToday, readTodaySize, type TodaySize } from '@/lib/focusQueue';
 import { lessonTimeLabel, paceKey, type PaceByKind } from '@/lib/pace';
 import type { FocusAction, FocusApi, FocusEntry } from '@/lib/useFocus';
 
-const SIZE_KEY = 'learning-os:today-size';
-const ghost = 'h-8 rounded-lg bg-transparent px-2 text-[0.82rem] font-medium text-fg-secondary hover:bg-fill-2 hover:text-fg';
+/**
+ * Today answers one question: what do I do now? One next step gets all the
+ * attention, and everything else is a quiet line under it.
+ */
+
+const quiet = 'h-9 rounded-lg bg-transparent px-2.5 text-[0.88rem] font-medium text-fg-secondary hover:bg-fill-2 hover:text-fg disabled:opacity-50';
 
 const timeOf = (item: FocusEntry, pace: PaceByKind) =>
   item.estimatedMinutes ? lessonTimeLabel(item.estimatedMinutes, pace[paceKey(item.lessonKind)], { short: true }) : null;
@@ -18,22 +22,17 @@ export default function TodayQueue({ focus, dueCards, reviewMinutes, pace }: { f
   const toast = useToast();
   const [size, setSize] = useState<TodaySize>('normal');
   const [extra, setExtra] = useState(0);
-  const [swapping, setSwapping] = useState<string | null>(null);
+  const [swapping, setSwapping] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(SIZE_KEY);
-      if (saved === 'quick' || saved === 'normal' || saved === 'deep') setSize(saved);
-    } catch { /* Storage may be disabled. */ }
-  }, []);
+  useEffect(() => { setSize(readTodaySize()); }, []);
 
   const chooseSize = (next: TodaySize) => {
     setSize(next);
     setExtra(0);
-    try { localStorage.setItem(SIZE_KEY, next); } catch { /* Storage may be disabled. */ }
+    try { localStorage.setItem(TODAY_SIZE_KEY, next); } catch { /* Storage may be disabled. */ }
   };
 
   const run = async (work: () => Promise<boolean>) => {
@@ -43,7 +42,7 @@ export default function TodayQueue({ focus, dueCards, reviewMinutes, pace }: { f
   };
   const act = (id: string, action: FocusAction) => run(() => focus.act(id, action));
   const swap = (out: string, replacement: string) => run(async () => {
-    setSwapping(null);
+    setSwapping(false);
     return (await focus.act(replacement, 'add')) && focus.act(out, 'skip');
   });
   const addCustom = (e: React.FormEvent) => {
@@ -57,130 +56,137 @@ export default function TodayQueue({ focus, dueCards, reviewMinutes, pace }: { f
     });
   };
 
-  const { list, done, others } = pickToday(focus.items, size, extra);
-  const startHref = dueCards > 0 ? '/review' : list.find((i) => i.href)?.href ?? null;
-  const first = list[0];
-  const firstTime = dueCards === 0 && first?.href ? timeOf(first, pace) : null;
-  const finishedForToday = dueCards === 0 && list.length === 0;
+  const { list, done, others, reviewOpen, doneCount, total } = planToday(focus.items, size, extra, { due: dueCards, reviewedToday: focus.reviewedToday });
+  const hero = reviewOpen ? null : list[0] ?? null;
+  const then = reviewOpen ? list : list.slice(1);
+  const finished = !reviewOpen && list.length === 0;
   const pinnedCount = focus.items.filter((i) => !i.finished).length;
+  const heroTime = hero ? timeOf(hero, pace) : null;
+  const now = new Date();
 
   return (
-    <section aria-labelledby="today-h" className="glass-panel flex flex-col gap-5 p-7">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="today-h" className="m-0 font-serif text-[1.8rem] font-medium leading-tight">{finishedForToday ? 'That’s today.' : 'Your list for today'}</h2>
-        <div role="group" aria-label="How much today" className="flex rounded-xl bg-sunk p-1">
-          {TODAY_SIZES.map((s) => (
-            <button key={s.key} type="button" aria-pressed={size === s.key} onClick={() => chooseSize(s.key)} className={`h-8 rounded-[9px] px-3 text-[0.85rem] ${size === s.key ? 'bg-surface font-semibold text-fg shadow-card' : 'bg-transparent font-medium text-fg-secondary hover:text-fg'}`}>
-              {s.label}
-            </button>
-          ))}
+        <span className="text-[0.95rem] text-fg-muted">{now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+        <div className="flex items-center gap-4">
+          {total > 0 && (
+            <span className="flex items-center gap-2 text-[0.88rem] text-fg-secondary">
+              <span className="flex gap-1" aria-hidden="true">
+                {Array.from({ length: total }, (_, i) => <span key={i} className={`h-1.5 w-5 rounded-full ${i < doneCount ? 'bg-ink' : 'bg-[var(--border-strong)]'}`} />)}
+              </span>
+              {doneCount} of {total} done
+            </span>
+          )}
+          <label className="sr-only" htmlFor="today-size">How much today</label>
+          <select id="today-size" value={size} onChange={(e) => chooseSize(e.target.value as TodaySize)} className="form-input h-9 w-auto py-0 text-[0.85rem]">
+            {TODAY_SIZES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
         </div>
       </div>
 
-      {finishedForToday ? (
-        <div className="flex flex-col items-start gap-3">
-          <p className="m-0 text-[1rem] text-fg-secondary">{others.length > 0 ? 'You’re done for today. Stop here, or take on one more.' : 'Nothing else is waiting. Everything in your Focus has had its turn today.'}</p>
+      {finished ? (
+        <section aria-labelledby="today-h" className="glass-panel flex flex-col items-start gap-3 p-8">
+          <h1 id="today-h" className="m-0 font-serif text-[2.4rem] font-normal leading-tight">That’s today.</h1>
+          <p className="m-0 text-[1.05rem] text-fg-secondary">{others.length > 0 ? 'You can stop here, or take on one more.' : 'Everything in your Focus has had its turn.'}</p>
           {others.length > 0 && <Button onClick={() => setExtra((n) => n + 1)}>Keep going</Button>}
-        </div>
+        </section>
       ) : (
-        <ol className="m-0 flex list-none flex-col p-0">
-          {dueCards > 0 && (
-            <li className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-line py-3.5">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sunk text-[0.8rem] font-semibold text-fg-secondary">1</span>
-              <Link href="/review" className="flex min-w-0 flex-1 flex-col no-underline hover:no-underline">
-                <span className="text-[1.05rem] font-semibold text-fg">Review {dueCards} card{dueCards === 1 ? '' : 's'}</span>
-                <span className="text-[0.85rem] text-fg-muted">Keeps what you already know</span>
-              </Link>
-              <span className="text-[0.85rem] text-fg-muted">about {reviewMinutes} min</span>
-            </li>
-          )}
-          {list.map((item, index) => {
-            const time = timeOf(item, pace);
-            const main = item.nextStep ?? item.title;
-            const context = item.nextStep ? `${item.title} · ${item.reason}` : item.reason;
-            return (
-              <li key={item.id} className="flex flex-col gap-2 border-b border-line py-3.5 last:border-b-0">
-                <div className="flex items-start gap-x-4">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sunk text-[0.8rem] font-semibold text-fg-secondary">{index + (dueCards > 0 ? 2 : 1)}</span>
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    {item.href
-                      ? <Link href={item.href} className="text-[1.05rem] font-semibold leading-snug text-fg no-underline hover:no-underline">{main}</Link>
-                      : <span className="text-[1.05rem] font-semibold leading-snug text-fg">{main}</span>}
-                    <span className="text-[0.85rem] text-fg-muted">{context}</span>
-                  </div>
-                  {time && <span className="shrink-0 whitespace-nowrap text-[0.85rem] text-fg-muted">{time}</span>}
-                </div>
-                <div className="flex flex-wrap gap-1 pl-11">
-                  <button type="button" disabled={busy} className={ghost} onClick={() => void act(item.id, 'done')}>Done</button>
-                  {others.length > 0 && <button type="button" disabled={busy} aria-expanded={swapping === item.id} className={ghost} onClick={() => setSwapping(swapping === item.id ? null : item.id)}>Swap</button>}
-                  <button type="button" disabled={busy} className={ghost} onClick={() => void act(item.id, 'skip')}>Not today</button>
-                </div>
-                {swapping === item.id && (
-                  <ul className="m-0 ml-11 flex list-none flex-col gap-1 rounded-xl bg-sunk p-2">
-                    {others.map((o) => (
-                      <li key={o.id}>
-                        <button type="button" disabled={busy} onClick={() => void swap(item.id, o.id)} className="flex min-h-10 w-full flex-col justify-center rounded-lg bg-transparent px-2 py-1 text-left hover:bg-fill-2">
-                          <span className="text-[0.92rem] font-medium text-fg">{o.nextStep ?? o.title}</span>
-                          {o.nextStep && <span className="text-[0.8rem] text-fg-muted">{o.title}</span>}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+        <section aria-labelledby="today-h" className="glass-panel flex flex-col gap-5 p-8">
+          {hero ? (
+            <>
+              <div className="flex flex-col gap-2">
+                <span className="text-[0.95rem] text-fg-muted">Up next · {[hero.title, hero.position].filter(Boolean).join(' · ')}</span>
+                <h1 id="today-h" className="m-0 font-serif text-[2.4rem] font-normal leading-[1.15]">{hero.nextStep ?? hero.title}</h1>
+                <p className="m-0 text-[1rem] text-fg-secondary">{hero.reason}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {hero.href ? (
+                  <ButtonLink href={hero.href} variant="primary" size="lg" className="mr-2">
+                    Continue{heroTime ? ` · ${heroTime}` : ''} <Icon name="arrowRight" size={16} />
+                  </ButtonLink>
+                ) : (
+                  <Button variant="primary" size="lg" className="mr-2" disabled={busy} onClick={() => void act(hero.id, 'done')}>Mark done</Button>
                 )}
-              </li>
-            );
-          })}
-        </ol>
-      )}
-
-      <div className="flex flex-wrap items-center gap-3">
-        {startHref && (
-          <ButtonLink href={startHref} variant="primary" size="lg">
-            Start{firstTime ? ` · ${firstTime}` : ''} <Icon name="arrowRight" size={16} />
-          </ButtonLink>
-        )}
-        <Button variant="ghost" onClick={() => setAdding((v) => !v)} aria-expanded={adding}>Add something</Button>
-        <Link href="/plan" className="text-[0.88rem] text-fg-secondary">Edit Focus</Link>
-      </div>
-
-      {adding && (
-        <div className="flex flex-col gap-2 rounded-xl bg-sunk p-3">
-          {others.length > 0 && (
-            <ul className="m-0 flex list-none flex-col gap-1 p-0">
-              {others.map((o) => (
-                <li key={o.id}>
-                  <button type="button" disabled={busy} onClick={() => void act(o.id, 'add')} className="flex min-h-10 w-full items-center justify-between gap-3 rounded-lg bg-transparent px-2 py-1 text-left hover:bg-fill-2">
-                    <span className="min-w-0 truncate text-[0.92rem] font-medium text-fg">{o.nextStep ?? o.title}</span>
-                    <Icon name="plus" size={15} className="shrink-0 text-fg-muted" />
-                  </button>
-                </li>
-              ))}
-            </ul>
+                {hero.href && <button type="button" disabled={busy} className={quiet} onClick={() => void act(hero.id, 'done')}>Done</button>}
+                {others.length > 0 && <button type="button" disabled={busy} aria-expanded={swapping} className={quiet} onClick={() => setSwapping((v) => !v)}>Swap</button>}
+                <button type="button" disabled={busy} className={quiet} onClick={() => void act(hero.id, 'skip')}>Not today</button>
+              </div>
+              {swapping && (
+                <ul className="m-0 flex list-none flex-col gap-1 rounded-xl bg-sunk p-2">
+                  {others.map((o) => (
+                    <li key={o.id}>
+                      <button type="button" disabled={busy} onClick={() => void swap(hero.id, o.id)} className="flex min-h-11 w-full flex-col justify-center rounded-lg bg-transparent px-3 py-1 text-left hover:bg-fill-2">
+                        <span className="text-[0.95rem] font-medium text-fg">{o.nextStep ?? o.title}</span>
+                        {o.nextStep && <span className="text-[0.8rem] text-fg-muted">{o.title}</span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col gap-2">
+                <span className="text-[0.95rem] text-fg-muted">Up next</span>
+                <h1 id="today-h" className="m-0 font-serif text-[2.4rem] font-normal leading-[1.15]">Review {dueCards} card{dueCards === 1 ? '' : 's'}</h1>
+                <p className="m-0 text-[1rem] text-fg-secondary">Keeps what you already know.</p>
+              </div>
+              <ButtonLink href="/review" variant="primary" size="lg" className="self-start">
+                Continue · about {reviewMinutes} min <Icon name="arrowRight" size={16} />
+              </ButtonLink>
+            </>
           )}
-          <form onSubmit={addCustom} className="flex gap-2">
-            <label htmlFor="today-new" className="sr-only">Something else for today</label>
-            <input id="today-new" className="form-input h-10 flex-1 py-0" placeholder="Something else, like a chapter or a task" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
-            <Button type="submit" disabled={busy || !newTitle.trim()}>Add</Button>
-          </form>
-        </div>
+        </section>
       )}
 
-      {done.length > 0 && (
-        <div className="flex flex-col gap-1 border-t border-line pt-3">
-          <span className="text-[0.85rem] font-semibold text-fg-secondary">Done today</span>
-          {done.map((item) => (
-            <div key={item.id} className="flex items-center gap-2.5 text-[0.92rem] text-fg-secondary">
-              <Icon name="check" size={15} strokeWidth={2.4} className="shrink-0" />
-              <span className="min-w-0 flex-1 truncate">{item.nextStep ?? item.title}</span>
-              {item.canUndo && <button type="button" disabled={busy} className={ghost} onClick={() => void act(item.id, 'undo')}>Undo</button>}
-            </div>
-          ))}
-        </div>
+      {(then.length > 0 || done.length > 0) && (
+        <section aria-label="The rest of today" className="flex flex-col">
+          {then.length > 0 && <h2 className="m-0 mb-1 text-[0.9rem] font-semibold text-fg-muted">Then</h2>}
+          <ul className="m-0 list-none p-0">
+            {then.map((item) => {
+              const time = timeOf(item, pace);
+              const label = item.nextStep ? `${item.title}: ${item.nextStep}` : item.title;
+              return (
+                <li key={item.id} className="flex items-center justify-between gap-4 border-b border-line py-3 last:border-b-0">
+                  {item.href
+                    ? <Link href={item.href} className="min-w-0 text-[1rem] text-fg no-underline hover:underline">{label}</Link>
+                    : <span className="min-w-0 text-[1rem] text-fg">{label}</span>}
+                  {time && <span className="shrink-0 whitespace-nowrap text-[0.88rem] text-fg-muted">{time}</span>}
+                </li>
+              );
+            })}
+            {done.map((item) => (
+              <li key={item.id} className="flex items-center gap-2.5 border-b border-line py-3 text-[0.98rem] text-fg-muted last:border-b-0">
+                <Icon name="check" size={15} strokeWidth={2.4} className="shrink-0" />
+                <span className="min-w-0 flex-1">{item.title}</span>
+                {item.canUndo && <button type="button" disabled={busy} className={quiet} onClick={() => void act(item.id, 'undo')}>Undo</button>}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
-      {pinnedCount > ROTATION_WARNING_AT && (
-        <p className="m-0 text-[0.85rem] text-fg-muted">You’ve pinned {pinnedCount} things, so they’ll take turns across the week.</p>
-      )}
-    </section>
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-4">
+          <button type="button" aria-expanded={adding} onClick={() => setAdding((v) => !v)} className="bg-transparent p-0 text-[0.9rem] font-medium text-fg-secondary hover:text-fg">Add something for today</button>
+          {pinnedCount > ROTATION_WARNING_AT && <span className="text-[0.85rem] text-fg-muted">{pinnedCount} things pinned, so they take turns.</span>}
+        </div>
+        {adding && (
+          <div className="flex flex-col gap-2 rounded-xl bg-sunk p-3">
+            {others.map((o) => (
+              <button key={o.id} type="button" disabled={busy} onClick={() => void act(o.id, 'add')} className="flex min-h-10 w-full items-center justify-between gap-3 rounded-lg bg-transparent px-2 py-1 text-left hover:bg-fill-2">
+                <span className="min-w-0 text-[0.95rem] text-fg">{o.nextStep ? `${o.title}: ${o.nextStep}` : o.title}</span>
+                <Icon name="plus" size={15} className="shrink-0 text-fg-muted" />
+              </button>
+            ))}
+            <form onSubmit={addCustom} className="flex gap-2">
+              <label htmlFor="today-new" className="sr-only">Something else for today</label>
+              <input id="today-new" className="form-input h-10 flex-1 py-0" placeholder="Something else, like a chapter or a task" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
+              <Button type="submit" disabled={busy || !newTitle.trim()}>Add</Button>
+            </form>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

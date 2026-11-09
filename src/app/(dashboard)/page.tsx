@@ -16,10 +16,8 @@ import { lessonTimeLabel, paceKey, reviewMinutes as estimateReviewMinutes } from
 import { usePace } from '@/lib/usePace';
 import WeeklyTarget from './WeeklyTarget';
 import { useFocus } from '@/lib/useFocus';
-import { RHYTHM_LABEL } from '@/lib/focusQueue';
 import TodayQueue from '@/components/focus/TodayQueue';
 import FocusSetup from '@/components/focus/FocusSetup';
-import ReminderControl from '@/components/focus/ReminderControl';
 
 /**
  * Today — the front door. It answers "what do I do now?" by deciding for
@@ -214,10 +212,8 @@ export default function TodayPage() {
   const usingQueue = focus.items.length > 0;
   const showSetup = focus.loaded && !focus.setupDone && !usingQueue && topics.length > 0;
 
-  const subline = usingQueue
-    ? 'One short list. Everything else can wait.'
-    : pick && due.length
-    ?'One session and a short review make today count. Everything else is optional.'
+  const subline = pick && due.length
+    ? 'One session and a short review make today count. Everything else is optional.'
     : pick
       ? 'One focused session makes today count.'
       : due.length
@@ -246,13 +242,15 @@ export default function TodayPage() {
   return (
     <div key="dashboard-loaded" className="mx-auto grid max-w-[1120px] gap-12 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="flex min-w-0 flex-col gap-7">
-        <header className="flex flex-col gap-2">
-          <div className="text-[0.9rem] text-fg-muted">
-            {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-          </div>
-          <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em] text-fg">{greeting(now)}</h1>
-          <p className="m-0 text-[1.05rem] leading-relaxed text-fg-secondary">{subline}</p>
-        </header>
+        {!usingQueue && (
+          <header className="flex flex-col gap-2">
+            <div className="text-[0.9rem] text-fg-muted">
+              {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+            </div>
+            <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em] text-fg">{greeting(now)}</h1>
+            <p className="m-0 text-[1.05rem] leading-relaxed text-fg-secondary">{subline}</p>
+          </header>
+        )}
 
         {topics.length === 0 && (
           <section aria-labelledby="first-h" className="glass-panel flex flex-col gap-4 p-7">
@@ -384,7 +382,7 @@ export default function TodayPage() {
           </section>
         )}
 
-        {topics.length > 0 && (
+        {topics.length > 0 && !usingQueue && (
           <form onSubmit={handleQuickStart} className="flex flex-col gap-2">
             <label htmlFor="learn-new-input" className="text-[0.95rem] font-semibold text-fg-secondary">Learn something new</label>
             <div className="flex gap-2.5">
@@ -458,25 +456,6 @@ export default function TodayPage() {
                 })}
               </div>
             )}
-          </section>
-        )}
-
-        <ReminderControl />
-
-        {usingQueue && (
-          <section aria-labelledby="focus-side-h" className="flex flex-col gap-4">
-            <div className="flex items-baseline justify-between">
-              <h2 id="focus-side-h" className="m-0 text-[0.95rem] font-semibold">Focus</h2>
-              <Link href="/plan" className="text-[0.875rem] text-fg-secondary">Edit</Link>
-            </div>
-            {focus.items.filter((i) => !i.finished).map((i) => (
-              <div key={i.id} className="flex min-w-0 flex-col">
-                {i.href
-                  ? <Link href={i.href} className="truncate text-[1rem] font-semibold text-fg no-underline hover:no-underline">{i.title}</Link>
-                  : <span className="truncate text-[1rem] font-semibold text-fg">{i.title}</span>}
-                <span className="text-[0.82rem] text-fg-muted">{RHYTHM_LABEL[i.rhythm]}</span>
-              </div>
-            ))}
           </section>
         )}
 

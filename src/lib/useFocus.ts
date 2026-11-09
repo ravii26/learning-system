@@ -22,6 +22,8 @@ export function useFocus() {
   const [items, setItems] = useState<FocusEntry[]>([]);
   const [setupDone, setSetupDone] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [dueCards, setDueCards] = useState(0);
+  const [reviewedToday, setReviewedToday] = useState(false);
 
   const refresh = useCallback(async () => {
     const res = await fetch(`/api/focus?tz=${tz()}`).catch(() => null);
@@ -30,6 +32,8 @@ export function useFocus() {
       if (data) {
         setItems(data.items ?? []);
         setSetupDone(!!data.setupDone);
+        setDueCards(data.dueCards ?? 0);
+        setReviewedToday(!!data.reviewedToday);
       }
     }
     setLoaded(true);
@@ -60,7 +64,10 @@ export function useFocus() {
   const finishSetup = useCallback(async (pins: Array<FocusTarget & { rhythm: Rhythm }>) =>
     finishAndRedraw(await send('/api/focus/setup', 'POST', { pins, tz: tz() })), [finishAndRedraw]);
 
-  return { items, setupDone, loaded, refresh, pin, unpin, update, act, finishSetup };
+  const renameGoal = useCallback(async (goalId: string, shortName: string) =>
+    finishAndRedraw(await send(`/api/goals/${goalId}`, 'PATCH', { shortName })), [finishAndRedraw]);
+
+  return { items, setupDone, loaded, dueCards, reviewedToday, refresh, pin, unpin, update, act, finishSetup, renameGoal };
 }
 
 export type FocusApi = ReturnType<typeof useFocus>;
