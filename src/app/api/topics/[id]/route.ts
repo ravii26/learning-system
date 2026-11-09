@@ -112,18 +112,12 @@ export async function PUT(
       }
     }
 
-    // 2. Enforce Active Topic Limit and Slot Types
+    // 2. Slot Types
     let finalActiveSlotType = body.activeSlotType !== undefined ? body.activeSlotType : existing.activeSlotType;
     if (newStatus === 'active') {
       const activeTopics = await db.topic.findMany({
         where: { status: 'active', userId, id: { not: id }, deletedAt: null }
       });
-      if (activeTopics.length >= 2) {
-        return NextResponse.json(
-          { error: 'Active limit reached. You already have 2 active topics. Please pause or drop one before activating another.' },
-          { status: 400 }
-        );
-      }
       if (!finalActiveSlotType) {
         const hasPrimary = activeTopics.some(t => t.activeSlotType === 'primary');
         finalActiveSlotType = hasPrimary ? 'secondary' : 'primary';

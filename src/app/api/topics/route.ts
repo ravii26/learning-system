@@ -104,16 +104,9 @@ export async function POST(request: Request) {
 
     // Enforce limits and field guards if starting directly as active
     if (status === 'active') {
-      // 1. Verify Active Limit (max 2 active topics)
       const activeTopics = await db.topic.findMany({
         where: { status: 'active', userId, deletedAt: null },
       });
-      if (activeTopics.length >= 2) {
-        return NextResponse.json(
-          { error: 'Active limit reached. You already have 2 active topics. Please pause or drop one first.' },
-          { status: 400 }
-        );
-      }
 
       // Automatically determine slot type if not provided
       if (!finalActiveSlotType) {
@@ -121,7 +114,7 @@ export async function POST(request: Request) {
         finalActiveSlotType = hasPrimary ? 'secondary' : 'primary';
       }
 
-      // 2. Verify required fields for active status
+      // Verify required fields for active status
       if (!why || !depthTarget || !nextAction) {
         return NextResponse.json(
           { error: 'To make a topic Active, you must provide "Why you are learning", "Depth Target", and a "Next Action".' },

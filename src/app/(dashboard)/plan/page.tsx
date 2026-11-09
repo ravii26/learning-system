@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 // Subcomponents Import
-import PrioritizationPortal from '../PrioritizationPortal';
 import RoadmapWizard from '../RoadmapWizard';
+import FocusPanel from '@/components/focus/FocusPanel';
+import PinControl from '@/components/focus/PinControl';
+import { useFocus } from '@/lib/useFocus';
 import { topicLabelUnderGoal } from '@/lib/statusLabels';
 import { GOAL_STATUS_WORD, type GoalStatusName } from '@/lib/goalStatusWords';
 import { KnowledgeStrip } from '@/components/ui';
@@ -123,9 +125,9 @@ export default function PlanPage() {
   const [showRoadmapWizard, setShowRoadmapWizard] = useState(false);
   const [captureTopicMode, setCaptureTopicMode] = useState<'self_directed' | 'course'>('self_directed');
 
-  // Prioritization swaps state
-  const [showPrioritization, setShowPrioritization] = useState(false);
-  const [pendingActiveTopic, setPendingActiveTopic] = useState<Topic | null>(null);
+  // Focus sits on top; the full list opens on demand once something is pinned.
+  const focus = useFocus();
+  const [seeEverything, setSeeEverything] = useState(false);
 
   // Drag and Drop State
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
@@ -281,13 +283,6 @@ export default function PlanPage() {
 
   const handleTransition = async (topic: Topic, newStatus: string) => {
     if (newStatus === 'active') {
-      const currentActiveCount = topics.filter(t => t.status === 'active').length;
-      if (currentActiveCount >= 2) {
-        setPendingActiveTopic(topic);
-        setShowPrioritization(true);
-        return;
-      }
-
       if (!topic.why || !topic.depthTarget || !topic.nextAction) {
         setActivatingTopic(topic);
         setWhy(topic.why || '');
@@ -314,79 +309,6 @@ export default function PlanPage() {
       }
     } catch (err) {
       showToast('Failed to connect to server', 'error');
-    }
-  };
-
-  const handleConfirmSwap = async (
-    activeToPauseId: string,
-    pauseReason: string,
-    pendingWhy?: string,
-    pendingDepth?: string,
-    pendingNextAction?: string
-  ) => {
-    if (!pendingActiveTopic) return;
-
-    const activeToPause = topics.find(t => t.id === activeToPauseId);
-    let updatedPauseHistory: any[] = [];
-    if (activeToPause) {
-      const existingHistory = activeToPause.knowledgeMap?.pauseHistory || [];
-      const newPause = {
-        id: Math.random().toString(36).substring(2, 9),
-        pausedAt: new Date().toISOString(),
-        resumedAt: null,
-        reason: pauseReason,
-        completedConcepts: [],
-        currentConcept: 'None',
-        openQuestion: 'None',
-        reactivationScore: null,
-      };
-      updatedPauseHistory = [...existingHistory, newPause];
-    }
-
-    try {
-      const pauseRes = await fetch(`/api/topics/${activeToPauseId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'paused',
-          pauseHistory: updatedPauseHistory,
-          nextAction: 'Re-prioritize and resume study',
-        }),
-      });
-
-      if (!pauseRes.ok) {
-        const pauseErr = await pauseRes.json();
-        throw new Error(pauseErr.error || 'Failed to pause selected topic');
-      }
-
-      const targetWhy = pendingWhy || pendingActiveTopic.why || 'Swapped into active focus slot.';
-      const targetDepth = pendingDepth || pendingActiveTopic.depthTarget || 'Proficiency';
-      const targetNext = pendingNextAction || pendingActiveTopic.nextAction || 'Map core concepts and prerequisites';
-
-      const activateRes = await fetch(`/api/topics/${pendingActiveTopic.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'active',
-          why: targetWhy,
-          depthTarget: targetDepth,
-          nextAction: targetNext,
-        }),
-      });
-
-      if (!activateRes.ok) {
-        const actErr = await activateRes.json();
-        throw new Error(actErr.error || 'Failed to activate new topic');
-      }
-
-      setShowPrioritization(false);
-      setPendingActiveTopic(null);
-      await fetchData();
-      router.refresh();
-      showToast(`"${pendingActiveTopic.title}" is now active`, 'success');
-    } catch (e: any) {
-      console.error(e);
-      showToast(e.message || 'Connection error during slot swap.', 'error');
     }
   };
 
@@ -516,6 +438,13 @@ export default function PlanPage() {
   const inbox = byStatus('inbox');
   const others = filteredTopics.filter((t) => ['paused', 'maintenance', 'reference', 'dropped'].includes(t.status));
   const ghost = 'h-9 rounded-lg px-3 text-[0.85rem] font-medium text-fg-secondary hover:bg-fill-2 hover:text-fg';
+  const pinnedGoals = new Set(focus.items.map((i) => i.goalId).filter(Boolean));
+  const pinnedTopics = new Set(focus.items.map((i) => i.topicId).filter(Boolean));
+  const notNow = {
+    goals: goals.filter((g) => g.status !== 'abandoned' && g.status !== 'achieved' && !pinnedGoals.has(g.id)).length,
+    topics: topics.filter((t) => t.status !== 'dropped' && !pinnedTopics.has(t.id) && !(t.goal && pinnedGoals.has(t.goal.id))).length,
+  };
+  const showEverything = seeEverything || (focus.loaded && focus.items.length === 0);
 
   const Row = ({ t, actions }: { t: Topic; actions: React.ReactNode }) => {
     const states = knowledge[t.id] ?? [];
@@ -541,7 +470,7 @@ export default function PlanPage() {
         <div className="min-w-0">
           {states.length > 0 ? <KnowledgeStrip states={states} size="sm" /> : <span className="text-[0.82rem] text-fg-muted">Not started</span>}
         </div>
-        <div className="flex flex-wrap justify-end gap-1">{actions}</div>
+        <div className="flex flex-wrap justify-end gap-1">{actions}<PinControl focus={focus} target={{ kind: 'topic', topicId: t.id }} /></div>
       </li>
     );
   };
@@ -560,6 +489,9 @@ export default function PlanPage() {
         </div>
       </header>
 
+      <FocusPanel focus={focus} notNow={notNow} everythingOpen={showEverything} onToggleEverything={() => setSeeEverything((v) => !v)} />
+
+      {showEverything && (<>
       {goals.some((g) => g.status !== 'abandoned' && g.status !== 'achieved') && (
         <section aria-labelledby="goals-h" className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between">
@@ -570,7 +502,7 @@ export default function PlanPage() {
             {goals.filter((g) => g.status !== 'abandoned' && g.status !== 'achieved').map((g) => {
               const count = topics.filter((t) => t.goal?.id === g.id).length;
               return (
-                <li key={g.id} className={g.status === 'active' ? '' : 'opacity-70'}>
+                <li key={g.id} className={`flex flex-col gap-1.5 ${g.status === 'active' ? '' : 'opacity-70'}`}>
                   <Link href={`/goals/${g.id}`} className="flex h-full flex-col gap-1.5 rounded-xl border border-line bg-surface px-4 py-3.5 no-underline hover:border-line-hover hover:no-underline">
                     <span className="line-clamp-2 text-[0.98rem] font-semibold leading-snug text-fg">{g.title}</span>
                     <span className="text-[0.8rem] text-fg-muted">
@@ -578,6 +510,7 @@ export default function PlanPage() {
                       {g.readinessTotal > 0 ? ` · ${g.readinessMet} of ${g.readinessTotal} ready` : ''}
                     </span>
                   </Link>
+                  <PinControl focus={focus} target={{ kind: 'goal', goalId: g.id }} />
                 </li>
               );
             })}
@@ -622,7 +555,7 @@ export default function PlanPage() {
         <div className="flex flex-col gap-10">
           <section aria-labelledby="now-h" className="flex flex-col gap-4">
             <div className="flex items-baseline justify-between">
-              <h2 id="now-h" className="m-0 text-[1.2rem] font-semibold">Now <span className="font-normal text-fg-muted">{now.length} of 2</span></h2>
+              <h2 id="now-h" className="m-0 text-[1.2rem] font-semibold">Now <span className="font-normal text-fg-muted">{now.length}</span></h2>
               {stats && stats.staleActiveCount > 0 && <span className="text-[0.85rem] text-k-fading-text">{stats.staleActiveCount} untouched for a week+</span>}
             </div>
             {now.length === 0 ? (
@@ -643,10 +576,11 @@ export default function PlanPage() {
                       </div>
                       {states.length > 0 && <KnowledgeStrip states={states} showSummary />}
                       <span className="text-[0.95rem] text-fg-secondary">Next: {nm ?? t.nextAction ?? 'set a next step'}</span>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Link href={`/topics/${t.id}`} className="btn btn-primary h-10 py-0 no-underline hover:no-underline">Continue</Link>
                         <button type="button" className={ghost} onClick={() => handleTransition(t, 'paused')}>Rest it</button>
                         <button type="button" className={ghost} onClick={() => handleTransition(t, 'maintenance')}>Done — keep fresh</button>
+                        <PinControl focus={focus} target={{ kind: 'topic', topicId: t.id }} />
                       </div>
                     </div>
                   );
@@ -788,7 +722,7 @@ export default function PlanPage() {
                 >
                   <div className="flex items-baseline justify-between px-1">
                     <span className="text-[0.95rem] font-semibold">{STATUS_WORD[status]}</span>
-                    <span className="text-[0.82rem] text-fg-muted">{list.length}{status === 'active' ? ' / 2' : ''}</span>
+                    <span className="text-[0.82rem] text-fg-muted">{list.length}</span>
                   </div>
                   {list.length === 0 && <span className="px-1 text-[0.82rem] text-fg-muted">{EMPTY_STATE_HINTS[status]?.text}</span>}
                   {list.map((t) => {
@@ -818,17 +752,7 @@ export default function PlanPage() {
           )}
         </div>
       )}
-
-
-      {/* Prioritization swap portal */}
-      {showPrioritization && pendingActiveTopic && (
-        <PrioritizationPortal
-          activeTopics={topics.filter(t => t.status === 'active')}
-          pendingTopic={pendingActiveTopic}
-          onConfirmSwap={handleConfirmSwap}
-          onClose={() => { setShowPrioritization(false); setPendingActiveTopic(null); }}
-        />
-      )}
+      </>)}
 
       {/* Fallback Quick Activation Form Modal */}
       {activatingTopic && (
