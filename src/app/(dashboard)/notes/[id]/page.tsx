@@ -151,7 +151,7 @@ export default function NoteDetailPage() {
     return (
       <div className="mx-auto flex max-w-[760px] flex-col items-start gap-3 py-10">
         <p className="m-0 text-fg-secondary">This note doesn’t exist, or it was deleted.</p>
-        <Link href="/notes" className="btn btn-secondary">Back to Notebook</Link>
+        <Link href="/notes" className="btn btn-secondary">Back to Notes</Link>
       </div>
     );
   }
@@ -161,7 +161,7 @@ export default function NoteDetailPage() {
   return (
     <div className="mx-auto flex max-w-[760px] flex-col gap-7">
       <Link href="/notes" className="flex items-center gap-1.5 self-start text-[0.9rem] text-fg-secondary no-underline hover:text-fg hover:no-underline">
-        <Icon name="arrowLeft" size={16} /> Notebook
+        <Icon name="arrowLeft" size={16} /> Notes
       </Link>
 
       <div className="flex flex-col gap-2">

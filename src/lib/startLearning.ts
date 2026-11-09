@@ -140,7 +140,7 @@ export function planStart(input: StartInput): StartPlan {
     }
     return {
       type: 'create', mode: 'accretion', title, modules: [], minutes: 0, nextAction: 'Capture the first idea', redirect: 'notes',
-      preview: ['A place in your Notebook. Ideas you capture land here, and the ones worth keeping become review cards.', 'No finish line. You can add a lesson to it any time.'],
+      preview: ['A place in your Notes. Ideas you capture land here, and the ones worth keeping become review cards.', 'No finish line. You can add a lesson to it any time.'],
     };
   }
 

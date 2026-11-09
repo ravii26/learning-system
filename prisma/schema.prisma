@@ -69,6 +69,8 @@ model User {
   weeklyTargetMinutes Int?
   // Set once you finish or skip the first Focus setup.
   focusSetupAt DateTime?
+  // Local day (yyyy-mm-dd) of the last daily reminder, so a retried job can't send twice.
+  reminderSentDay String?
 
   topics                 Topic[]
   activityLogs           ActivityLog[]
@@ -109,6 +111,46 @@ model User {
   fieldMapSharesSent     FieldMapShare[]      @relation("FieldMapShareFrom")
   fieldMapSharesReceived FieldMapShare[]      @relation("FieldMapShareTo")
   focusItems             FocusItem[]
+  lessonAdditions        LessonAddition[]
+  pushSubscriptions      PushSubscription[]
+}
+
+/// Something you added to a lesson. Kept apart from GeneratedLesson so that
+/// rewriting the lesson can never erase it.
+model LessonAddition {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  topicId  String
+  topic    Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  moduleId String // CurriculumItem.legacyId
+
+  type    String // section | practice
+  heading String
+  body    String @default("") // markdown, for a section
+  items   Json? // practice checklist: see src/lib/lessonAssist.ts
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, topicId, moduleId])
+}
+
+/// A browser or phone that asked for the daily reminder.
+model PushSubscription {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  endpoint String @unique
+  p256dh   String
+  auth     String
+  tz       Int    @default(0) // Date.getTimezoneOffset() of that device
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 /// Something you've pinned as a current priority. Today's list is picked
@@ -229,6 +271,7 @@ model Topic {
   placementChecks  PlacementCheck[]
   programItems     ProgramItem[]
   focusItems       FocusItem[]
+  lessonAdditions  LessonAddition[]
 }
 
 /// Evidence from the Study Room: one row per checked quiz or graded
@@ -459,6 +502,8 @@ model ReviewLog {
   nextReview      DateTime
   // How long the card took, from appearing to being graded; null if not timed.
   durationMs      Int?
+  // The card as it was before this review, so the review can be undone.
+  previous        Json?
 
   @@index([userId, reviewedAt])
   @@index([conceptId, reviewedAt])

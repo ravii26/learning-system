@@ -21,6 +21,18 @@ Vercel (app) + Neon (Postgres). Both have free tiers that fit one user.
 5. **Domain** (optional) — Vercel → Domains, add it, set the DNS records it
    shows. HTTPS is automatic.
 
+## Daily reminder (optional)
+
+1. Run `npx web-push generate-vapid-keys` once.
+2. In Vercel, add `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `CRON_SECRET`
+   (any long random value), then redeploy.
+3. Open Today and turn on **Daily reminder**, then use **Send a test**.
+
+`vercel.json` runs the job once a day at 03:30 UTC (about 9:00 in India).
+Vercel's free plan allows only one run a day and may fire any time within
+that hour. To change the time, edit the schedule there. On an iPhone,
+reminders need the site added to the Home Screen first.
+
 ## Moving existing local data (optional)
 
 ```bash

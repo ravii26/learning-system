@@ -19,13 +19,14 @@ import { useFocus } from '@/lib/useFocus';
 import { RHYTHM_LABEL } from '@/lib/focusQueue';
 import TodayQueue from '@/components/focus/TodayQueue';
 import FocusSetup from '@/components/focus/FocusSetup';
+import ReminderControl from '@/components/focus/ReminderControl';
 
 /**
  * Today — the front door. It answers "what do I do now?" by deciding for
  * you and always saying why (lib/nextAction.ts): one session to start, the
  * review that protects what you already know, and a couple of optional
  * small things. Everything else is one click away in Learn, Review,
- * Notebook or You.
+ * Notes or You.
  */
 
 interface Topic extends TopicForNextAction {
@@ -163,7 +164,7 @@ export default function TodayPage() {
       const res = await createCapture(title);
       if (res.ok) {
         setCaptureTitle('');
-        toast.success('Captured. It’s in your Notebook inbox with a suggested home.');
+        toast.success('Captured. It’s in Notes with a suggested home.');
         await fetchData();
       } else {
         const data = await res.json();
@@ -459,6 +460,8 @@ export default function TodayPage() {
             )}
           </section>
         )}
+
+        <ReminderControl />
 
         {usingQueue && (
           <section aria-labelledby="focus-side-h" className="flex flex-col gap-4">

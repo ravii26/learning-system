@@ -3,6 +3,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
+import { MIN_QUERY, SEARCH_KIND_LABEL, type SearchResult } from '@/lib/search';
+
+interface PaletteItem {
+  id: string;
+  title: string;
+  subtitle?: string | null;
+  icon: string;
+  action: () => void;
+}
+
+const SEARCH_DELAY_MS = 200;
 
 interface TopicItem {
   id: string;
@@ -64,6 +75,37 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     }
   }, [isOpen]);
 
+  // Everything else is searched on the server as you type.
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const term = query.trim();
+  const searchMode = term.length >= MIN_QUERY;
+  useEffect(() => {
+    if (!isOpen || !searchMode) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(term)}`, { signal: controller.signal })
+        .then((res) => (res.ok ? res.json() : { results: [] }))
+        .then((data) => {
+          setResults(Array.isArray(data.results) ? data.results : []);
+          setSelectedIndex(0);
+          setSearching(false);
+        })
+        .catch((err) => {
+          if (err?.name !== 'AbortError') setSearching(false);
+        });
+    }, SEARCH_DELAY_MS);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [isOpen, searchMode, term]);
+
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -73,8 +115,10 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   if (!isOpen || !mounted) return null;
 
   const quickActions = [
-    { id: 'act-home', title: 'Go to Dashboard', icon: '', action: () => router.push('/') },
-    { id: 'act-review', title: 'Open Spaced Review Queue', icon: '', action: () => router.push('/review') },
+    { id: 'act-home', title: 'Go to Today', icon: '', action: () => router.push('/') },
+    { id: 'act-learn', title: 'Go to Learn', icon: '', action: () => router.push('/plan') },
+    { id: 'act-review', title: 'Open Review', icon: '', action: () => router.push('/review') },
+    { id: 'act-notes', title: 'Open Notes', icon: '', action: () => router.push('/notes') },
     { id: 'act-explore', title: 'Explore Topic Ideas', icon: '', action: () => router.push('/explore') },
   ];
 
@@ -83,14 +127,22 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     (t.category && t.category.toLowerCase().includes(query.toLowerCase()))
   );
 
-  const allItems = [
+  const allItems: PaletteItem[] = [
     ...quickActions.filter((a) => a.title.toLowerCase().includes(query.toLowerCase())),
-    ...filteredTopics.map((t) => ({
-      id: `topic-${t.id}`,
-      title: t.title,
-      icon: '',
-      action: () => router.push(`/topics/${t.id}`),
-    })),
+    ...(searchMode
+      ? results.map((r) => ({
+          id: `${r.kind}-${r.id}`,
+          title: r.title,
+          subtitle: r.snippet ? `${SEARCH_KIND_LABEL[r.kind]} · ${r.snippet}` : SEARCH_KIND_LABEL[r.kind],
+          icon: '',
+          action: () => router.push(r.href),
+        }))
+      : filteredTopics.map((t) => ({
+          id: `topic-${t.id}`,
+          title: t.title,
+          icon: '',
+          action: () => router.push(`/topics/${t.id}`),
+        }))),
   ];
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -161,7 +213,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Search topics, actions, or jump anywhere... (Press Esc to close)"
+            placeholder="Search lessons, notes, cards and goals"
             style={{
               flex: 1,
               background: 'none',
@@ -188,15 +240,15 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
 
         {/* Results List */}
         <div style={{ maxHeight: '380px', overflowY: 'auto', padding: '8px' }}>
-          {loading && (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
-              Loading suggestions...
+          {(loading || searching) && (
+            <div style={{ padding: '12px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
+              Searching…
             </div>
           )}
 
-          {!loading && allItems.length === 0 && (
+          {!loading && !searching && allItems.length === 0 && (
             <div style={{ padding: '32px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
-              No matching topics or actions found for "{query}"
+              Nothing found for "{query}"
             </div>
           )}
 
@@ -223,11 +275,15 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '1.1rem' }}>{item.icon}</span>
-                    <span style={{ fontSize: '0.92rem', color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-primary)', fontWeight: 500 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                    <span style={{ fontSize: '0.92rem', color: 'var(--color-text-primary)', fontWeight: 500 }}>
                       {item.title}
                     </span>
+                    {item.subtitle && (
+                      <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {item.subtitle}
+                      </span>
+                    )}
                   </div>
                   {isSelected && (
                     <span style={{ fontSize: '0.78rem', color: 'var(--color-text-primary)', fontWeight: 600 }}>Press ↵</span>

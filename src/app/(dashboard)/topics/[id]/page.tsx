@@ -131,6 +131,13 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
   const [modulesOpen, setModulesOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
 
+  // "Edit" on the Notes page lands here with this lesson's notes already open.
+  useEffect(() => {
+    if (searchParams.get('notes') === '1') setNotesOpen(true);
+    // Only when arriving at the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Alt+N opens/closes this module's notes from anywhere on the page.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -67,12 +67,12 @@ function CaptureInner() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-5 px-4 py-8">
       <div className="flex items-baseline justify-between">
         <h1 className="m-0 font-serif text-[2rem] font-normal">Capture</h1>
-        <Link href="/notes" className="text-[0.9rem] text-fg-secondary">Notebook</Link>
+        <Link href="/notes" className="text-[0.9rem] text-fg-secondary">Notes</Link>
       </div>
 
       {state === 'saved' && (
         <div role="status" className="flex flex-col gap-1 rounded-xl bg-sunk p-4">
-          <span className="text-[0.85rem] font-semibold text-fg-secondary">Saved to your inbox</span>
+          <span className="text-[0.85rem] font-semibold text-fg-secondary">Saved to Notes</span>
           <p className="m-0 break-words text-[0.95rem]">{lastSaved}</p>
           {incoming && (
             <button onClick={() => history.back()} className="mt-2 self-start text-[0.9rem] font-medium underline underline-offset-4">
@@ -101,7 +101,7 @@ function CaptureInner() {
           {state === 'saving' ? 'Saving…' : 'Save'}
         </Button>
       </form>
-      <p className="m-0 text-center text-[0.85rem] text-fg-muted">It lands in your Notebook inbox with a suggested home.</p>
+      <p className="m-0 text-center text-[0.85rem] text-fg-muted">It lands in Notes with a suggested home.</p>
     </main>
   );
 }

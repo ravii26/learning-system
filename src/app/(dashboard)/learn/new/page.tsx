@@ -34,7 +34,7 @@ const KINDS: Array<{ key: Kind; label: string; desc: string; explain: string }> 
   { key: 'case_study', label: 'Case study', desc: 'learn from real cases', explain: 'One lesson built from cases of how teams made a choice, with the reasoning and when it would not apply. Cases are labelled documented or illustrative.' },
   { key: 'roadmap', label: 'Roadmap', desc: 'a path to follow', explain: 'One lesson that lays out phases in order, with a realistic pace and milestones you can check. For a full syllabus with a lesson per module, choose Course.' },
   { key: 'practice', label: 'Practice', desc: 'a skill you repeat', explain: 'No syllabus. A short daily rep, a scoring rubric, and a trend line of how you’re improving.' },
-  { key: 'accretion', label: 'Collect ideas', desc: 'no finish line', explain: 'A place in your Notebook. Captures on this subject land here, and ideas worth keeping become review cards. Never a percentage.' },
+  { key: 'accretion', label: 'Collect ideas', desc: 'no finish line', explain: 'A place in your Notes. Captures on this subject land here, and ideas worth keeping become review cards. Never a percentage.' },
 ];
 
 const AREAS = ['Tech', 'Business', 'Finance', 'Creative', 'Personal', 'Other'];
