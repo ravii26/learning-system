@@ -23,9 +23,10 @@ export async function GET(request: Request) {
     const since = new Date(Date.now() - (days + 1) * 24 * 60 * 60 * 1000);
     const where = { userId, topic: { deletedAt: null }, ...(topicId ? { topicId } : {}) };
 
-    const [entries, allTime] = await Promise.all([
+    const [entries, allTime, user] = await Promise.all([
       db.studyTimeEntry.findMany({ where: { ...where, startedAt: { gte: since } }, select: { topicId: true, startedAt: true, seconds: true } }),
       db.studyTimeEntry.aggregate({ where, _sum: { seconds: true } }),
+      db.user.findUnique({ where: { id: userId }, select: { weeklyTargetMinutes: true } }),
     ]);
 
     const summary = summarizeStudyTime(entries, { days, tzOffsetMinutes });
@@ -39,6 +40,7 @@ export async function GET(request: Request) {
       ...summary,
       byTopic: summary.byTopic.map((t) => ({ ...t, title: titles.get(t.topicId) ?? 'Topic' })),
       allTimeSeconds: allTime._sum.seconds ?? 0,
+      weeklyTargetMinutes: user?.weeklyTargetMinutes ?? null,
     });
   } catch (e) {
     console.error('Failed to summarize study time:', e);

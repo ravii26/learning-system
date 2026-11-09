@@ -150,6 +150,8 @@ export function useStudyTracker({ topicId, moduleId, forceActive = false }: { to
     unflushedSeconds,
     /** Increments whenever something was saved; refetch totals when it changes. */
     flushCount,
+    /** Saves what's been counted so far, for when a figure must be current. */
+    flushNow: () => flush(false),
     awayPrompt,
     confirmAway,
     dismissAway: () => setAwayPrompt(null),

@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: learning_os_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: learning_os
+      POSTGRES_PASSWORD: learning_os_dev
+      POSTGRES_DB: learning_os
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U learning_os"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

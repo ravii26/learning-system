@@ -12,6 +12,9 @@ import { formatDuration } from '@/lib/timeSummary';
 import type { Knowledge } from '@/lib/moduleState';
 import ResurfacedNote from '@/components/ResurfacedNote';
 import { topicLabelUnderGoal } from '@/lib/statusLabels';
+import { lessonTimeLabel, paceKey, reviewMinutes as estimateReviewMinutes } from '@/lib/pace';
+import { usePace } from '@/lib/usePace';
+import WeeklyTarget from './WeeklyTarget';
 
 /**
  * Today — the front door. It answers "what do I do now?" by deciding for
@@ -24,7 +27,7 @@ import { topicLabelUnderGoal } from '@/lib/statusLabels';
 interface Topic extends TopicForNextAction {
   area: string;
   mode: string;
-  curriculum?: Array<{ id: string; order: number; title: string; completed: boolean }> | null;
+  curriculum?: Array<{ id: string; order: number; title: string; completed: boolean; estimatedMinutes?: number; kind?: string }> | null;
   goal?: { id: string; title: string } | null;
 }
 
@@ -33,6 +36,7 @@ interface TimeWeek {
   todaySeconds: number;
   allTimeSeconds: number;
   daily: Array<{ date: string; seconds: number }>;
+  weeklyTargetMinutes: number | null;
 }
 
 interface DueCard {
@@ -43,8 +47,6 @@ interface TopicKnowledge {
   id: string;
   knowledge: { unit: 'module' | 'idea'; states: Knowledge[] } | null;
 }
-
-const WEEKLY_GOAL_SECONDS = 5 * 60 * 60;
 
 function greeting(now: Date) {
   const h = now.getHours();
@@ -68,6 +70,8 @@ export default function TodayPage() {
   const [repLoggedToday, setRepLoggedToday] = useState(false);
   const [inboxCount, setInboxCount] = useState(0);
   const [time, setTime] = useState<TimeWeek | null>(null);
+  const [cardSeconds, setCardSeconds] = useState<number | null>(null);
+  const pace = usePace();
   const [loading, setLoading] = useState(true);
 
   const [captureTitle, setCaptureTitle] = useState('');
@@ -89,7 +93,11 @@ export default function TodayPage() {
         const inbox = await inboxRes.json();
         setInboxCount(Array.isArray(inbox) ? inbox.length : 0);
       }
-      if (spacedRes.ok) setDue((await spacedRes.json()).dueConcepts ?? []);
+      if (spacedRes.ok) {
+        const spaced = await spacedRes.json();
+        setDue(spaced.dueConcepts ?? []);
+        setCardSeconds(spaced.typicalCardSeconds ?? null);
+      }
       if (progressRes.ok) {
         const p: { topics: TopicKnowledge[] } = await progressRes.json();
         setKnowledge(Object.fromEntries(p.topics.filter((t) => t.knowledge).map((t) => [t.id, t.knowledge!.states])));
@@ -191,7 +199,9 @@ export default function TodayPage() {
   const pickStates = pick ? knowledge[pick.topicId] ?? [] : [];
   const alternatives = activeTopics.filter((t) => t.id !== pick?.topicId);
   const slipping = due.filter((c) => c.lastRecalledAt).length;
-  const reviewMinutes = Math.max(1, Math.ceil(due.length * 0.7));
+  const reviewMinutes = estimateReviewMinutes(due.length, cardSeconds);
+  const nextMinutes = next?.module.estimatedMinutes;
+  const nextTime = nextMinutes && nextMinutes > 0 ? lessonTimeLabel(nextMinutes, pace.byKind[paceKey(next?.module.kind)], { short: true }) : null;
   const hasPracticeTopic = topics.some((t) => t.mode === 'practice');
 
   const subline = pick && due.length
@@ -278,7 +288,7 @@ export default function TodayPage() {
             {pickStates.length > 0 && <KnowledgeStrip states={pickStates} current={next?.index} showSummary />}
             <div className="flex flex-wrap items-center gap-3">
               <ButtonLink href={`/topics/${pick.topicId}`} variant="primary" size="lg">
-                Start a 25-minute session <Icon name="arrowRight" size={16} />
+                Start{nextTime ? ` · ${nextTime}` : ''} <Icon name="arrowRight" size={16} />
               </ButtonLink>
               {alternatives.length > 0 && (
                 <Button variant="ghost" onClick={() => setShowAlternatives((v) => !v)} aria-expanded={showAlternatives}>
@@ -406,8 +416,11 @@ export default function TodayPage() {
             </div>
             <div className="flex items-baseline gap-2.5">
               <span className="font-serif text-[2.4rem] leading-none">{formatDuration(time.totalSeconds)}</span>
-              <span className="text-[0.875rem] text-fg-muted">of {formatDuration(WEEKLY_GOAL_SECONDS)} · today {formatDuration(time.todaySeconds)}</span>
+              <span className="text-[0.875rem] text-fg-muted">
+                {time.weeklyTargetMinutes ? `of ${formatDuration(time.weeklyTargetMinutes * 60)} · ` : ''}today {formatDuration(time.todaySeconds)}
+              </span>
             </div>
+            <WeeklyTarget minutes={time.weeklyTargetMinutes} onSaved={(weeklyTargetMinutes) => setTime((t) => (t ? { ...t, weeklyTargetMinutes } : t))} />
             {week.length > 0 && (
               <div
                 className="flex h-28 items-end gap-2.5"

@@ -41,7 +41,7 @@ export default function ProgramPanel({ view, goalId, onPlanChanged }: { view: Pr
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="stand-h" className="m-0 text-[1.15rem] font-semibold">Where you stand</h2>
           <span className="text-[0.85rem] text-fg-muted">
-            {sentence(targetLabel(program.intake.target, program.archetype))} · {program.hoursPerWeek} h/week · about {program.totalWeeks} weeks · plan v{program.version}
+            {sentence(targetLabel(program.intake.target, program.archetype))} · est. {program.totalWeeks} weeks at {program.hoursPerWeek} h/week · plan v{program.version}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-3">

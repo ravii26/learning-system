@@ -18,6 +18,8 @@ import type { Knowledge } from '@/lib/moduleState';
 import { useToast } from '@/components/ToastProvider';
 import { useStudyTracker } from '@/lib/useStudyTracker';
 import { formatDuration } from '@/lib/timeSummary';
+import { lessonTimeLabel, paceKey } from '@/lib/pace';
+import { usePace } from '@/lib/usePace';
 import TopicTimeDrawer from './TopicTimeDrawer';
 import PlacementDrawer from './PlacementDrawer';
 import TopicToolsMenu from './TopicToolsMenu';
@@ -164,6 +166,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
 
   // Real study time: tracked while you study here (see useStudyTracker)
   const tracker = useStudyTracker({ topicId: params.id, moduleId: activeModuleId, forceActive: timerActive });
+  const pace = usePace(params.id);
   const [timeTotals, setTimeTotals] = useState({ todaySeconds: 0, allTimeSeconds: 0 });
   const [timeDrawerOpen, setTimeDrawerOpen] = useState(false);
   const [addingModule, setAddingModule] = useState(false);
@@ -341,7 +344,10 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
         }
         : m
     );
+    // Time still waiting to be saved has to count towards this lesson.
+    if (nowCompleting) await tracker.flushNow();
     await handleSaveCurriculum(updated);
+    void pace.refresh();
 
     // Finishing a module turns its lesson into Daily Review cards, so it
     // comes back before you forget it.
@@ -778,6 +784,8 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                 topicTitle={title}
                 topicArea={area}
                 module={activeModule}
+                pace={pace.byKind[paceKey(activeModule.kind)]}
+                actualSeconds={pace.moduleSeconds[activeModule.id]}
                 evidence={evidence[activeModule.id]}
                 onEvidenceChanged={fetchEvidence}
                 notes={notes}
@@ -937,7 +945,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
                           </span>
                           {isSelected && (
                             <span className="text-[0.75rem] text-fg-muted">
-                              {KNOWLEDGE_LABEL[state]} · {mod.estimatedMinutes} min
+                              {KNOWLEDGE_LABEL[state]} · {lessonTimeLabel(mod.estimatedMinutes, pace.byKind[paceKey(mod.kind)], { short: true })}
                               {ev?.quiz?.total ? ` · quiz ${ev.quiz.correct}/${ev.quiz.total}` : ''}
                             </span>
                           )}

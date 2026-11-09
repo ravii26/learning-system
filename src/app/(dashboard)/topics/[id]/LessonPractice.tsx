@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Icon } from '@/components/ui';
-import { renderMarkdown } from '@/lib/markdown';
+import { MarkdownProse } from '@/components/MarkdownProse';
 import { useSpeechToText } from '@/lib/useSpeechToText';
 import { useAiMode } from '@/lib/useAiMode';
 import type { LessonExercise } from '@/lib/program/lessonGuide';
@@ -115,7 +115,7 @@ export function Exercise({ n, ex, subject, done, onDone, onChecked, initialAnswe
         {done && <span className="ml-auto flex items-center gap-1 normal-case tracking-normal text-fg"><Icon name="check" size={14} strokeWidth={2.4} /> Done</span>}
       </div>
       {ex.instruction && <p className="m-0 text-[0.95rem] text-fg-secondary">{ex.instruction}</p>}
-      {ex.prompt && <div className="lesson-prose text-[1.05rem]" dangerouslySetInnerHTML={{ __html: renderMarkdown(ex.prompt) }} />}
+      {ex.prompt && <MarkdownProse className="lesson-prose text-[1.05rem]" markdown={ex.prompt} />}
 
       {typed && (
         <div className="flex flex-col gap-2">
@@ -177,7 +177,7 @@ export function Exercise({ n, ex, subject, done, onDone, onChecked, initialAnswe
       {showAnswer && (ex.answer || (typed && selfCheck)) && (
         <div className="flex flex-col gap-3 rounded-xl border border-line p-4">
           {ex.answer
-            ? <div className="lesson-prose text-[0.98rem]" dangerouslySetInnerHTML={{ __html: renderMarkdown(ex.answer) }} />
+            ? <MarkdownProse className="lesson-prose text-[0.98rem]" markdown={ex.answer} />
             : <p className="m-0 text-[0.95rem] text-fg-secondary">No model answer for this one: judge it against the task and target above.</p>}
           {typed && selfCheck && (
             <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">

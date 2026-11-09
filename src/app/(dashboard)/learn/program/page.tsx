@@ -335,8 +335,8 @@ export default function BuildProgramPage() {
         <fieldset className="m-0 flex flex-col gap-3 border-0 p-0">
           <legend className="mb-3 p-0 text-[1.1rem] font-semibold">How many hours a week can you give it?</legend>
           <div className="flex flex-wrap items-center gap-2">
-            {[3, 5, 7, 10, 15].map((h) => (
-              <button key={h} type="button" aria-pressed={hours === h} onClick={() => setHours(h)} className={chip(hours === h)}>{h} h</button>
+            {([[3, 'Light'], [5, 'Steady'], [7, ''], [10, 'Intensive'], [15, '']] as const).map(([h, name]) => (
+              <button key={h} type="button" aria-pressed={hours === h} onClick={() => setHours(h)} className={chip(hours === h)}>{name ? `${name} · ` : ''}{h} h</button>
             ))}
             <label className="sr-only" htmlFor="hours">Hours per week</label>
             <input id="hours" type="number" min={1} max={60} value={hours} onChange={(e) => setHours(Math.max(1, Math.min(60, Number(e.target.value) || 1)))} className="form-input h-10 w-20 py-0" />
@@ -659,7 +659,7 @@ export default function BuildProgramPage() {
           <span className="text-[0.85rem] font-semibold uppercase tracking-wide text-fg-muted">Draft plan · not saved yet</span>
           <h1 className="m-0 font-serif text-[2.4rem] font-normal leading-tight">{draft.map.title}</h1>
           <p className="m-0 text-[1.05rem] text-fg-secondary">
-            {sentence(targetLabel(draft.intake.target, draft.intake.archetype ?? draft.map.archetype))} · {draft.hoursPerWeek} h/week · about {draft.totalWeeks} weeks · {draft.phases.length} phases
+            {sentence(targetLabel(draft.intake.target, draft.intake.archetype ?? draft.map.archetype))} · est. {draft.totalWeeks} weeks at {draft.hoursPerWeek} h/week · {draft.phases.length} phases
           </p>
           {draft.intake.doneMeans && <p className="m-0 text-[0.95rem]">Finish line: <strong>{draft.intake.doneMeans}</strong></p>}
         </header>

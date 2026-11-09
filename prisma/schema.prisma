@@ -65,6 +65,8 @@ model User {
   // "app": the app's AI writes plans/lessons/practice days. "manual": the
   // learner runs our prompt in their own ChatGPT/Claude and pastes the reply.
   aiMode       String   @default("app")
+  // Your own weekly study target; null means none set.
+  weeklyTargetMinutes Int?
 
   topics                 Topic[]
   activityLogs           ActivityLog[]
@@ -420,6 +422,8 @@ model ReviewLog {
   elapsedDays     Int
   scheduledDays   Int
   nextReview      DateTime
+  // How long the card took, from appearing to being graded; null if not timed.
+  durationMs      Int?
 
   @@index([userId, reviewedAt])
   @@index([conceptId, reviewedAt])

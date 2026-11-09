@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useModalFocus } from '@/lib/useModalFocus';
 import { Icon } from '@/components/ui/Icon';
 import RichTextEditor from './RichTextEditor';
+import { moduleNotesDraftKey } from '@/lib/noteQuote';
 
 interface ModuleNotesDrawerProps {
   topicId: string;
@@ -104,7 +105,7 @@ export default function ModuleNotesDrawer({
           <div className="flex-1 flex flex-col">
             <RichTextEditor
               key={moduleId}
-              draftKey={`learning-os:notes:${topicId}:${moduleId}`}
+              draftKey={moduleNotesDraftKey(topicId, moduleId)}
               content={notes || ''}
               onChange={onSaveNotes}
               placeholder={`Explain ${moduleTitle} in your own words. Jot down key formulas, core takeaways, mental models, or code templates...`}

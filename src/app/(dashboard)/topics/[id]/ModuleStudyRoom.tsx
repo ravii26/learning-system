@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { CourseModule, ModuleEvidence } from './page';
-import { renderMarkdown } from '@/lib/markdown';
+import { MarkdownProse } from '@/components/MarkdownProse';
 import { normalizeBlocks } from '@/lib/lessonBlocks';
 import { LESSON_KIND_LABEL, lessonKindOf } from '@/lib/lessonKinds';
 import { LessonBlocks } from '@/components/lesson/LessonBlocks';
@@ -12,14 +12,22 @@ import LessonPractice from './LessonPractice';
 import ManualAiPanel, { postManual } from '@/components/ManualAiPanel';
 import { useAiMode } from '@/lib/useAiMode';
 import ModuleNotesDrawer from './ModuleNotesDrawer';
+import LessonSelectionMenu from './LessonSelectionMenu';
 import ReadAloud from '@/components/ReadAloud';
 import { readStudySession, writeStudySession } from '@/lib/studySession';
+import { queueNoteWork } from '@/lib/noteAutosave';
+import { appendToNotes, moduleNotesDraftKey } from '@/lib/noteQuote';
+import { lessonTimeLabel, tookLabel, type KindPace } from '@/lib/pace';
 
 interface ModuleStudyRoomProps {
   topicId: string;
   topicTitle: string;
   topicArea: string;
   module: CourseModule;
+  /** How long lessons of this kind usually take you, once measured. */
+  pace?: KindPace;
+  /** Time recorded on this lesson, once finished. */
+  actualSeconds?: number;
   notes: string;
   onSaveNotes: (html: string) => Promise<void>;
   /** Called after this module's own notes were saved, so the page keeps its copy fresh. */
@@ -50,6 +58,8 @@ export default function ModuleStudyRoom({
   topicTitle,
   topicArea,
   module,
+  pace,
+  actualSeconds,
   notes,
   onSaveNotes,
   onModuleNotesSaved,
@@ -61,6 +71,7 @@ export default function ModuleStudyRoom({
   onNotesOpenChange: setNotesDrawerOpen,
 }: ModuleStudyRoomProps) {
   const guideRef = React.useRef<HTMLDivElement>(null);
+  const articleRef = React.useRef<HTMLElement>(null);
   const [activeTab, setActiveTab] = useState<'guide' | 'practice' | 'media' | 'challenge' | 'quiz'>('guide');
   const [lesson, setLesson] = useState<any | null>(null);
   const [loadingLesson, setLoadingLesson] = useState(true);
@@ -230,6 +241,26 @@ export default function ModuleStudyRoom({
     }
   };
 
+  // Waits for any save still running from the notes editor, and keeps an
+  // unsaved draft in step so restoring it later doesn't lose this quote.
+  const addQuoteToNotes = (quote: string) => {
+    const draftKey = moduleNotesDraftKey(topicId, module.id);
+    return queueNoteWork(draftKey, async () => {
+      const res = await fetch(`/api/topics/${topicId}/modules/${module.id}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quote }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || typeof data?.notes !== 'string') throw new Error(data?.error || 'Couldn’t add that to your notes.');
+      try {
+        const draft = sessionStorage.getItem(draftKey);
+        if (draft !== null) sessionStorage.setItem(draftKey, appendToNotes(draft, data.added));
+      } catch { /* Storage may be disabled. */ }
+      onModuleNotesSaved?.(module.id, data.notes);
+    });
+  };
+
   // Grade locally right away, then save the attempt: the score becomes
   // evidence and every miss becomes a Daily Review card due tomorrow.
   // A fresh quiz of 5, 10 or 20 questions from this module's lesson. It becomes
@@ -387,14 +418,15 @@ export default function ModuleStudyRoom({
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-[1040px] flex-col gap-10">
-      <article className="flex min-w-0 flex-col gap-8">
+      <LessonSelectionMenu rootRef={articleRef} onAdd={addQuoteToNotes} onOpenNotes={() => setNotesDrawerOpen(true)} />
+      <article ref={articleRef} className="flex min-w-0 flex-col gap-8">
         {/* One heading, one line of context, then the steps. */}
         <header className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.875rem] text-fg-muted">
               <span>Module {module.order}</span>
               <span aria-hidden="true">·</span>
-              <span>about {module.estimatedMinutes} min</span>
+              <span>{(module.completed && tookLabel(actualSeconds, module.estimatedMinutes)) || lessonTimeLabel(module.estimatedMinutes, pace)}</span>
               {evidence?.state && (
                 <>
                   <span aria-hidden="true">·</span>
@@ -499,7 +531,7 @@ export default function ModuleStudyRoom({
                 )}
 
                 {lesson.explanation && (
-                  <div className="lesson-prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(lesson.explanation) }} />
+                  <MarkdownProse className="lesson-prose" markdown={lesson.explanation} />
                 )}
 
                 <LessonBlocks blocks={normalizeBlocks(lesson.blocks)} onRedo={redoSection} redoing={redoing} />
@@ -528,7 +560,7 @@ export default function ModuleStudyRoom({
                 {lesson.codeOrExample && (
                   <section aria-labelledby="ex-h" className="flex flex-col gap-3">
                     <h3 id="ex-h" className="m-0 text-[1.15rem] font-semibold">A worked example</h3>
-                    <div className="lesson-prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(lesson.codeOrExample) }} />
+                    <MarkdownProse className="lesson-prose" markdown={lesson.codeOrExample} />
                   </section>
                 )}
 

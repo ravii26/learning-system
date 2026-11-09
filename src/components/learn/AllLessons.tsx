@@ -8,6 +8,8 @@ import { BlueprintPicker } from '@/components/lesson/BlueprintPicker';
 import type { BlockType } from '@/lib/lessonBlocks';
 import { KIND_BLOCKS, KIND_DEFAULT_BLOCKS, LESSON_KINDS, LESSON_KIND_BADGE, LESSON_KIND_LABEL, isDefaultBlueprint, type LessonKind } from '@/lib/lessonKinds';
 import { STATE_LABEL, filterOverview, groupByTopic, summarize, type OverviewRow, type OverviewState } from '@/lib/lessonOverview';
+import { lessonTimeLabel, paceKey, type KindPace } from '@/lib/pace';
+import { usePace } from '@/lib/usePace';
 
 /**
  * Everything you are learning in one list: every lesson of every topic, with
@@ -18,7 +20,7 @@ import { STATE_LABEL, filterOverview, groupByTopic, summarize, type OverviewRow,
 
 const pill = 'rounded-full border border-line-strong px-2.5 py-0.5 text-[0.75rem] text-fg-secondary';
 
-function Row({ row, onChanged }: { row: OverviewRow; onChanged: (next: OverviewRow) => void }) {
+function Row({ row, pace, onChanged }: { row: OverviewRow; pace?: KindPace; onChanged: (next: OverviewRow) => void }) {
   const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [kind, setKind] = useState<LessonKind>(row.kind);
@@ -57,7 +59,7 @@ function Row({ row, onChanged }: { row: OverviewRow; onChanged: (next: OverviewR
         {row.needsRegenerate && <span className={`${pill} font-semibold text-fg`}>Needs regenerating</span>}
         {!row.written && <span className="text-[0.8rem] text-fg-muted">Not written yet</span>}
         {row.completed && <span className="text-[0.8rem] text-fg-muted">Finished</span>}
-        <span className="ml-auto text-[0.82rem] tabular-nums text-fg-muted">about {row.minutes} min</span>
+        <span className="ml-auto text-[0.82rem] tabular-nums text-fg-muted">{lessonTimeLabel(row.minutes, pace)}</span>
         <button type="button" onClick={() => setEditing(!editing)} aria-expanded={editing} className="text-[0.85rem] font-medium text-fg-secondary underline-offset-4 hover:text-fg hover:underline">
           {editing ? 'Cancel' : 'Change'}
         </button>
@@ -91,6 +93,7 @@ function Row({ row, onChanged }: { row: OverviewRow; onChanged: (next: OverviewR
 
 /** `initialRows` skips the fetch (used by tests and previews); the page passes nothing. */
 export function AllLessons({ initialRows }: { initialRows?: OverviewRow[] } = {}) {
+  const pace = usePace();
   const [rows, setRows] = useState<OverviewRow[] | null>(initialRows ?? null);
   const [error, setError] = useState<string | null>(null);
   const [kind, setKind] = useState<LessonKind | 'all'>('all');
@@ -169,7 +172,7 @@ export function AllLessons({ initialRows }: { initialRows?: OverviewRow[] } = {}
               <span className="text-[0.85rem] text-fg-muted">{g.topicStatus} · {summarize(g.rows)}</span>
             </div>
             <ul className="m-0 flex list-none flex-col p-0">
-              {g.rows.map((r) => <Row key={`${r.topicId}:${r.moduleId}`} row={r} onChanged={update} />)}
+              {g.rows.map((r) => <Row key={`${r.topicId}:${r.moduleId}`} row={r} pace={pace.byKind[paceKey(r.kind)]} onChanged={update} />)}
             </ul>
           </section>
         ))}
