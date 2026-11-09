@@ -16,6 +16,9 @@ interface LessonSelectionMenuProps {
   rootRef: React.RefObject<HTMLElement>;
   onAdd: (quote: string) => Promise<void>;
   onOpenNotes: () => void;
+  onAsk: (text: string) => void;
+  onSimpler: (text: string) => void;
+  onMakeCard: (text: string) => void;
 }
 
 interface Selected {
@@ -24,7 +27,7 @@ interface Selected {
   left: number;
 }
 
-const MENU_HALF_WIDTH = 110;
+const MENU_HALF_WIDTH = 210;
 const ADDED_VISIBLE_MS = 4000;
 
 const isTyping = (el: Element | null) => !!el?.closest('input, textarea, [contenteditable="true"]');
@@ -44,7 +47,7 @@ function readSelection(root: HTMLElement): Selected | null {
 
 const itemClass = 'flex h-9 items-center gap-2 whitespace-nowrap rounded-lg bg-transparent px-3 text-[0.875rem] font-semibold text-on-ink hover:opacity-80 disabled:opacity-60';
 
-export default function LessonSelectionMenu({ rootRef, onAdd, onOpenNotes }: LessonSelectionMenuProps) {
+export default function LessonSelectionMenu({ rootRef, onAdd, onOpenNotes, onAsk, onSimpler, onMakeCard }: LessonSelectionMenuProps) {
   const toast = useToast();
   const [selected, setSelected] = useState<Selected | null>(null);
   const [saving, setSaving] = useState(false);
@@ -105,6 +108,13 @@ export default function LessonSelectionMenu({ rootRef, onAdd, onOpenNotes }: Les
     }
   };
 
+  const handOff = (action: (text: string) => void) => {
+    const { text } = selected;
+    setSelected(null);
+    window.getSelection()?.removeAllRanges();
+    action(text);
+  };
+
   const openNotes = () => {
     setAdded(false);
     setSelected(null);
@@ -117,7 +127,7 @@ export default function LessonSelectionMenu({ rootRef, onAdd, onOpenNotes }: Les
       aria-label="Selected text"
       // Keeps the text selected when a button is pressed.
       onMouseDown={(e) => e.preventDefault()}
-      className={`fixed z-[150] flex items-center gap-1 rounded-xl bg-ink p-1 shadow-card ${coarse ? 'bottom-[calc(env(safe-area-inset-bottom)+84px)] left-1/2 -translate-x-1/2' : '-translate-x-1/2'}`}
+      className={`fixed z-[150] flex max-w-[calc(100vw-16px)] flex-wrap items-center justify-center gap-0.5 rounded-xl bg-ink p-1 shadow-card ${coarse ? 'bottom-[calc(env(safe-area-inset-bottom)+84px)] left-1/2 -translate-x-1/2' : '-translate-x-1/2'}`}
       style={coarse ? undefined : { top: selected.top, left: selected.left }}
     >
       {added ? (
@@ -128,9 +138,14 @@ export default function LessonSelectionMenu({ rootRef, onAdd, onOpenNotes }: Les
           <button type="button" onClick={openNotes} className={`${itemClass} underline underline-offset-2`}>Open</button>
         </>
       ) : (
-        <button type="button" onClick={add} disabled={saving} className={itemClass}>
-          <Icon name="notebook" size={16} /> {saving ? 'Adding…' : 'Add to notes'}
-        </button>
+        <>
+          <button type="button" onClick={add} disabled={saving} className={itemClass}>
+            <Icon name="notebook" size={16} /> {saving ? 'Adding…' : 'Add to notes'}
+          </button>
+          <button type="button" onClick={() => handOff(onAsk)} disabled={saving} className={itemClass}>Ask</button>
+          <button type="button" onClick={() => handOff(onSimpler)} disabled={saving} className={itemClass}>Simpler</button>
+          <button type="button" onClick={() => handOff(onMakeCard)} disabled={saving} className={itemClass}>Make card</button>
+        </>
       )}
     </div>,
     document.body,

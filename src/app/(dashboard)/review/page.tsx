@@ -7,6 +7,7 @@ import { useStudyTimer } from '@/lib/useStudyTimer';
 import { Button, ButtonLink } from '@/components/ui';
 import ResurfacedNote from '@/components/ResurfacedNote';
 import { reviewMinutes } from '@/lib/pace';
+import { confirmDialog } from '@/components/dialogs';
 
 const SPRINT_GRADES = [
   { grade: 'Again', key: '1', label: 'Forgot', hint: 'comes back soon' },
@@ -94,6 +95,18 @@ export default function ReviewPage() {
   useEffect(() => {
     cardShownAt.current = Date.now();
   }, [currentConceptIdx, dueConcepts.length, pauseAfterSlipping, activeTab]);
+
+  const [recall, setRecall] = useState('');
+  const [editing, setEditing] = useState<{ prompt: string; answer: string } | null>(null);
+  const [lastGraded, setLastGraded] = useState<{ logId: string; label: string } | null>(null);
+  const [undoing, setUndoing] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
+  const currentCardId = dueConcepts[currentConceptIdx]?.conceptId;
+  useEffect(() => {
+    setRecall('');
+    setEditing(null);
+    setCardError(null);
+  }, [currentCardId]);
   
   // Timer Hook
   const { secondsRemaining, isActive, mode, formattedTime, startTimer, pauseTimer, resetTimer, isCompleted } = useStudyTimer();
@@ -114,7 +127,8 @@ export default function ReviewPage() {
   const [nextAction, setNextAction] = useState('');
   const [promotedDecisions, setPromotedDecisions] = useState<Array<{ topicId: string, why: string, depthTarget: string, nextAction: string }>>([]);
 
-  const fetchData = async () => {
+  const fetchData = async (): Promise<DueConcept[]> => {
+    let ordered: DueConcept[] = [];
     try {
       const [topicsRes, spacedRes] = await Promise.all([
         fetch('/api/topics'),
@@ -134,7 +148,8 @@ export default function ReviewPage() {
         // Slipping cards (recalled before, now overdue) first: they're the
         // ones you'd otherwise lose. The API's most-overdue order is kept
         // within each group.
-        setDueConcepts([...list.filter((c) => c.lastRecalledAt), ...list.filter((c) => !c.lastRecalledAt)]);
+        ordered = [...list.filter((c) => c.lastRecalledAt), ...list.filter((c) => !c.lastRecalledAt)];
+        setDueConcepts(ordered);
         setUpcoming(spacedData.upcoming ?? null);
         setCardSeconds(spacedData.typicalCardSeconds ?? null);
       }
@@ -143,11 +158,69 @@ export default function ReviewPage() {
     } finally {
       setLoading(false);
     }
+    return ordered;
   };
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  const undoLastGrade = async () => {
+    if (!lastGraded || undoing) return;
+    setUndoing(true);
+    const res = await fetch('/api/review/spaced/undo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reviewLogId: lastGraded.logId }) }).catch(() => null);
+    const data = await res?.json().catch(() => null);
+    if (res?.ok) {
+      const list = await fetchData();
+      setCurrentConceptIdx(Math.max(0, list.findIndex((c) => c.conceptId === data.conceptId)));
+      setRevealedAnswer(false);
+      setPauseAfterSlipping(false);
+      setRecall('');
+      cardShownAt.current = Date.now();
+      setLastGraded(null);
+      setCardError(null);
+    } else setCardError(data?.error || 'Couldn’t undo that.');
+    setUndoing(false);
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'spaced_sprint' || !lastGraded) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      if (e.key.toLowerCase() === 'u' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        void undoLastGrade();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, lastGraded, undoing]);
+
+  const saveCardEdit = async () => {
+    const current = dueConcepts[currentConceptIdx];
+    if (!current || !editing) return;
+    const res = await fetch(`/api/review/cards/${current.conceptId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editing) }).catch(() => null);
+    const data = await res?.json().catch(() => null);
+    if (!res?.ok) { setCardError(data?.error || 'Couldn’t save that card.'); return; }
+    setDueConcepts((prev) => prev.map((c) => (c.conceptId === current.conceptId ? { ...c, prompt: data.prompt, answer: data.answer } : c)));
+    setEditing(null);
+    setCardError(null);
+  };
+
+  const removeCard = async () => {
+    const current = dueConcepts[currentConceptIdx];
+    if (!current) return;
+    const sure = await confirmDialog({ title: 'Remove this card?', message: 'It stops coming back for review. Your lesson and notes are not affected.', danger: true, confirmLabel: 'Remove card' });
+    if (!sure) return;
+    const res = await fetch(`/api/review/cards/${current.conceptId}`, { method: 'DELETE' }).catch(() => null);
+    if (!res?.ok) { setCardError('Couldn’t remove that card.'); return; }
+    setRevealedAnswer(false);
+    const remaining = dueConcepts.filter((c) => c.conceptId !== current.conceptId);
+    setDueConcepts(remaining);
+    if (currentConceptIdx >= remaining.length) setCurrentConceptIdx(0);
+  };
 
   // Four FSRS grades (was pass/fail, which threw away Hard/Easy — the
   // difference between a 3-day and a 3-week next interval).
@@ -156,7 +229,7 @@ export default function ReviewPage() {
     if (!concept) return;
 
     try {
-      await fetch('/api/review/spaced', {
+      const res = await fetch('/api/review/spaced', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -166,6 +239,10 @@ export default function ReviewPage() {
           durationMs: Date.now() - cardShownAt.current,
         }),
       });
+      if (!res.ok) { setCardError('That didn’t save. Try again.'); return; }
+      const saved = await res.json().catch(() => null);
+      setLastGraded(saved?.reviewLogId ? { logId: saved.reviewLogId, label: concept.prompt || concept.conceptTitle } : null);
+      setCardError(null);
 
       setRevealedAnswer(false);
       const slippingCount = dueConcepts.filter((c) => c.lastRecalledAt).length;
@@ -178,13 +255,14 @@ export default function ReviewPage() {
       }
     } catch (e) {
       console.error(e);
+      setCardError('Couldn’t reach the server.');
     }
   };
 
   // Keyboard: Space reveals, 1-4 grades — only on the sprint tab, and never
   // while typing in a field.
   useEffect(() => {
-    if (activeTab !== 'spaced_sprint' || dueConcepts.length === 0 || pauseAfterSlipping) return;
+    if (activeTab !== 'spaced_sprint' || dueConcepts.length === 0 || pauseAfterSlipping || editing) return;
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
@@ -202,7 +280,7 @@ export default function ReviewPage() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, revealedAnswer, dueConcepts.length, currentConceptIdx, pauseAfterSlipping]);
+  }, [activeTab, revealedAnswer, dueConcepts.length, currentConceptIdx, pauseAfterSlipping, editing]);
 
   const startReview = () => {
     if (activePaused.length === 0) {
@@ -431,11 +509,24 @@ export default function ReviewPage() {
                 <span className="ml-auto text-fg-muted">{currentConceptIdx + 1} of {dueConcepts.length}</span>
               </div>
 
-              <h2 className="m-0 font-serif text-[2.1rem] font-medium leading-[1.2] tracking-[-0.01em]">
-                {card.prompt ? card.prompt : <>Explain “{card.conceptTitle}” in your own words.</>}
-              </h2>
+              {!editing && (
+                <h2 className="m-0 font-serif text-[2.1rem] font-medium leading-[1.2] tracking-[-0.01em]">
+                  {card.prompt ? card.prompt : <>Explain “{card.conceptTitle}” in your own words.</>}
+                </h2>
+              )}
 
-              {!revealedAnswer ? (
+              {editing ? (
+                <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); void saveCardEdit(); }}>
+                  <label htmlFor="edit-prompt" className="text-[0.95rem] font-semibold text-fg-secondary">Question</label>
+                  <textarea id="edit-prompt" rows={2} className="form-input resize-y text-[1.05rem]" value={editing.prompt} onChange={(e) => setEditing({ ...editing, prompt: e.target.value })} autoFocus />
+                  <label htmlFor="edit-answer" className="text-[0.95rem] font-semibold text-fg-secondary">Answer</label>
+                  <textarea id="edit-answer" rows={4} className="form-input resize-y text-[1.05rem]" value={editing.answer} onChange={(e) => setEditing({ ...editing, answer: e.target.value })} />
+                  <div className="flex gap-3">
+                    <Button type="submit" variant="primary" disabled={!editing.prompt.trim() || !editing.answer.trim()}>Save card</Button>
+                    <Button type="button" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
+                  </div>
+                </form>
+              ) : !revealedAnswer ? (
                 <div className="flex flex-col gap-3.5">
                   <label htmlFor="recall-attempt" className="text-[0.95rem] font-semibold text-fg-secondary">
                     Answer from memory first — out loud or typed
@@ -446,6 +537,8 @@ export default function ReviewPage() {
                     rows={4}
                     placeholder="Optional. Writing it down makes the check more honest."
                     className="form-input resize-y text-[1.05rem] leading-relaxed"
+                    value={recall}
+                    onChange={(e) => setRecall(e.target.value)}
                   />
                   <div className="flex items-center gap-3.5">
                     <Button variant="primary" size="lg" onClick={() => setRevealedAnswer(true)}>Show answer</Button>
@@ -456,6 +549,12 @@ export default function ReviewPage() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-6">
+                  {recall.trim() && (
+                    <div className="flex flex-col gap-2 border-t border-line pt-6">
+                      <span className="text-[0.875rem] font-semibold text-fg-secondary">Your answer</span>
+                      <p className="m-0 whitespace-pre-wrap text-[1.1rem] leading-relaxed text-fg">{recall}</p>
+                    </div>
+                  )}
                   <div className="flex flex-col gap-2.5 border-t border-line pt-6">
                     <span className="text-[0.875rem] font-semibold text-k-solid">Answer</span>
                     {card.answer ? (
@@ -494,7 +593,24 @@ export default function ReviewPage() {
                   </div>
                 </div>
               )}
+
+              {!editing && (
+                <div className="flex flex-wrap gap-4 text-[0.875rem]">
+                  <button type="button" className="bg-transparent p-0 font-medium text-fg-muted underline-offset-2 hover:text-fg hover:underline" onClick={() => setEditing({ prompt: card.prompt ?? `Explain “${card.conceptTitle}” in your own words.`, answer: card.answer ?? '' })}>Edit card</button>
+                  <button type="button" className="bg-transparent p-0 font-medium text-fg-muted underline-offset-2 hover:text-fg hover:underline" onClick={() => void removeCard()}>Remove card</button>
+                </div>
+              )}
             </article>
+          )}
+
+          {cardError && <p role="alert" className="m-0 text-[0.95rem] text-danger">{cardError}</p>}
+
+          {lastGraded && (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl bg-sunk px-4 py-3 text-[0.9rem]">
+              <span className="min-w-0 flex-1 truncate text-fg-secondary">Graded: {lastGraded.label}</span>
+              <button type="button" disabled={undoing} className="bg-transparent p-0 font-semibold text-fg underline underline-offset-2" onClick={() => void undoLastGrade()}>{undoing ? 'Undoing…' : 'Undo'}</button>
+              <kbd className="hidden rounded bg-surface px-1.5 py-0.5 text-[0.7rem] text-fg-secondary sm:inline">U</kbd>
+            </div>
           )}
 
           <ResurfacedNote />

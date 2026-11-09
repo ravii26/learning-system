@@ -20,6 +20,8 @@ export async function middleware(request: NextRequest) {
     // Phone-shortcut capture: authenticates itself with a bearer token
     // (CAPTURE_TOKEN), not the session cookie — see that route.
     pathname === '/api/capture-hook' ||
+    // Called by Vercel Cron, which proves itself with CRON_SECRET in that route.
+    pathname === '/api/cron/reminders' ||
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico'
   ) {
@@ -42,5 +44,5 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   // Run middleware on all frontend pages except assets and login
-  matcher: ['/((?!api/auth|_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!api/auth|_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|icon-192.png|icon-512.png).*)'],
 };

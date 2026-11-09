@@ -240,7 +240,7 @@ export default function WhereYouStandPage() {
                         <KnowledgeStrip states={k.states} size="lg" />
                       ) : (
                         <span className="text-[0.875rem] text-fg-muted">
-                          {t.mode === 'syllabus' ? 'Build a roadmap to start measuring.' : 'Ideas you keep from your Notebook show up here.'}
+                          {t.mode === 'syllabus' ? 'Build a roadmap to start measuring.' : 'Ideas you keep from your Notes show up here.'}
                         </span>
                       )}
                     </div>

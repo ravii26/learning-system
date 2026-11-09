@@ -13,6 +13,10 @@ import ManualAiPanel, { postManual } from '@/components/ManualAiPanel';
 import { useAiMode } from '@/lib/useAiMode';
 import ModuleNotesDrawer from './ModuleNotesDrawer';
 import LessonSelectionMenu from './LessonSelectionMenu';
+import LessonAssistant, { type AssistRequest } from '@/components/lesson/LessonAssistant';
+import LessonAdditions from '@/components/lesson/LessonAdditions';
+import { useToast } from '@/components/ToastProvider';
+import { promptDialog } from '@/components/dialogs';
 import ReadAloud from '@/components/ReadAloud';
 import { readStudySession, writeStudySession } from '@/lib/studySession';
 import { queueNoteWork } from '@/lib/noteAutosave';
@@ -74,6 +78,11 @@ export default function ModuleStudyRoom({
 }: ModuleStudyRoomProps) {
   const guideRef = React.useRef<HTMLDivElement>(null);
   const articleRef = React.useRef<HTMLElement>(null);
+  const toast = useToast();
+  const [assistRequest, setAssistRequest] = useState<AssistRequest | null>(null);
+  const [additionsVersion, setAdditionsVersion] = useState(0);
+  const askAssistant = (action: AssistRequest['action'], request: string, selection: string) =>
+    setAssistRequest((prev) => ({ action, request, selection, nonce: (prev?.nonce ?? 0) + 1 }));
   const [activeTab, setActiveTab] = useState<'guide' | 'practice' | 'media' | 'challenge' | 'quiz'>('guide');
   const [lesson, setLesson] = useState<any | null>(null);
   const [loadingLesson, setLoadingLesson] = useState(true);
@@ -263,6 +272,23 @@ export default function ModuleStudyRoom({
     });
   };
 
+  const askAboutSelection = async (selection: string) => {
+    const request = await promptDialog({ title: 'Ask about this', message: selection.slice(0, 200), placeholder: 'What do you want to know?', confirmLabel: 'Ask' });
+    if (request?.trim()) askAssistant('ask', request.trim(), selection);
+  };
+
+  const makeCardFromSelection = async (answer: string) => {
+    const prompt = await promptDialog({ title: 'Make a review card', message: `Answer: ${answer.slice(0, 200)}`, placeholder: 'The question that should bring this back', confirmLabel: 'Add card' });
+    if (!prompt?.trim()) return;
+    const res = await fetch(`/api/topics/${topicId}/modules/${module.id}/cards`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: prompt.trim(), answer }) }).catch(() => null);
+    const data = await res?.json().catch(() => null);
+    if (!res?.ok) { toast.error(data?.error || 'Couldn’t make that card.'); return; }
+    if (data.added > 0) {
+      toast.success('Card added. It comes back in Review tomorrow.');
+      onEvidenceChanged?.();
+    } else toast.success('You already have that card.');
+  };
+
   // Grade locally right away, then save the attempt: the score becomes
   // evidence and every miss becomes a Daily Review card due tomorrow.
   // A fresh quiz of 5, 10 or 20 questions from this module's lesson. It becomes
@@ -420,7 +446,14 @@ export default function ModuleStudyRoom({
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-[1040px] flex-col gap-10">
-      <LessonSelectionMenu rootRef={articleRef} onAdd={addQuoteToNotes} onOpenNotes={() => setNotesDrawerOpen(true)} />
+      <LessonSelectionMenu
+        rootRef={articleRef}
+        onAdd={addQuoteToNotes}
+        onOpenNotes={() => setNotesDrawerOpen(true)}
+        onAsk={(text) => void askAboutSelection(text)}
+        onSimpler={(text) => askAssistant('improve', 'Explain this part more simply.', text)}
+        onMakeCard={(text) => void makeCardFromSelection(text)}
+      />
       <article ref={articleRef} className="flex min-w-0 flex-col gap-8">
         {/* One heading, one line of context, then the steps. */}
         <header className="flex flex-col gap-4">
@@ -518,6 +551,7 @@ export default function ModuleStudyRoom({
               </p>
             )}
             {activeTab === 'guide' && (
+              <div className="flex flex-col gap-9">
               <div ref={guideRef} className="flex flex-col gap-9">
                 {objectives.length > 0 && (
                   <section aria-labelledby="obj-h" className="flex flex-col gap-3">
@@ -596,13 +630,16 @@ export default function ModuleStudyRoom({
                     </ul>
                   </section>
                 )}
+              </div>
 
-                <div className="flex flex-wrap items-center gap-4 border-t border-line pt-6">
-                  <button type="button" onClick={() => setActiveTab(exercises.length ? 'practice' : checkTab)} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
-                    {exercises.length ? 'Practise it' : 'Check yourself'} <Icon name="arrowRight" size={16} />
-                  </button>
-                  <span className="text-[0.9rem] text-fg-muted">{exercises.length ? `${exercises.length} exercises: doing it is what makes it stay.` : 'Recalling it now is what makes it stay.'}</span>
-                </div>
+              <LessonAdditions topicId={topicId} moduleId={module.id} refreshKey={additionsVersion} onEvidenceChanged={onEvidenceChanged} />
+
+              <div className="flex flex-wrap items-center gap-4 border-t border-line pt-6">
+                <button type="button" onClick={() => setActiveTab(exercises.length ? 'practice' : checkTab)} className="btn btn-primary h-12 px-6 py-0 text-[1rem]">
+                  {exercises.length ? 'Practise it' : 'Check yourself'} <Icon name="arrowRight" size={16} />
+                </button>
+                <span className="text-[0.9rem] text-fg-muted">{exercises.length ? `${exercises.length} exercises: doing it is what makes it stay.` : 'Recalling it now is what makes it stay.'}</span>
+              </div>
               </div>
             )}
 
@@ -808,6 +845,15 @@ export default function ModuleStudyRoom({
                 </ul>
               </section>
             )}
+            <LessonAssistant
+              key={module.id}
+              topicId={topicId}
+              moduleId={module.id}
+              manual={useManual}
+              incoming={assistRequest}
+              onSaveToNotes={addQuoteToNotes}
+              onAdded={() => setAdditionsVersion((v) => v + 1)}
+            />
           </>
         )}
       </article>

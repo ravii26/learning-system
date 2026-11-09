@@ -7,14 +7,14 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 
 /**
  * Five places, one question each: what now (Today), what am I learning
- * (Learn), what might I forget (Review), what have I collected (Notebook),
+ * (Learn), what might I forget (Review), what have I written (Notes),
  * where do I stand (You). Everything else lives inside one of them.
  */
 const LINKS: Array<{ name: string; href: string; icon: IconName; match: string[] }> = [
   { name: 'Today', href: '/', icon: 'today', match: ['/'] },
   { name: 'Learn', href: '/plan', icon: 'learn', match: ['/plan', '/learn', '/topics', '/goals', '/explore', '/practice', '/library'] },
   { name: 'Review', href: '/review', icon: 'review', match: ['/review'] },
-  { name: 'Notebook', href: '/notes', icon: 'notebook', match: ['/notes'] },
+  { name: 'Notes', href: '/notes', icon: 'notebook', match: ['/notes'] },
   { name: 'You', href: '/progress', icon: 'you', match: ['/progress', '/skills', '/friends'] },
 ];
 

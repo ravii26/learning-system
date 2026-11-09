@@ -8,12 +8,13 @@ import { computeAccretionStats } from '@/lib/accretionStats';
 import { Button, Icon, Sparkline } from '@/components/ui';
 import ResurfacedNote from '@/components/ResurfacedNote';
 import { suggestionLabel, type CaptureSuggestion } from '@/lib/captureSuggest';
+import LessonNotesList from '@/components/notes/LessonNotesList';
+import { filterLessonNotes, type LessonNoteGroup } from '@/lib/lessonNotes';
 
 /**
- * The accretion-mode home: capture anything in 3 seconds, process the
- * inbox weekly, browse the linked-note base. Per the project plan's
- * Example C — no percentage anywhere on this page. A note base doesn't
- * have a completion state.
+ * One place for everything you've written while learning: captures still to
+ * sort, your notes from every lesson, and notes of your own. No percentage
+ * anywhere on this page; notes don't have a completion state.
  */
 
 interface CaptureRow {
@@ -42,9 +43,10 @@ interface TopicOption {
 
 export default function NotesPage() {
   const toast = useToast();
-  const [tab, setTab] = useState<'inbox' | 'notes'>('inbox');
   const [captures, setCaptures] = useState<CaptureRow[]>([]);
   const [notes, setNotes] = useState<NoteRow[]>([]);
+  const [lessonGroups, setLessonGroups] = useState<LessonNoteGroup[]>([]);
+  const [filter, setFilter] = useState('');
   const [topics, setTopics] = useState<TopicOption[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -72,11 +74,13 @@ export default function NotesPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [capturesRes, notesRes, topicsRes] = await Promise.all([
+      const [capturesRes, notesRes, topicsRes, lessonsRes] = await Promise.all([
         fetch('/api/captures?status=inbox'),
         fetch('/api/notes'),
         fetch('/api/topics'),
+        fetch('/api/notes/lessons'),
       ]);
+      if (lessonsRes.ok) setLessonGroups((await lessonsRes.json()).groups ?? []);
       if (capturesRes.ok) setCaptures(await capturesRes.json());
       if (notesRes.ok) setNotes(await notesRes.json());
       if (topicsRes.ok) setTopics((await topicsRes.json()).map((t: any) => ({ id: t.id, title: t.title })));
@@ -188,13 +192,17 @@ export default function NotesPage() {
     }
   };
 
+  const searching = filter.trim().length > 0;
+  const shownGroups = filterLessonNotes(lessonGroups, filter);
+  const shownNotes = searching ? notes.filter((n) => [n.title, ...n.tags].join(' ').toLowerCase().includes(filter.trim().toLowerCase())) : notes;
+
   return (
     <div className="mx-auto grid max-w-[1120px] gap-12 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="flex min-w-0 flex-col gap-7">
         <header className="flex flex-col gap-2">
-          <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Notebook</h1>
+          <h1 className="m-0 font-serif text-[2.6rem] font-normal leading-[1.1] tracking-[-0.015em]">Notes</h1>
           <p className="m-0 text-[1.05rem] text-fg-secondary">
-            For subjects with no syllabus. Capture anything; give each thing a home in one tap.
+            Everything you’ve written while learning, in one place.
           </p>
         </header>
 
@@ -214,30 +222,9 @@ export default function NotesPage() {
           )}
         </form>
 
-        <div role="tablist" aria-label="Show" className="flex self-start rounded-xl bg-sunk p-1">
-          {([
-            ['inbox', `Inbox · ${captures.length}`],
-            ['notes', `Notes · ${notes.length}`],
-          ] as const).map(([key, label]) => (
-            <button
-              key={key}
-              role="tab"
-              aria-selected={tab === key}
-              onClick={() => setTab(key)}
-              className={`h-10 rounded-[9px] px-4 text-[0.9rem] ${tab === key ? 'bg-surface font-semibold text-fg shadow-card' : 'font-medium text-fg-secondary hover:text-fg'}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {tab === 'inbox' && (
-          captures.length === 0 ? (
-            <div className="flex flex-col gap-2 py-6">
-              <p className="m-0 font-serif text-[1.8rem]">Inbox clear.</p>
-              <p className="m-0 text-[1rem] text-fg-secondary">Everything has a home. Press C anywhere to capture the next thing.</p>
-            </div>
-          ) : (
+        {captures.length > 0 && (
+          <section aria-labelledby="to-sort-h" className="flex flex-col gap-3">
+            <h2 id="to-sort-h" className="m-0 text-[1.2rem] font-semibold">To sort <span className="font-normal text-fg-muted">{captures.length}</span></h2>
             <ul className="m-0 flex list-none flex-col gap-3 p-0">
               {captures.map((c) => {
                 const s = suggestions[c.id];
@@ -307,19 +294,40 @@ export default function NotesPage() {
                 );
               })}
             </ul>
-          )
+          </section>
         )}
 
-        {tab === 'notes' && (
-          <div className="flex flex-col gap-4">
-            <Link href="/notes/new" className="btn btn-secondary self-start no-underline hover:no-underline">
+        {(lessonGroups.length > 0 || notes.length > 0) && (
+          <>
+            <label htmlFor="notes-filter" className="sr-only">Search your notes</label>
+            <input id="notes-filter" className="form-input h-11 py-0" placeholder="Search your notes" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          </>
+        )}
+
+        <section aria-labelledby="from-lessons-h" className="flex flex-col gap-4">
+          <h2 id="from-lessons-h" className="m-0 text-[1.2rem] font-semibold">From your lessons</h2>
+          {shownGroups.length > 0 ? (
+            <LessonNotesList groups={shownGroups} searching={searching} />
+          ) : (
+            <p className="m-0 text-[1rem] text-fg-secondary">
+              {searching ? 'No lesson notes match that.' : 'Nothing yet. Select text in a lesson and choose Add to notes, or open Notes while studying.'}
+            </p>
+          )}
+        </section>
+
+        <section aria-labelledby="own-notes-h" className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="own-notes-h" className="m-0 text-[1.2rem] font-semibold">Your own notes <span className="font-normal text-fg-muted">{notes.length}</span></h2>
+            <Link href="/notes/new" className="btn btn-secondary h-10 py-0 no-underline hover:no-underline">
               <Icon name="plus" size={16} /> New note
             </Link>
-            {notes.length === 0 ? (
-              <p className="m-0 text-[1rem] text-fg-secondary">No notes yet. Keep a capture as a note, or start one here.</p>
+          </div>
+          <div className="flex flex-col gap-4">
+            {shownNotes.length === 0 ? (
+              <p className="m-0 text-[1rem] text-fg-secondary">{searching ? 'None of your own notes match that.' : 'Notes that aren’t tied to a lesson live here. Keep a capture as a note, or start one.'}</p>
             ) : (
               <ul className="m-0 flex list-none flex-col p-0">
-                {notes.map((n) => (
+                {shownNotes.map((n) => (
                   <li key={n.id}>
                     <Link href={`/notes/${n.id}`} className="flex min-h-[60px] items-center justify-between gap-3 border-b border-line py-3 no-underline hover:no-underline">
                       <span className="flex min-w-0 flex-col gap-1">
@@ -335,13 +343,13 @@ export default function NotesPage() {
               </ul>
             )}
           </div>
-        )}
+        </section>
       </div>
 
       <aside className="flex flex-col gap-9 lg:pt-2">
         {notes.length > 0 && (
           <section aria-labelledby="growth-h" className="flex flex-col gap-3">
-            <h2 id="growth-h" className="m-0 text-[0.95rem] font-semibold">Your notebook</h2>
+            <h2 id="growth-h" className="m-0 text-[0.95rem] font-semibold">Your own notes</h2>
             <div className="flex items-baseline gap-2.5">
               <span className="font-serif text-[2.2rem] leading-none">{stats.noteCount}</span>
               <span className="text-[0.875rem] text-fg-muted">notes · {stats.linkCount} links · +{stats.addedThisWeek} this week</span>

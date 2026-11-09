@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { schedule, type Grade } from '@/lib/fsrs';
@@ -178,6 +179,22 @@ export async function POST(request: Request) {
     const elapsedMs = Number(body.durationMs);
     const durationMs = Number.isFinite(elapsedMs) && elapsedMs > 0 && elapsedMs <= MAX_CARD_MS ? Math.round(elapsedMs) : null;
 
+    const before = concept;
+    const previous = {
+      state: before.state,
+      stability: before.stability,
+      difficulty: before.difficulty,
+      reps: before.reps,
+      lapses: before.lapses,
+      elapsedDays: before.elapsedDays,
+      scheduledDays: before.scheduledDays,
+      lastReview: before.lastReview?.toISOString() ?? null,
+      nextReview: before.nextReview?.toISOString() ?? null,
+      masteryLevel: before.masteryLevel,
+      seededFromLegacy: before.seededFromLegacy,
+    } as Prisma.InputJsonValue;
+    let reviewLogId = '';
+
     await db.$transaction(async (tx) => {
       await tx.concept.update({
         where: { id: conceptId_ },
@@ -196,7 +213,7 @@ export async function POST(request: Request) {
         },
       });
 
-      await tx.reviewLog.create({
+      const log = await tx.reviewLog.create({
         data: {
           userId,
           conceptId: conceptId_,
@@ -210,8 +227,11 @@ export async function POST(request: Request) {
           scheduledDays: result.scheduledDays,
           nextReview: result.nextReview,
           durationMs,
+          previous,
         },
+        select: { id: true },
       });
+      reviewLogId = log.id;
 
       // Mistake-bank logging: a real Mistake row, attached to this exact
       // concept (no title-matching needed — createMistakeRow is for
@@ -238,7 +258,7 @@ export async function POST(request: Request) {
     });
 
     const updatedTopic = await db.topic.findUnique({ where: { id: topicId_ } });
-    return NextResponse.json(updatedTopic);
+    return NextResponse.json({ ...updatedTopic, reviewLogId });
   } catch (e) {
     console.error('Failed to log spaced review:', e);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

@@ -23,6 +23,9 @@ const code = JetBrains_Mono({ subsets: ['latin'], variable: '--font-code', displ
 export const metadata: Metadata = {
   title: 'Learning OS',
   description: 'Learn many things, know where you stand, and keep what you learn.',
+  manifest: '/manifest.webmanifest',
+  icons: { apple: '/icon-192.png' },
+  appleWebApp: { capable: true, title: 'Learning OS', statusBarStyle: 'black-translucent' },
 };
 
 export const viewport: Viewport = {
