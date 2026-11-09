@@ -113,6 +113,7 @@ model User {
   focusItems             FocusItem[]
   lessonAdditions        LessonAddition[]
   pushSubscriptions      PushSubscription[]
+  planEntries            PlanEntry[]
 }
 
 /// Something you added to a lesson. Kept apart from GeneratedLesson so that
@@ -181,7 +182,25 @@ model FocusItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  planEntries PlanEntry[]
+
   @@index([userId, completedAt])
+}
+
+/// One Focus item placed on one day of your week plan. See src/lib/weekPlan.ts.
+model PlanEntry {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  focusItemId String
+  focusItem   FocusItem @relation(fields: [focusItemId], references: [id], onDelete: Cascade)
+  day         String // local calendar day, yyyy-mm-dd
+  position    Int       @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@unique([focusItemId, day])
+  @@index([userId, day])
 }
 
 model Topic {

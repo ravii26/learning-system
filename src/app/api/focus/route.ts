@@ -3,6 +3,9 @@ import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { loadFocus, parseTz, savePin, todayKey } from '@/lib/focusData';
 import { localDateKey } from '@/lib/timeSummary';
+import { addDays, weekDays } from '@/lib/weekPlan';
+
+const PLAN_HISTORY_DAYS = 14;
 
 export async function GET(request: Request) {
   const auth = requireAuth();
@@ -13,7 +16,7 @@ export async function GET(request: Request) {
     const tz = parseTz(new URL(request.url).searchParams.get('tz'));
     const now = new Date();
     const today = todayKey(tz, now);
-    const [items, user, dueCards, recentReviews] = await Promise.all([
+    const [items, user, dueCards, recentReviews, entries] = await Promise.all([
       loadFocus(db, userId, tz, now),
       db.user.findUnique({ where: { id: userId }, select: { focusSetupAt: true } }),
       db.concept.count({
@@ -26,9 +29,11 @@ export async function GET(request: Request) {
         },
       }),
       db.reviewLog.findMany({ where: { userId, reviewedAt: { gte: new Date(now.getTime() - 36 * 3_600_000) } }, select: { reviewedAt: true } }),
+      db.planEntry.findMany({ where: { userId, day: { gte: addDays(today, -PLAN_HISTORY_DAYS) } }, select: { focusItemId: true, day: true, position: true } }),
     ]);
+    const plan = { today, days: weekDays(today), entries };
     const reviewedToday = recentReviews.some((r) => localDateKey(r.reviewedAt, tz) === today);
-    return NextResponse.json({ items, setupDone: !!user?.focusSetupAt, dueCards, reviewedToday });
+    return NextResponse.json({ items, setupDone: !!user?.focusSetupAt, dueCards, reviewedToday, plan });
   } catch (e) {
     console.error('Failed to load Focus:', e);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

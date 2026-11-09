@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { FocusKind, FocusView } from './focusData';
 import type { Ranked, Rhythm } from './focusQueue';
+import type { PlanCell, WeekPlan } from './weekPlan';
 
 export type FocusEntry = Ranked<FocusView>;
 export interface FocusTarget { kind: FocusKind; goalId?: string; topicId?: string; moduleId?: string }
@@ -24,6 +25,7 @@ export function useFocus() {
   const [loaded, setLoaded] = useState(false);
   const [dueCards, setDueCards] = useState(0);
   const [reviewedToday, setReviewedToday] = useState(false);
+  const [plan, setPlan] = useState<WeekPlan>({ today: '', days: [], entries: [] });
 
   const refresh = useCallback(async () => {
     const res = await fetch(`/api/focus?tz=${tz()}`).catch(() => null);
@@ -34,6 +36,7 @@ export function useFocus() {
         setSetupDone(!!data.setupDone);
         setDueCards(data.dueCards ?? 0);
         setReviewedToday(!!data.reviewedToday);
+        if (data.plan) setPlan(data.plan);
       }
     }
     setLoaded(true);
@@ -67,7 +70,11 @@ export function useFocus() {
   const renameGoal = useCallback(async (goalId: string, shortName: string) =>
     finishAndRedraw(await send(`/api/goals/${goalId}`, 'PATCH', { shortName })), [finishAndRedraw]);
 
-  return { items, setupDone, loaded, dueCards, reviewedToday, refresh, pin, unpin, update, act, finishSetup, renameGoal };
+  const savePlan = useCallback(async (cells: PlanCell[]) => finish(await send('/api/plan', 'PUT', { cells, tz: tz() })), [finish]);
+  const moveItem = useCallback(async (focusItemId: string, to: string, from?: string) =>
+    finish(await send('/api/plan/move', 'POST', { focusItemId, to, from, tz: tz() })), [finish]);
+
+  return { items, setupDone, loaded, dueCards, reviewedToday, plan, refresh, pin, unpin, update, act, finishSetup, renameGoal, savePlan, moveItem };
 }
 
 export type FocusApi = ReturnType<typeof useFocus>;

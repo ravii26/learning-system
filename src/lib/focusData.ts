@@ -40,6 +40,7 @@ export interface PathStep {
 const DAY_MS = 86_400_000;
 const WEEK_DAYS = 7;
 const DONE_HISTORY_DAYS = 30;
+const HISTORY_DAYS = 15;
 const MAX_TITLE = 200;
 const COUNTS_AS_SESSION_SECONDS = 5 * 60;
 const COUNTS_AS_DONE_SECONDS = 10 * 60;
@@ -83,6 +84,8 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
 
   const topicIds = Array.from(new Set(live.flatMap((r) => [r.topicId, ...(r.goal?.links.map((l) => l.topicId) ?? [])]).filter((id): id is string => !!id)));
   const weekAgo = new Date(now.getTime() - WEEK_DAYS * DAY_MS);
+  const weekAgoKey = localDateKey(weekAgo, tz);
+  const historyStart = new Date(now.getTime() - HISTORY_DAYS * DAY_MS);
   const [topics, modules, entries, lastStudied] = await Promise.all([
     db.topic.findMany({ where: { userId, id: { in: topicIds } }, select: { id: true, title: true, status: true, deletedAt: true } }),
     db.curriculumItem.findMany({
@@ -90,7 +93,7 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
       orderBy: { order: 'asc' },
       select: { topicId: true, legacyId: true, title: true, order: true, completed: true, completedAt: true, estimatedMinutes: true, kind: true },
     }),
-    db.studyTimeEntry.findMany({ where: { userId, topicId: { in: topicIds }, startedAt: { gte: weekAgo } }, select: { topicId: true, moduleId: true, seconds: true, startedAt: true } }),
+    db.studyTimeEntry.findMany({ where: { userId, topicId: { in: topicIds }, startedAt: { gte: historyStart } }, select: { topicId: true, moduleId: true, seconds: true, startedAt: true } }),
     db.studyTimeEntry.groupBy({ by: ['topicId'], where: { userId, topicId: { in: topicIds } }, _max: { startedAt: true } }),
   ]);
 
@@ -182,11 +185,16 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
       const key = localDateKey(e.startedAt, tz);
       secondsByDay.set(key, (secondsByDay.get(key) ?? 0) + e.seconds);
     }
-    const sessionDays = new Set(Array.from(secondsByDay.entries()).filter(([, s]) => s >= COUNTS_AS_SESSION_SECONDS).map(([k]) => k));
+    const sessionDays = new Set(Array.from(secondsByDay.entries()).filter(([k, s]) => k >= weekAgoKey && s >= COUNTS_AS_SESSION_SECONDS).map(([k]) => k));
     const manualDays = new Set(row.doneAt.map((d) => localDateKey(d, tz)));
     row.doneAt.filter((d) => d >= weekAgo).forEach((d) => sessionDays.add(localDateKey(d, tz)));
 
     const finishedLessonToday = modules.some((m) => inScope(m.topicId, m.legacyId) && m.completedAt && localDateKey(m.completedAt, tz) === today);
+    const doneDays = Array.from(new Set([
+      ...Array.from(secondsByDay.entries()).filter(([, s]) => s >= COUNTS_AS_DONE_SECONDS).map(([k]) => k),
+      ...Array.from(manualDays),
+      ...modules.filter((m) => inScope(m.topicId, m.legacyId) && m.completedAt).map((m) => localDateKey(m.completedAt as Date, tz)),
+    ]));
     const completedToday = !!row.completedAt;
     const doneToday = (secondsByDay.get(today) ?? 0) >= COUNTS_AS_DONE_SECONDS || finishedLessonToday || manualDays.has(today) || completedToday;
 
@@ -215,6 +223,7 @@ export async function loadFocus(db: Db, userId: string, tz: number, now: Date = 
       estimatedMinutes: next?.estimatedMinutes ?? null,
       lessonKind: next?.kind ?? null,
       canUndo: manualDays.has(today),
+      doneDays,
       position,
       steps,
       lessonsDone,

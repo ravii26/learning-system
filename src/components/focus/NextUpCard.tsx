@@ -2,7 +2,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { ButtonLink, Icon } from '@/components/ui';
-import { planToday, readTodaySize } from '@/lib/focusQueue';
+import { readTodaySize } from '@/lib/focusQueue';
+import { planDayView } from '@/lib/weekPlan';
 import type { FocusApi } from '@/lib/useFocus';
 
 /**
@@ -27,7 +28,7 @@ export default function NextUpCard({ focus, scrollTo = false }: { focus: FocusAp
 
   if (!ready || focus.items.length === 0) return null;
 
-  const { list, reviewOpen } = planToday(focus.items, readTodaySize(), 0, { due: focus.dueCards, reviewedToday: focus.reviewedToday });
+  const { list, reviewOpen } = planDayView(focus.items, focus.plan, { size: readTodaySize(), extra: 0, review: { due: focus.dueCards, reviewedToday: focus.reviewedToday } });
   const next = list[0];
   const title = reviewOpen ? `Review ${focus.dueCards} card${focus.dueCards === 1 ? '' : 's'}` : next ? next.nextStep ?? next.title : null;
   const context = !reviewOpen && next?.nextStep ? next.title : null;

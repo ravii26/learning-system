@@ -42,6 +42,8 @@ export interface FocusFacts {
   skippedToday: boolean;
   addedToday: boolean;
   finished: boolean;
+  /** Local days this was worked on, for telling what's still waiting. */
+  doneDays?: string[];
 }
 
 export type Ranked<T> = T & { tier: number; reason: string };
