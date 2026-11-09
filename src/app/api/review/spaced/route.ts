@@ -6,6 +6,11 @@ import { enumToLabel, MASTERY_ENUM_VALUES } from '@/lib/masteryLevel';
 import { mirrorConceptsToJson } from '@/lib/conceptSync';
 import { createMistakeRow, mirrorMistakesToJson } from '@/lib/mistakeSync';
 import { htmlToText } from '@/lib/htmlText';
+import { typicalCardSeconds } from '@/lib/pace';
+
+const RECENT_TIMED_CARDS = 50;
+// Longer than this means you walked away, which says nothing about the card.
+const MAX_CARD_MS = 10 * 60 * 1000;
 
 export async function GET() {
   const auth = requireAuth();
@@ -77,13 +82,15 @@ export async function GET() {
       nextReview: { gt: now },
       topic: { status: { not: 'dropped' }, deletedAt: null },
     };
-    const [upcomingCount, nextUp] = await Promise.all([
+    const [upcomingCount, nextUp, timedCards] = await Promise.all([
       db.concept.count({ where: upcomingWhere }),
       db.concept.findFirst({ where: upcomingWhere, orderBy: { nextReview: 'asc' }, select: { nextReview: true } }),
+      db.reviewLog.findMany({ where: { userId, durationMs: { not: null } }, orderBy: { reviewedAt: 'desc' }, take: RECENT_TIMED_CARDS, select: { durationMs: true } }),
     ]);
 
     return NextResponse.json({
       dueConcepts,
+      typicalCardSeconds: typicalCardSeconds(timedCards.map((c) => c.durationMs as number)),
       upcoming: { count: upcomingCount, nextAt: nextUp?.nextReview?.toISOString() ?? null },
     });
   } catch (e) {
@@ -168,6 +175,8 @@ export async function POST(request: Request) {
 
     const conceptId_ = concept.id;
     const topicId_ = concept.topicId;
+    const elapsedMs = Number(body.durationMs);
+    const durationMs = Number.isFinite(elapsedMs) && elapsedMs > 0 && elapsedMs <= MAX_CARD_MS ? Math.round(elapsedMs) : null;
 
     await db.$transaction(async (tx) => {
       await tx.concept.update({
@@ -200,6 +209,7 @@ export async function POST(request: Request) {
           elapsedDays: result.elapsedDays,
           scheduledDays: result.scheduledDays,
           nextReview: result.nextReview,
+          durationMs,
         },
       });
 

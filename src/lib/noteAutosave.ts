@@ -17,6 +17,16 @@ async function writeNote(key: string | undefined, revision: object, save: () => 
   finally { if (writes.get(key) === current) writes.delete(key); }
 }
 
+/** Runs `work` after every write already queued for this note, and holds later writes until it ends. */
+export function queueNoteWork<T>(key: string, work: () => Promise<T>): Promise<T> {
+  const previous = writes.get(key) ?? Promise.resolve();
+  const result = previous.catch(() => {}).then(work);
+  const current = result.then(() => {}, () => {});
+  writes.set(key, current);
+  void current.then(() => { if (writes.get(key) === current) writes.delete(key); });
+  return result;
+}
+
 /** Serialize writes so a slow older request cannot overwrite newer notes. */
 export function createNoteAutosave(save: (html: string) => void | Promise<void>, status: (state: SaveStatus) => void, delay: number, key?: string) {
   let pending: { html: string; revision: object } | undefined;

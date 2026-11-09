@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/ui';
-import { renderMarkdown } from '@/lib/markdown';
+import { MarkdownProse } from '@/components/MarkdownProse';
 import type { SessionContent, SessionRating, SessionStep } from '@/lib/program/sessions';
 import type { CheckResult } from '@/lib/program/exerciseCheck';
 import { Exercise } from './LessonPractice';
@@ -213,7 +213,7 @@ function Today({ session, topicTitle, onFinish }: {
   return (
     <article className="flex flex-col gap-8">
       <header className="flex flex-col gap-2">
-        <span className="text-[0.85rem] font-semibold uppercase tracking-wide text-fg-muted">Today · Day {session.day} · about {session.minutes} min</span>
+        <span className="text-[0.85rem] font-semibold uppercase tracking-wide text-fg-muted">Today · Day {session.day} · est. {session.minutes} min</span>
         <h2 className="m-0 font-serif text-[2.2rem] font-medium leading-[1.1] tracking-[-0.02em]">{session.title}</h2>
         {c.goal && <p className="m-0 text-[1.05rem] leading-relaxed text-fg-secondary">{c.goal}</p>}
       </header>
@@ -228,7 +228,7 @@ function Today({ session, topicTitle, onFinish }: {
               </div>
               <h3 className="m-0 text-[1.15rem] font-semibold">{st.title}</h3>
               {st.target && <p className="m-0 text-[0.92rem]"><span className="text-fg-muted">Target: </span>{st.target}</p>}
-              {st.instructions && <div className="lesson-prose text-[1rem]" dangerouslySetInnerHTML={{ __html: renderMarkdown(st.instructions) }} />}
+              {st.instructions && <MarkdownProse className="lesson-prose text-[1rem]" markdown={st.instructions} />}
 
               {answerable ? (
                 <ol className="m-0 flex list-none flex-col gap-5 p-0">
@@ -295,8 +295,8 @@ function StepItems({ items }: { items: SessionStep['items'] }) {
       <ol className="m-0 flex flex-col gap-2.5 pl-6">
         {items.map((it, j) => (
           <li key={j} className="text-[1rem] leading-relaxed">
-            <div className="lesson-prose" dangerouslySetInnerHTML={{ __html: renderMarkdown(it.text) }} />
-            {show && it.answer && <div className="lesson-prose mt-1 text-[0.95rem] text-fg-secondary" dangerouslySetInnerHTML={{ __html: renderMarkdown(`→ ${it.answer}`) }} />}
+            <MarkdownProse className="lesson-prose" markdown={it.text} />
+            {show && it.answer && <MarkdownProse className="lesson-prose mt-1 text-[0.95rem] text-fg-secondary" markdown={`→ ${it.answer}`} />}
           </li>
         ))}
       </ol>

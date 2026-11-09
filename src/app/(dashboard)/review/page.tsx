@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useStudyTimer } from '@/lib/useStudyTimer';
 import { Button, ButtonLink } from '@/components/ui';
 import ResurfacedNote from '@/components/ResurfacedNote';
+import { reviewMinutes } from '@/lib/pace';
 
 const SPRINT_GRADES = [
   { grade: 'Again', key: '1', label: 'Forgot', hint: 'comes back soon' },
@@ -83,9 +84,16 @@ export default function ReviewPage() {
   // One natural stopping point: once the slipping cards are done.
   const [pauseAfterSlipping, setPauseAfterSlipping] = useState(false);
   const [slippingDismissed, setSlippingDismissed] = useState(false);
+  const [cardSeconds, setCardSeconds] = useState<number | null>(null);
 
   // Focus mode tab: 'spaced_sprint' | 'weekly_audit' | 'pomodoro'
   const [activeTab, setActiveTab] = useState<'spaced_sprint' | 'weekly_audit' | 'pomodoro'>('spaced_sprint');
+
+  // Each card's clock starts when it appears.
+  const cardShownAt = React.useRef(Date.now());
+  useEffect(() => {
+    cardShownAt.current = Date.now();
+  }, [currentConceptIdx, dueConcepts.length, pauseAfterSlipping, activeTab]);
   
   // Timer Hook
   const { secondsRemaining, isActive, mode, formattedTime, startTimer, pauseTimer, resetTimer, isCompleted } = useStudyTimer();
@@ -129,6 +137,7 @@ export default function ReviewPage() {
         // within each group.
         setDueConcepts([...list.filter((c) => c.lastRecalledAt), ...list.filter((c) => !c.lastRecalledAt)]);
         setUpcoming(spacedData.upcoming ?? null);
+        setCardSeconds(spacedData.typicalCardSeconds ?? null);
       }
     } catch (e) {
       console.error(e);
@@ -155,6 +164,7 @@ export default function ReviewPage() {
           topicId: concept.topicId,
           conceptId: concept.conceptId,
           grade,
+          durationMs: Date.now() - cardShownAt.current,
         }),
       });
 
@@ -398,7 +408,7 @@ export default function ReviewPage() {
                 The {slippingTotal} slipping card{slippingTotal === 1 ? ' is' : 's are'} safe again.
               </h2>
               <p className="m-0 max-w-[560px] text-[1.05rem] text-fg-secondary">
-                {remainingAfterSlipping} more {remainingAfterSlipping === 1 ? 'is' : 'are'} due, about {Math.max(1, Math.ceil(remainingAfterSlipping * 0.7))} min. You can also stop here — nothing else is slipping today.
+                {remainingAfterSlipping} more {remainingAfterSlipping === 1 ? 'is' : 'are'} due, about {reviewMinutes(remainingAfterSlipping, cardSeconds)} min. You can also stop here — nothing else is slipping today.
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button variant="primary" size="lg" onClick={() => { setPauseAfterSlipping(false); setSlippingDismissed(true); }}>

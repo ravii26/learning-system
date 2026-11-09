@@ -225,7 +225,7 @@ export default function LearnSomethingNewPage() {
             <h2 id="road-h" className="m-0 text-[1.15rem] font-semibold">Your roadmap</h2>
             {modules && (
               <span className="text-[0.9rem] text-fg-secondary">
-                {chosen.length} modules · about {Math.round(minutes / 6) / 10} hours · {weeks} week{weeks === 1 ? '' : 's'} at 30 min a day
+                {chosen.length} modules · est. {Math.round(minutes / 6) / 10} hours · {weeks} week{weeks === 1 ? '' : 's'} at 30 min a day
               </span>
             )}
           </div>
@@ -250,7 +250,7 @@ export default function LearnSomethingNewPage() {
                         className="h-5 w-5 shrink-0 accent-[var(--ink)]"
                       />
                       <span className={`flex-1 text-[1rem] ${m.on ? 'text-fg' : 'text-fg-muted line-through'}`}>{m.title}</span>
-                      <span className="w-16 text-right text-[0.85rem] text-fg-muted">{m.estimatedMinutes} min</span>
+                      <span className="w-20 text-right text-[0.85rem] text-fg-muted">est. {m.estimatedMinutes} min</span>
                     </label>
                   </li>
                 ))}

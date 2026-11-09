@@ -9,6 +9,7 @@ import { Icon, KnowledgeStrip } from '@/components/ui';
 import type { Knowledge } from '@/lib/moduleState';
 import type { ProgramView } from '@/lib/program/load';
 import ProgramPanel from './ProgramPanel';
+import GoalForecastCard from './GoalForecastCard';
 import CustomDialog, { type CustomDialogConfig } from '@/components/CustomDialog';
 import { GOAL_STATUSES, GOAL_STATUS_EFFECT, GOAL_STATUS_WORD, type GoalStatusName } from '@/lib/goalStatusWords';
 import { VALID_AREAS } from '@/lib/validations/topic';
@@ -220,6 +221,8 @@ export default function GoalDetailPage() {
           )}
         </div>
       </header>
+
+      <GoalForecastCard goalId={params.id} onDeadlineChanged={fetchGoal} />
 
       {program ? <ProgramPanel view={program} goalId={params.id} onPlanChanged={fetchGoal} /> : (<>
       <section aria-labelledby="ready-h" className="glass-panel flex flex-col gap-4 p-7">
