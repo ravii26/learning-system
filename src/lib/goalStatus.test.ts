@@ -1,5 +1,33 @@
-import { describe, expect, it } from 'vitest';
-import { planGoalTransition, targetStatus, type GoalTopic } from './goalStatus';
+import { describe, expect, it, vi } from 'vitest';
+import type { GoalStatus } from '@prisma/client';
+import { applyGoalStatus, planGoalTransition, targetStatus, type GoalTopic } from './goalStatus';
+
+describe('applyGoalStatus and your Focus', () => {
+  const linked = (id: string, otherGoalStatus?: string) => ({
+    topic: { id, status: 'active', mode: 'syllabus', startedDate: null, progressPct: 10, goalLinks: otherGoalStatus ? [{ goal: { status: otherGoalStatus } }] : [] },
+  });
+  const run = async (to: GoalStatus) => {
+    const deleteMany = vi.fn().mockResolvedValue({ count: 1 });
+    const tx = {
+      goal: { findFirst: vi.fn().mockResolvedValue({ topicStatusBefore: null }), update: vi.fn().mockResolvedValue({}) },
+      goalLink: { findMany: vi.fn().mockResolvedValue([linked('mine'), linked('shared', 'active')]) },
+      topic: { count: vi.fn().mockResolvedValue(0), update: vi.fn().mockResolvedValue({}) },
+      activityLog: { create: vi.fn().mockResolvedValue({}) },
+      focusItem: { deleteMany },
+    };
+    await applyGoalStatus(tx as never, 'u1', 'g1', to);
+    return deleteMany;
+  };
+
+  it.each<GoalStatus>(['paused', 'abandoned'])('%s takes the goal and its own topics off the list', async (to) => {
+    const deleteMany = await run(to);
+    expect(deleteMany).toHaveBeenCalledWith({ where: { userId: 'u1', OR: [{ goalId: 'g1' }, { kind: { in: ['topic', 'lesson'] }, topicId: { in: ['mine'] } }] } });
+  });
+
+  it.each<GoalStatus>(['active', 'draft', 'achieved'])('%s leaves the list alone', async (to) => {
+    expect(await run(to)).not.toHaveBeenCalled();
+  });
+});
 
 const topic = (id: string, status: string, extra: Partial<GoalTopic> = {}): GoalTopic => ({
   id, status, mode: 'syllabus', started: status !== 'inbox', heldByOtherGoal: false, ...extra,
