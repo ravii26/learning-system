@@ -62,7 +62,7 @@ export default function TodayQueue({ focus, dueCards, reviewMinutes, pace, weekl
   const act = (id: string, action: FocusAction) => run(() => focus.act(id, action));
   const moveTo = (id: string, to: string, from?: string) => run(() => focus.moveItem(id, to, from));
   const drop = async (item: FocusEntry) => {
-    const sure = await confirmDialog({ title: `Drop ${item.title}?`, message: 'It leaves your Focus and your plan. Goals and lessons are kept, under Not now.', confirmLabel: 'Drop', danger: true });
+    const sure = await confirmDialog({ title: `Drop ${item.title}?`, message: 'It leaves your Focus and your plan. Goals and lessons are kept, under Later.', confirmLabel: 'Drop', danger: true });
     if (sure) void run(() => focus.unpin(item.id));
   };
   const acceptDraft = () => run(() => focus.savePlan(suggestWeek(focus.items, editable, perDayFor(size))));

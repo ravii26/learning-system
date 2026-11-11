@@ -86,7 +86,7 @@ export default function FocusSetup({ focus, topics }: { focus: FocusApi; topics:
     <section aria-labelledby="setup-h" className="glass-panel flex flex-col gap-4 p-7">
       <div className="flex flex-col gap-1.5">
         <h2 id="setup-h" className="m-0 font-serif text-[1.8rem] font-medium leading-tight">What matters right now?</h2>
-        <p className="m-0 text-[0.95rem] text-fg-secondary">Pick what you’re working on and how often it should come up. Today’s list will be made from these. Everything else waits under Not now, and nothing is deleted.</p>
+        <p className="m-0 text-[0.95rem] text-fg-secondary">Pick what you’re working on and how often it should come up. Today’s list will be made from these. Everything else waits under Later, and nothing is deleted.</p>
       </div>
       <ul className="m-0 flex max-h-[420px] list-none flex-col overflow-y-auto p-0">
         {rows.map((r) => (

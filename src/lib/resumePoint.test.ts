@@ -1,5 +1,43 @@
 import { describe, expect, it } from 'vitest';
-import { deadlineLabel, lastTouch, learnList, pickTopic, progressLabel, resumeLesson, whenLabel, type LessonFacts } from './resumePoint';
+import { deadlineLabel, lastTouch, learnList, learnSummary, nearbySteps, pickTopic, progressLabel, resumeLesson, whenLabel, type LessonFacts } from './resumePoint';
+
+describe('nearbySteps', () => {
+  const path = (states: string[]) => states.map((state, id) => ({ id, state }));
+  const ids = (steps: Array<{ id: number }>) => steps.map((s) => s.id);
+
+  it('keeps a short path whole', () => {
+    expect(ids(nearbySteps(path(['done', 'current']), 5))).toEqual([0, 1]);
+  });
+
+  it('starts one step before where you are', () => {
+    expect(ids(nearbySteps(path(['done', 'done', 'done', 'current', 'todo', 'todo', 'todo', 'todo']), 3))).toEqual([2, 3, 4]);
+  });
+
+  it('stays inside the path near the end', () => {
+    expect(ids(nearbySteps(path(['done', 'done', 'done', 'done', 'current']), 3))).toEqual([2, 3, 4]);
+  });
+
+  it('falls back to the first unfinished step, then the end', () => {
+    expect(ids(nearbySteps(path(['done', 'done', 'todo', 'todo', 'todo']), 2))).toEqual([1, 2]);
+    expect(ids(nearbySteps(path(['done', 'done', 'done', 'done']), 2))).toEqual([2, 3]);
+  });
+});
+
+describe('learnSummary', () => {
+  const item = (kind: string, lessonsDone = 0, lessonsTotal = 0, finished = false) => ({ kind, lessonsDone, lessonsTotal, finished });
+
+  it('counts goals, topics and lessons', () => {
+    expect(learnSummary([item('goal', 3, 10), item('goal', 1, 2), item('topic', 2, 8)])).toBe('2 goals and 1 topic in progress, 6 of 20 lessons done');
+  });
+
+  it('leaves out finished things, habits and empty lesson counts', () => {
+    expect(learnSummary([item('topic'), item('custom'), item('goal', 5, 5, true)])).toBe('1 topic in progress');
+  });
+
+  it('says nothing when nothing is in progress', () => {
+    expect(learnSummary([item('custom')])).toBeNull();
+  });
+});
 
 const at = (day: number) => new Date(2026, 10, day, 12);
 const lesson = (legacyId: string, completedDay?: number): LessonFacts => ({ legacyId, completed: completedDay !== undefined, completedAt: completedDay !== undefined ? at(completedDay) : null });
