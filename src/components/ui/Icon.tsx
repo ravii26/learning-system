@@ -24,6 +24,7 @@ const PATHS = {
   arrowRight: 'M5 12h14M13 6l6 6-6 6',
   arrowLeft: 'M19 12H5M11 18l-6-6 6-6',
   chevronRight: 'M9 6l6 6-6 6',
+  more: 'M5 12h.01M12 12h.01M19 12h.01',
   mic: 'M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3M5 11a7 7 0 0 0 14 0M12 18v3',
   inbox: 'M4 13l2.5-7h11L20 13v6H4v-6M4 13h5l1 2h4l1-2h5',
   target: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8M12 11.5a.5.5 0 1 0 0 1a.5.5 0 1 0 0-1',

@@ -39,6 +39,22 @@ export function RhythmPicker({ focus, item, className = 'h-9' }: { focus: FocusA
   );
 }
 
+/** Moves something onto Learn's "Learning now". */
+export function StartNow({ focus, target, label = 'Start now' }: { focus: FocusApi; target: FocusTarget; label?: string }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const start = async () => {
+    setBusy(true);
+    if (!(await focus.pin({ ...target, rhythm: 'few_weekly' }))) toast.error('Couldn’t start that.');
+    setBusy(false);
+  };
+  return (
+    <button type="button" onClick={() => void start()} disabled={busy} className="h-9 shrink-0 whitespace-nowrap rounded-lg border border-line bg-surface px-3 text-[0.85rem] font-medium text-fg-secondary hover:border-line-hover hover:text-fg disabled:opacity-50">
+      {label}
+    </button>
+  );
+}
+
 /** Pin anything to Focus from wherever you are, or change or remove the pin. */
 export default function PinControl({ focus, target, label = 'Pin to Focus' }: { focus: FocusApi; target: FocusTarget; label?: string }) {
   const toast = useToast();

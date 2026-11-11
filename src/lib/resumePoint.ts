@@ -117,6 +117,33 @@ interface LearnItem {
 export const canLead = (item: Pick<LearnItem, 'kind' | 'finished' | 'doneToday'>) =>
   !item.finished && !(item.kind === 'custom' && item.doneToday);
 
+/** How many steps a Learn card shows before "Show all". */
+export const STEPS_SHOWN = 5;
+
+/** The part of a long path worth seeing: the step you're on, with the one before it. */
+export function nearbySteps<T extends { state: string }>(steps: T[], limit: number = STEPS_SHOWN): T[] {
+  if (steps.length <= limit) return steps;
+  const current = steps.findIndex((s) => s.state === 'current');
+  const firstLeft = steps.findIndex((s) => s.state !== 'done');
+  const place = current >= 0 ? current : firstLeft >= 0 ? firstLeft : steps.length - 1;
+  const start = Math.max(0, Math.min(place - 1, steps.length - limit));
+  return steps.slice(start, start + limit);
+}
+
+const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`;
+
+/** "2 goals and 1 topic in progress, 47 of 92 lessons done". */
+export function learnSummary(items: Array<{ kind: string; finished: boolean; lessonsDone: number; lessonsTotal: number }>): string | null {
+  const active = items.filter((i) => !i.finished && (i.kind === 'goal' || i.kind === 'topic'));
+  if (active.length === 0) return null;
+  const goals = active.filter((i) => i.kind === 'goal').length;
+  const topics = active.length - goals;
+  const names = [goals ? count(goals, 'goal') : null, topics ? count(topics, 'topic') : null].filter(Boolean).join(' and ');
+  const done = active.reduce((sum, i) => sum + i.lessonsDone, 0);
+  const total = active.reduce((sum, i) => sum + i.lessonsTotal, 0);
+  return `${names} in progress${total > 0 ? `, ${done} of ${total} lessons done` : ''}`;
+}
+
 /** One entry per thing, most recently studied first and finished things last. */
 export function learnList<T extends LearnItem>(items: T[]): T[] {
   const insideGoals = new Set(items.filter((i) => i.kind === 'goal').flatMap((i) => i.steps.map((s) => s.id)));
