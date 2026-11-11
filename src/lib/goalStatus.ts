@@ -19,7 +19,13 @@ type Tx = PrismaClient | Prisma.TransactionClient;
  * Leaving `active` saves each moved topic's status ({ before, set }), so
  * coming back restores it — but only for topics still where the goal put
  * them; anything you moved by hand since then is yours and stays put.
+ *
+ * Pausing or letting go also takes the goal off Learning now and Today, along
+ * with any of its topics you pinned on their own. Coming back doesn't re-pin:
+ * the goal waits under Later until you start it.
  */
+
+const LEAVES_FOCUS: ReadonlySet<GoalStatus> = new Set<GoalStatus>(['paused', 'abandoned']);
 
 export interface GoalTopic {
   id: string;
@@ -145,6 +151,10 @@ export async function applyGoalStatus(tx: Tx, userId: string, goalId: string, to
     where: { id: goalId },
     data: { topicStatusBefore: plan.snapshot ?? Prisma.DbNull },
   });
+  if (LEAVES_FOCUS.has(to)) {
+    const ownTopics = topics.filter((t) => !t.heldByOtherGoal).map((t) => t.id);
+    await tx.focusItem.deleteMany({ where: { userId, OR: [{ goalId }, { kind: { in: ['topic', 'lesson'] }, topicId: { in: ownTopics } }] } });
+  }
   return plan.updates.length;
 }
 

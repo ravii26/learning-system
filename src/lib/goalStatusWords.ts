@@ -19,7 +19,7 @@ export const GOAL_STATUS_WORD: Record<GoalStatusName, string> = {
 export const GOAL_STATUS_EFFECT: Record<GoalStatusName, string> = {
   draft: 'Its topics wait in your Inbox until you start.',
   active: 'Its topics go back to where they were.',
-  paused: 'Its topics rest: they leave Now and Next and daily practice stops. Review of what you learned keeps going.',
+  paused: 'Its topics rest: they leave Now and Next and daily practice stops. Review of what you learned keeps going. The goal leaves Learning now and Today, and waits under Later.',
   achieved: 'What you studied is kept fresh by review. Topics you never started are filed as Reference.',
-  abandoned: 'Its topics are archived and their review cards stop. You can bring it back later.',
+  abandoned: 'Its topics are archived and their review cards stop. The goal leaves Learning now and Today. You can bring it back later.',
 };

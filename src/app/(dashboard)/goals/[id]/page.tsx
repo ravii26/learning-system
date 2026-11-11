@@ -130,7 +130,9 @@ export default function GoalDetailPage() {
         const r = await res.json();
         const n = body.area ? r.topicsRetyped : r.topicsMoved;
         toast.success(n > 0 ? `Goal updated · ${n} topic${n === 1 ? '' : 's'} ${body.area ? 'changed to ' + body.area : 'moved'}` : 'Goal updated');
-        await fetchGoal();
+        await Promise.all([fetchGoal(), focus.refresh()]);
+        // The sidebar lists your Focus and is drawn on the server.
+        router.refresh();
       } else {
         toast.error('Failed to update goal');
       }
