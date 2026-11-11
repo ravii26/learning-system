@@ -810,7 +810,9 @@ export default function ModuleStudyRoom({
             )}
 
             {activeTab === 'practice' && exercises.length > 0 && (
-              <LessonPractice key={module.id} exercises={exercises} subject={`${topicTitle}: ${module.title}`} onDone={() => setActiveTab(checkTab)}
+              // Not plain module.id: LessonAssistant below is a sibling with that key, and two
+              // siblings sharing a key leave this section on the page after a tab change.
+              <LessonPractice key={`practice-${module.id}`} exercises={exercises} subject={`${topicTitle}: ${module.title}`} onDone={() => setActiveTab(checkTab)}
                 saved={lesson?.practice} onWork={(p) => setLesson((l: any) => (l ? { ...l, practice: p } : l))} saveUrl={`/api/topics/${topicId}/modules/${encodeURIComponent(module.id)}/practice`} />
             )}
 
