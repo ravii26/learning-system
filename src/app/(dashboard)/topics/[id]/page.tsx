@@ -303,16 +303,24 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
   };
 
   // Save Curriculum to Backend
-  const handleSaveCurriculum = async (updated: CourseModule[]) => {
+  // Returns whether the server stored it. On failure the page goes back to
+  // what it had, so it never shows a change that a reload would undo.
+  const handleSaveCurriculum = async (updated: CourseModule[]): Promise<boolean> => {
+    const previous = curriculum;
     setCurriculum(updated);
     try {
-      await fetch(`/api/topics/${params.id}`, {
+      const res = await fetch(`/api/topics/${params.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ curriculum: updated }),
       });
+      if (!res.ok) throw new Error(`save failed (${res.status})`);
+      return true;
     } catch (e) {
       console.error('Failed to save curriculum:', e);
+      setCurriculum(previous);
+      toast.error('Couldn’t save that change. Try again.');
+      return false;
     }
   };
 
@@ -363,12 +371,11 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
       setFinishing(true);
       await tracker.flushNow();
     }
-    await handleSaveCurriculum(updated);
+    const saved = await handleSaveCurriculum(updated);
+    if (nowCompleting) setFinishing(false);
+    if (!saved) return;
     void pace.refresh();
-    if (nowCompleting) {
-      setFinishing(false);
-      setJustFinished(true);
-    }
+    if (nowCompleting) setJustFinished(true);
 
     // Finishing a module turns its lesson into Daily Review cards, so it
     // comes back before you forget it.
@@ -401,7 +408,7 @@ export default function TopicStudyRoomPage({ params }: { params: { id: string } 
       .map((m) => ({ ...m, title: m.title.trim(), estimatedMinutes: Math.min(240, Math.max(5, Math.round(Number(m.estimatedMinutes) || 30))) }))
       .filter((m) => m.title)
       .map((m, i) => ({ ...m, order: i + 1 }));
-    await handleSaveCurriculum(cleaned);
+    if (!(await handleSaveCurriculum(cleaned))) return;
     if (activeModuleId && !cleaned.some((m) => m.id === activeModuleId)) {
       setActiveModuleId(cleaned[0]?.id ?? null);
     }

@@ -33,27 +33,40 @@ export async function POST(request: Request) {
     const topic = await db.topic.findFirst({ where: { id: topicId, userId, deletedAt: null }, select: { id: true } });
     if (!topic) return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
 
-    const existing = await db.studyTimeEntry.findUnique({ where: { userId_clientSessionId: { userId, clientSessionId } } });
-    if (existing) {
+    const key = { userId_clientSessionId: { userId, clientSessionId } };
+    const growExisting = async () => {
+      const existing = await db.studyTimeEntry.findUnique({ where: key });
+      if (!existing) return null;
       if (secs > existing.seconds) {
         await db.studyTimeEntry.update({ where: { id: existing.id }, data: { seconds: secs } });
       }
       return NextResponse.json({ id: existing.id, seconds: Math.max(secs, existing.seconds) });
-    }
+    };
+    const grown = await growExisting();
+    if (grown) return grown;
     if (secs === 0) return NextResponse.json({ id: null, seconds: 0 }); // nothing worth a row yet
 
-    const created = await db.studyTimeEntry.create({
-      data: {
-        userId,
-        topicId,
-        moduleId: typeof moduleId === 'string' && moduleId ? moduleId : null,
-        startedAt: start,
-        seconds: secs,
-        source: 'auto',
-        clientSessionId,
-      },
-    });
-    return NextResponse.json({ id: created.id, seconds: created.seconds });
+    try {
+      const created = await db.studyTimeEntry.create({
+        data: {
+          userId,
+          topicId,
+          moduleId: typeof moduleId === 'string' && moduleId ? moduleId : null,
+          startedAt: start,
+          seconds: secs,
+          source: 'auto',
+          clientSessionId,
+        },
+      });
+      return NextResponse.json({ id: created.id, seconds: created.seconds });
+    } catch (e) {
+      // Two heartbeats for a new session raced and the other created the
+      // row first: treat this one as an update.
+      if ((e as { code?: string }).code !== 'P2002') throw e;
+      const after = await growExisting();
+      if (after) return after;
+      throw e;
+    }
   } catch (e) {
     console.error('Time heartbeat failed:', e);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

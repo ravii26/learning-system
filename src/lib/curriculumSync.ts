@@ -97,6 +97,19 @@ export function planCurriculumSync(activeLegacyIds: string[], incoming: Array<Pa
   return { upserts, removeLegacyIds: activeLegacyIds.filter((id) => !seen.has(id)) };
 }
 
+/** Pure: would writing `data` change this active row? Notes are ignored (set on create only). */
+export function curriculumRowChanged(
+  row: Pick<CurriculumRowLike, 'order' | 'title' | 'estimatedMinutes' | 'completed' | 'completedAt' | 'kind' | 'blueprint'>,
+  data: ReturnType<typeof curriculumJsonToRowData>
+): boolean {
+  if (row.order !== data.order || row.title !== data.title || row.estimatedMinutes !== data.estimatedMinutes) return true;
+  if (row.completed !== data.completed) return true;
+  if ((row.completedAt?.getTime() ?? null) !== (data.completedAt?.getTime() ?? null)) return true;
+  if ('kind' in data && data.kind !== row.kind) return true;
+  if ('blueprint' in data && JSON.stringify(data.blueprint) !== JSON.stringify(normalizeBlueprint(row.blueprint))) return true;
+  return false;
+}
+
 export async function mirrorCurriculumToJson(db: DbClient, topicId: string): Promise<CurriculumJson[]> {
   const rows = await db.curriculumItem.findMany({
     where: { topicId, removed: false },
@@ -111,10 +124,19 @@ export async function syncCurriculumFromJson(
   topicId: string,
   incoming: Array<Partial<CurriculumJson>>
 ): Promise<CurriculumJson[]> {
-  const active = await db.curriculumItem.findMany({ where: { topicId, removed: false }, select: { legacyId: true } });
+  const active = await db.curriculumItem.findMany({
+    where: { topicId, removed: false },
+    select: { legacyId: true, order: true, title: true, estimatedMinutes: true, completed: true, completedAt: true, kind: true, blueprint: true },
+  });
   const plan = planCurriculumSync(active.map((r) => r.legacyId), incoming);
+  const byLegacyId = new Map(active.map((r) => [r.legacyId, r]));
 
   for (const { legacyId, data } of plan.upserts) {
+    // The page re-sends the whole syllabus to tick one module. Writing only
+    // the rows that changed keeps that to one query instead of one per
+    // module, so the transaction finishes well inside its time limit.
+    const current = byLegacyId.get(legacyId);
+    if (current && !curriculumRowChanged(current, data)) continue;
     // Notes are only set on create. After that they belong to the module
     // notes route: the topic page re-sends the whole syllabus whenever a
     // module is ticked or reordered, and its copy of a note can be seconds

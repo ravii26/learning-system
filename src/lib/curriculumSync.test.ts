@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { planCurriculumSync, curriculumJsonToRowData, curriculumRowToJson } from './curriculumSync';
+import { planCurriculumSync, curriculumJsonToRowData, curriculumRowToJson, curriculumRowChanged } from './curriculumSync';
 
 const mod = (id: string, extra: Record<string, unknown> = {}) => ({
   id, order: 1, title: `Module ${id}`, estimatedMinutes: 30, completed: false, completedAt: null, notes: '', ...extra,
@@ -84,5 +84,26 @@ describe('curriculum mapping', () => {
 
   it('never stores an empty title', () => {
     expect(curriculumJsonToRowData({ title: '   ' }, 1).title).toBe('Untitled module');
+  });
+});
+
+describe('curriculumRowChanged', () => {
+  const row = { order: 1, title: 'Intro', estimatedMinutes: 30, completed: false, completedAt: null, kind: 'concept', blueprint: null };
+
+  it('skips a row the syllabus sends back unchanged', () => {
+    expect(curriculumRowChanged(row, curriculumJsonToRowData({ id: 'a', order: 1, title: 'Intro', estimatedMinutes: 30, completed: false, completedAt: null, notes: 'stale' }, 1))).toBe(false);
+  });
+
+  it('writes a module that was just ticked', () => {
+    const data = curriculumJsonToRowData({ id: 'a', order: 1, title: 'Intro', estimatedMinutes: 30, completed: true, completedAt: '2026-11-15T10:00:00.000Z', notes: '' }, 1);
+    expect(curriculumRowChanged(row, data)).toBe(true);
+    expect(curriculumRowChanged({ ...row, completed: true, completedAt: new Date('2026-11-15T10:00:00.000Z') }, data)).toBe(false);
+  });
+
+  it('writes reorders, renames and kind changes', () => {
+    const base = { id: 'a', order: 1, title: 'Intro', estimatedMinutes: 30, completed: false, completedAt: null, notes: '' };
+    expect(curriculumRowChanged(row, curriculumJsonToRowData({ ...base, order: 2 }, 1))).toBe(true);
+    expect(curriculumRowChanged(row, curriculumJsonToRowData({ ...base, title: 'Basics' }, 1))).toBe(true);
+    expect(curriculumRowChanged(row, curriculumJsonToRowData({ ...base, kind: 'drill' as const }, 1))).toBe(true);
   });
 });
