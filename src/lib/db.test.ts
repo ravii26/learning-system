@@ -17,6 +17,11 @@ describe('runtimeDatabaseUrl', () => {
     expect(runtimeDatabaseUrl(undefined, true)).toBeUndefined();
   });
 
+  it('gives pooled (Neon -pooler) hosts more connections', () => {
+    const pooled = 'postgres://u:p@ep-x-123-pooler.ap-southeast-1.aws.neon.tech/db?sslmode=require';
+    expect(new URL(runtimeDatabaseUrl(pooled, true)!).searchParams.get('connection_limit')).toBe('5');
+  });
+
   it('respects an explicit limit', () => {
     expect(new URL(runtimeDatabaseUrl(raw, true, '3')!).searchParams.get('connection_limit')).toBe('3');
     expect(new URL(runtimeDatabaseUrl(raw + '&connection_limit=5', true)!).searchParams.get('connection_limit')).toBe('5');
